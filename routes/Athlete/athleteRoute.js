@@ -303,4 +303,77 @@ router.delete('/:id', verifyFirebaseToken, async (req, res) => {
   }
 });
 
+/**
+ * Find Athlete Only (for signin)
+ * POST /api/athlete/find
+ * Only finds existing athletes - no creation
+ */
+router.post('/find', verifyFirebaseToken, async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { firebaseId, email } = req.body;
+    
+    console.log('🔍 ATHLETE FIND: ===== ATHLETE LOOKUP (VERIFIED) =====');
+    console.log('🔍 ATHLETE FIND: Firebase ID:', firebaseId);
+    console.log('🔍 ATHLETE FIND: Email:', email);
+    console.log('✅ ATHLETE FIND: Firebase token verified successfully!');
+    
+    if (!firebaseId || !email) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Missing required fields',
+        required: ['firebaseId', 'email']
+      });
+    }
+    
+    // 1. Find existing Athlete by firebaseId first
+    let athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+    
+    if (athlete) {
+      console.log('✅ ATHLETE FIND: Found by Firebase ID:', athlete.id);
+      return res.json({
+        success: true,
+        message: 'Athlete found by Firebase ID',
+        athleteId: athlete.id,
+        data: athlete
+      });
+    }
+    
+    // 2. Find by email (but don't link Firebase ID)
+    athlete = await prisma.athlete.findFirst({
+      where: { email }
+    });
+    
+    if (athlete) {
+      console.log('✅ ATHLETE FIND: Found by email:', athlete.id);
+      return res.json({
+        success: true,
+        message: 'Athlete found by email',
+        athleteId: athlete.id,
+        data: athlete
+      });
+    }
+    
+    // 3. NO USER FOUND - Send to signup
+    console.log('❌ ATHLETE FIND: No athlete found - redirect to signup');
+    return res.status(404).json({
+      success: false,
+      error: 'User not found',
+      message: 'No existing athlete found. Please sign up first.',
+      code: 'USER_NOT_FOUND',
+      redirectTo: '/signup'
+    });
+    
+  } catch (error) {
+    console.error('❌ ATHLETE FIND: Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database error',
+      message: error.message
+    });
+  }
+});
+
 export default router;
