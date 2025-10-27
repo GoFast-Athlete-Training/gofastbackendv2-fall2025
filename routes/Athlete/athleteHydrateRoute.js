@@ -14,7 +14,7 @@ const router = express.Router();
 router.get('/hydrate', async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma)...');
+    console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma) - DEPLOY TEST...');
     
     // SQL equivalent of MongoDB find() with sort
     const athletes = await prisma.athlete.findMany({
