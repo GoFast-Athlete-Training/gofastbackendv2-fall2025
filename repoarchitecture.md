@@ -23,6 +23,19 @@ GoFast has multiple frontend applications and one shared backend. This document 
 - **Athlete** model with Firebase integration
 - **Firebase token verification** middleware
 
+### Deployment
+- **Platform**: Render.com
+- **URL**: `https://gofastbackendv2-fall2025.onrender.com`
+- **Environment**: Production
+- **Database**: PostgreSQL (Render managed)
+- **Status**: Deployed but database connection failing
+
+### Database Issues
+- **Local**: Missing `.env` file with `DATABASE_URL`
+- **Deployed**: Has `DATABASE_URL` in Render environment but connection failing
+- **Tables**: `athletes` table not created (Prisma migrations not run)
+- **Impact**: All athlete-related API calls return 500 errors
+
 ---
 
 ## Frontend Applications
@@ -139,6 +152,14 @@ if (username === 'admin' && password === 'gofast2025') {
 - Connection to backend unknown
 - Purpose unclear
 
+### 4. 🚨 CRITICAL DATABASE ISSUE
+- **Local Backend**: Missing `.env` file with `DATABASE_URL`
+- **Deployed Backend**: Has `DATABASE_URL` on Render but database connection failing
+- **Prisma**: Cannot connect to PostgreSQL database
+- **Tables**: `athletes` table doesn't exist in database
+- **API Calls**: `/api/athlete/create` fails silently (500 errors)
+- **MVP1 Flow**: Firebase auth works, but athlete creation fails
+
 ---
 
 ## Recommendations
@@ -163,19 +184,29 @@ if (username === 'admin' && password === 'gofast2025') {
 ## Current Status (as of latest commit)
 
 ### ✅ Working
-- MVP1 Firebase auth flow
-- Backend `/api/athlete/create` endpoint
-- MVP1 → Backend integration
+- MVP1 Firebase auth flow (Google OAuth)
+- Backend health endpoint (`/api/health`)
+- MVP1 frontend → Backend API calls (structure)
 
 ### ❌ Not Working/Unknown
+- **Database connection** (CRITICAL)
+- **Athlete creation** (fails silently)
 - User Dashboard backend integration
 - Athlete Site authentication
 - Cross-app auth consistency
 
 ### 🔧 Needs Investigation
+- **Render database connection** - why is `DATABASE_URL` not working?
+- **Prisma migrations** - need to run `npx prisma db push`
 - How did user get to `/athlete-admin` on User Dashboard?
 - What's the purpose of `athlete.gofastcrushgoals.com`?
 - Should we consolidate apps or keep separate?
+
+### 🚨 Immediate Action Required
+1. **Check Render environment variables** - verify `DATABASE_URL` is set
+2. **Run Prisma migrations** on deployed backend
+3. **Test database connection** from deployed backend
+4. **Create local `.env` file** for development
 
 ---
 
@@ -198,6 +229,29 @@ console.log('All localStorage:', {...localStorage});
 ### Check backend health:
 ```bash
 curl https://gofastbackendv2-fall2025.onrender.com/api/health
+```
+
+### Check database connection (deployed):
+```bash
+# This should return 500 error (database not connected)
+curl https://gofastbackendv2-fall2025.onrender.com/api/athletes
+
+# This should return 401 error (Firebase token required)
+curl -X POST https://gofastbackendv2-fall2025.onrender.com/api/athlete/create \
+  -H "Content-Type: application/json" \
+  -d '{"firebaseId":"test","email":"test@example.com"}'
+```
+
+### Check local database setup:
+```bash
+# Check if .env file exists
+ls -la .env
+
+# Try to push Prisma schema (will fail without DATABASE_URL)
+npx prisma db push
+
+# Generate Prisma client
+npx prisma generate
 ```
 
 ---
