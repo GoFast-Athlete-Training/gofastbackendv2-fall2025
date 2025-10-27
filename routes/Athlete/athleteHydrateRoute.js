@@ -2,8 +2,8 @@
 // Pattern: Query container athlete + hydrate frontend
 
 import express from 'express';
-import { getPrismaClient } from '../config/database.js';
-import { verifyFirebaseToken } from '../middleware/firebaseMiddleware.js';
+import { getPrismaClient } from '../../config/database.js';
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 
 const router = express.Router();
 
