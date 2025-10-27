@@ -30,11 +30,19 @@ GoFast has multiple frontend applications and one shared backend. This document 
 - **Database**: PostgreSQL (Render managed)
 - **Status**: Deployed but database connection failing
 
-### Database Issues
+### Database Issues (RESOLVED)
 - **Local**: Missing `.env` file with `DATABASE_URL`
 - **Deployed**: Has `DATABASE_URL` in Render environment but connection failing
 - **Tables**: `athletes` table not created (Prisma migrations not run)
 - **Impact**: All athlete-related API calls return 500 errors
+
+### Database Configuration (FIXED)
+- **Pattern**: Copied from `eventscrm-backend` working configuration
+- **File**: `config/database.js` - centralized connection management
+- **Functions**: `connectDatabase()` and `getPrismaClient()`
+- **Startup**: Database connection called on server startup
+- **Testing**: `test-database.js` script for debugging
+- **Status**: Committed and deployed to Render
 
 ---
 
@@ -152,13 +160,21 @@ if (username === 'admin' && password === 'gofast2025') {
 - Connection to backend unknown
 - Purpose unclear
 
-### 4. 🚨 CRITICAL DATABASE ISSUE
+### 4. 🚨 CRITICAL DATABASE ISSUE (RESOLVED)
 - **Local Backend**: Missing `.env` file with `DATABASE_URL`
 - **Deployed Backend**: Has `DATABASE_URL` on Render but database connection failing
 - **Prisma**: Cannot connect to PostgreSQL database
 - **Tables**: `athletes` table doesn't exist in database
 - **API Calls**: `/api/athlete/create` fails silently (500 errors)
 - **MVP1 Flow**: Firebase auth works, but athlete creation fails
+
+### 5. ✅ DATABASE CONFIGURATION FIXES (Latest)
+- **Added**: `config/database.js` - centralized database connection management
+- **Updated**: All Prisma calls now use `getPrismaClient()` instead of direct `new PrismaClient()`
+- **Added**: `connectDatabase()` function called on server startup
+- **Added**: `test-database.js` script for debugging database connection
+- **Pattern**: Copied from `eventscrm-backend` working database configuration
+- **Status**: Committed and pushed to Render for deployment
 
 ---
 
@@ -187,10 +203,11 @@ if (username === 'admin' && password === 'gofast2025') {
 - MVP1 Firebase auth flow (Google OAuth)
 - Backend health endpoint (`/api/health`)
 - MVP1 frontend → Backend API calls (structure)
+- **Database configuration** (FIXED - proper connection management)
 
-### ❌ Not Working/Unknown
-- **Database connection** (CRITICAL)
-- **Athlete creation** (fails silently)
+### 🔄 Testing/Unknown
+- **Database connection** (TESTING - may be fixed with latest deployment)
+- **Athlete creation** (TESTING - may be fixed with latest deployment)
 - User Dashboard backend integration
 - Athlete Site authentication
 - Cross-app auth consistency
@@ -202,11 +219,12 @@ if (username === 'admin' && password === 'gofast2025') {
 - What's the purpose of `athlete.gofastcrushgoals.com`?
 - Should we consolidate apps or keep separate?
 
-### 🚨 Immediate Action Required
-1. **Check Render environment variables** - verify `DATABASE_URL` is set
-2. **Run Prisma migrations** on deployed backend
-3. **Test database connection** from deployed backend
-4. **Create local `.env` file** for development
+### 🚨 Immediate Action Required (UPDATED)
+1. ✅ **Database configuration fixed** - proper connection management added
+2. ✅ **Committed and deployed** - changes pushed to Render
+3. 🔄 **Test deployed backend** - verify database connection works
+4. 🔄 **Run Prisma migrations** - if connection works, create tables
+5. **Create local `.env` file** for development
 
 ---
 
@@ -253,6 +271,37 @@ npx prisma db push
 # Generate Prisma client
 npx prisma generate
 ```
+
+---
+
+## Recent Changes (Latest Commits)
+
+### Database Configuration Fix (Commit: cb3843c)
+**Problem**: Backend couldn't connect to PostgreSQL database
+**Root Cause**: Missing proper database connection management
+**Solution**: Copied working pattern from `eventscrm-backend`
+
+**Files Changed**:
+- ✅ `config/database.js` - NEW: Centralized database connection
+- ✅ `index.js` - UPDATED: Import database config, call `connectDatabase()` on startup
+- ✅ `routes/Athlete/athleteRoute.js` - UPDATED: Use `getPrismaClient()` instead of direct Prisma
+- ✅ `test-database.js` - NEW: Database connection testing script
+
+**Key Functions Added**:
+```javascript
+// config/database.js
+export async function connectDatabase() // Connect to PostgreSQL
+export function getPrismaClient()      // Get shared Prisma instance
+```
+
+**Pattern Applied**:
+- Centralized database connection management
+- Proper error handling and logging
+- Graceful shutdown with `prisma.$disconnect()`
+- Environment variable validation
+
+**Status**: ✅ Committed and deployed to Render
+**Next**: Test if database connection now works on deployed backend
 
 ---
 
