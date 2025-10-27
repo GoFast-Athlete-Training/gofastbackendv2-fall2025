@@ -36,10 +36,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes - ORDER MATTERS! Specific routes before parameterized routes
-app.use('/api/athlete', athleteProfileRouter);
-app.use('/api/athlete', athleteHydrateRouter); // Hydration routes FIRST
-app.use('/api/athlete', athleteRouter); // Parameterized routes LAST
+// CLEAN ROUTES - ORDER MATTERS!
+// 1. Specific routes FIRST
+app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
+// 2. Profile routes SECOND  
+app.use('/api/athlete', athleteProfileRouter); // /:id/profile
+// 3. General routes LAST
+app.use('/api/athlete', athleteRouter); // /create, /, /:id, /find
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -49,84 +52,6 @@ app.get('/api/health', (req, res) => {
     version: '2.0.0',
     message: 'GoFast Backend V2 is running!'
   });
-});
-
-// Database setup endpoint (for creating tables)
-app.post('/api/setup-database', async (req, res) => {
-  try {
-    console.log('🔧 SETUP: Starting database setup...');
-    
-    const prisma = getPrismaClient();
-    
-    // Test if athletes table exists
-    try {
-      const athletes = await prisma.athlete.findMany();
-      console.log('✅ SETUP: Athletes table exists with', athletes.length, 'records');
-      
-      res.json({
-        success: true,
-        message: 'Database already set up',
-        athletesCount: athletes.length,
-        timestamp: new Date().toISOString()
-      });
-      
-    } catch (tableError) {
-      console.log('❌ SETUP: Athletes table does not exist, need to create it');
-      console.log('❌ SETUP: Error:', tableError.message);
-      
-      res.status(500).json({
-        success: false,
-        error: 'Athletes table does not exist',
-        message: 'Run "npx prisma db push" to create tables',
-        details: tableError.message,
-        timestamp: new Date().toISOString()
-      });
-    }
-    
-  } catch (error) {
-    console.error('❌ SETUP: Database setup error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Database setup failed',
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Manual database push endpoint (for emergency table creation)
-app.post('/api/push-database', async (req, res) => {
-  try {
-    console.log('🚀 PUSH: Attempting to push Prisma schema to database...');
-    
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    
-    // Run prisma db push
-    const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss');
-    
-    console.log('✅ PUSH: Prisma db push completed');
-    console.log('STDOUT:', stdout);
-    if (stderr) console.log('STDERR:', stderr);
-    
-    res.json({
-      success: true,
-      message: 'Database schema pushed successfully',
-      stdout: stdout,
-      stderr: stderr,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ PUSH: Database push failed:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Database push failed',
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
 });
 
 // Basic athletes endpoint (with Prisma)
@@ -153,7 +78,7 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// Root endpoint
+// Root endpoint with ACTUAL routes
 app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2 API',
@@ -161,10 +86,17 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       athletes: '/api/athletes',
+      // ACTUAL ROUTES FROM FILES:
       athleteCreate: '/api/athlete/create',
-      athleteHydrate: '/api/athlete/hydrate',
-      athleteHydrateSummary: '/api/athlete/hydrate/summary',
-      athleteHydrateById: '/api/athlete/:id/hydrate'
+      athleteFind: '/api/athlete/find', 
+      athleteGetAll: '/api/athlete/',
+      athleteGetById: '/api/athlete/:id',
+      athleteUpdate: '/api/athlete/:id',
+      athleteDelete: '/api/athlete/:id',
+      athleteProfile: '/api/athlete/:id/profile',
+      athleteHydrateAdmin: '/api/athlete/admin/hydrate',
+      athleteHydrateById: '/api/athlete/:id/hydrate',
+      athleteHydrateSummary: '/api/athlete/hydrate/summary'
     }
   });
 });

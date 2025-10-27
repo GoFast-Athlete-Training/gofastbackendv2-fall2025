@@ -11,7 +11,7 @@ const router = express.Router();
  * Hydrate frontend with all athletes (admin view)
  * Pattern: Query container athlete (SQL/Prisma version)
  */
-router.get('/hydrate', async (req, res) => {
+router.get('/admin/hydrate', async (req, res) => {
   try {
     const prisma = getPrismaClient();
     console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma) - DEPLOY TEST...');
