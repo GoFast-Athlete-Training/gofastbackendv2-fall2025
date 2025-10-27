@@ -5,9 +5,12 @@ import dotenv from 'dotenv';
 // Import database connection
 import { connectDatabase, getPrismaClient } from './config/database.js';
 
+// Import API configuration
+import { API_ROUTES, ROUTE_ORDER } from './config/apiConfig.js';
+
 // Import routes
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
-import athleteRouter from './routes/Athlete/athleteRoute.js';
+import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 
 dotenv.config();
@@ -42,7 +45,7 @@ app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summa
 // 2. Profile routes SECOND  
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 // 3. General routes LAST
-app.use('/api/athlete', athleteRouter); // /create, /, /:id, /find
+app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -78,7 +81,7 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// Root endpoint with ACTUAL routes
+// Root endpoint with CONFIG routes
 app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2 API',
@@ -86,18 +89,12 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       athletes: '/api/athletes',
-      // ACTUAL ROUTES FROM FILES:
-      athleteCreate: '/api/athlete/create',
-      athleteFind: '/api/athlete/find', 
-      athleteGetAll: '/api/athlete/',
-      athleteGetById: '/api/athlete/:id',
-      athleteUpdate: '/api/athlete/:id',
-      athleteDelete: '/api/athlete/:id',
-      athleteProfile: '/api/athlete/:id/profile',
-      athleteHydrateAdmin: '/api/athlete/admin/hydrate',
-      athleteHydrateById: '/api/athlete/:id/hydrate',
-      athleteHydrateSummary: '/api/athlete/hydrate/summary'
-    }
+      // THE 3 ACTUAL API CALLS FROM CONFIG:
+      createAthlete: API_ROUTES.CREATE_ATHLETE.path,
+      hydrateAthletes: API_ROUTES.HYDRATE_ATHLETES.path,
+      updateProfile: API_ROUTES.UPDATE_PROFILE.path
+    },
+    config: API_ROUTES
   });
 });
 
