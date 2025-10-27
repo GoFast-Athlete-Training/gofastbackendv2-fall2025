@@ -92,6 +92,41 @@ app.post('/api/setup-database', async (req, res) => {
   }
 });
 
+// Manual database push endpoint (for emergency table creation)
+app.post('/api/push-database', async (req, res) => {
+  try {
+    console.log('🚀 PUSH: Attempting to push Prisma schema to database...');
+    
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    // Run prisma db push
+    const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss');
+    
+    console.log('✅ PUSH: Prisma db push completed');
+    console.log('STDOUT:', stdout);
+    if (stderr) console.log('STDERR:', stderr);
+    
+    res.json({
+      success: true,
+      message: 'Database schema pushed successfully',
+      stdout: stdout,
+      stderr: stderr,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ PUSH: Database push failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database push failed',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Basic athletes endpoint (with Prisma)
 app.get('/api/athletes', async (req, res) => {
   try {
