@@ -50,48 +50,6 @@ app.get('/api/athletes', async (req, res) => {
   }
 });
 
-// Database setup endpoint
-app.post('/api/setup-database', async (req, res) => {
-  try {
-    const prisma = getPrismaClient();
-    const athletes = await prisma.athlete.findMany();
-    res.json({
-      success: true,
-      message: 'Database already set up',
-      athletesCount: athletes.length
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Athletes table does not exist',
-      message: 'Run "npx prisma db push" to create tables'
-    });
-  }
-});
-
-// Emergency database push endpoint
-app.post('/api/push-database', async (req, res) => {
-  try {
-    const { exec } = await import('child_process');
-    const { promisify } = await import('util');
-    const execAsync = promisify(exec);
-    
-    const { stdout, stderr } = await execAsync('npx prisma db push --accept-data-loss');
-    
-    res.json({
-      success: true,
-      message: 'Database schema pushed successfully',
-      stdout: stdout,
-      stderr: stderr
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Database push failed',
-      message: error.message
-    });
-  }
-});
 
 // Root
 app.get('/', (req, res) => {
