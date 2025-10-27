@@ -21,10 +21,12 @@ app.use(cors({
     'https://gofastfrontend-demo.vercel.app',
     'https://gofastfrontend-mvp1.vercel.app',
     'https://gofast-user-dashboard.vercel.app',
+    'https://athlete.gofastcrushgoals.com',
     /^https:\/\/gofastfrontend-demo-.*\.vercel\.app$/,
     /^https:\/\/gofastfrontend-mvp1-.*\.vercel\.app$/,
     /^https:\/\/gofast-user-dashboard-.*\.vercel\.app$/,
-    /^https:\/\/gofast-.*\.vercel\.app$/
+    /^https:\/\/gofast-.*\.vercel\.app$/,
+    /^https:\/\/athlete\.gofastcrushgoals\.com$/
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
