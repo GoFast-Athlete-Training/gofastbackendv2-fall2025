@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client';
 
 // Import routes
 import athleteAuthRouter from './routes/Athlete/athleteAuthRoute.js';
+import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
+import athleteRouter from './routes/Athlete/athleteRoute.js';
 
 dotenv.config();
 
@@ -33,6 +35,8 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/auth', athleteAuthRouter);
+app.use('/api/athlete', athleteProfileRouter);
+app.use('/api/athlete', athleteRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -75,7 +79,8 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       athletes: '/api/athletes',
-      auth: '/api/auth/athleteuser'
+      auth: '/api/auth/athleteuser',
+      athleteCreate: '/api/athlete/create'
     }
   });
 });
