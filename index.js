@@ -8,6 +8,7 @@ import { connectDatabase, getPrismaClient } from './config/database.js';
 // Import routes
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athleteRouter from './routes/Athlete/athleteRoute.js';
+import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/athlete', athleteProfileRouter);
 app.use('/api/athlete', athleteRouter);
+app.use('/api/athlete', athleteHydrateRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -79,7 +81,10 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       athletes: '/api/athletes',
-      athleteCreate: '/api/athlete/create'
+      athleteCreate: '/api/athlete/create',
+      athleteHydrate: '/api/athlete/hydrate',
+      athleteHydrateSummary: '/api/athlete/hydrate/summary',
+      athleteHydrateById: '/api/athlete/:id/hydrate'
     }
   });
 });
