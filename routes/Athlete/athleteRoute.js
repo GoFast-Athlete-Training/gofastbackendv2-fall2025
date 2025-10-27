@@ -2,11 +2,10 @@
 // Follows api/athlete pattern with api/athlete/create
 
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database.js';
 import { debugFirebaseToken, verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * Create Athlete from Firebase data
@@ -15,6 +14,7 @@ const prisma = new PrismaClient();
  */
 router.post('/create', verifyFirebaseToken, async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { firebaseId, email, firstName, lastName, photoURL } = req.body;
     
     console.log('🔐 ATHLETE: ===== ATHLETE CREATION (VERIFIED) =====');
@@ -172,6 +172,7 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
  */
 router.get('/', async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     console.log('👥 ATHLETE: Fetching all athletes...');
     
     const athletes = await prisma.athlete.findMany({
@@ -202,6 +203,7 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { id } = req.params;
     console.log('👤 ATHLETE: Fetching athlete by ID:', id);
     
@@ -241,6 +243,7 @@ router.get('/:id', async (req, res) => {
  */
 router.put('/:id', verifyFirebaseToken, async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { id } = req.params;
     const updateData = req.body;
     
@@ -275,6 +278,7 @@ router.put('/:id', verifyFirebaseToken, async (req, res) => {
  */
 router.delete('/:id', verifyFirebaseToken, async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { id } = req.params;
     console.log('🗑️ ATHLETE: Deleting athlete:', id);
     

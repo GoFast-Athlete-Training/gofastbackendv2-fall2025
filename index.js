@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+
+// Import database connection
+import { connectDatabase, getPrismaClient } from './config/database.js';
 
 // Import routes
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
@@ -10,7 +12,6 @@ import athleteRouter from './routes/Athlete/athleteRoute.js';
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -49,6 +50,7 @@ app.get('/api/health', (req, res) => {
 // Basic athletes endpoint (with Prisma)
 app.get('/api/athletes', async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const athletes = await prisma.athlete.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -96,15 +98,20 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
+// Start server
+app.listen(PORT, async () => {
   console.log(`🚀 GoFast Backend V2 running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`👥 Athletes: http://localhost:${PORT}/api/athletes`);
+  
+  // Connect to database
+  await connectDatabase();
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
   console.log('Shutting down gracefully...');
+  const prisma = getPrismaClient();
   await prisma.$disconnect();
   process.exit(0);
 });
