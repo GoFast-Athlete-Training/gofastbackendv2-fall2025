@@ -49,6 +49,49 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database setup endpoint (for creating tables)
+app.post('/api/setup-database', async (req, res) => {
+  try {
+    console.log('🔧 SETUP: Starting database setup...');
+    
+    const prisma = getPrismaClient();
+    
+    // Test if athletes table exists
+    try {
+      const athletes = await prisma.athlete.findMany();
+      console.log('✅ SETUP: Athletes table exists with', athletes.length, 'records');
+      
+      res.json({
+        success: true,
+        message: 'Database already set up',
+        athletesCount: athletes.length,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (tableError) {
+      console.log('❌ SETUP: Athletes table does not exist, need to create it');
+      console.log('❌ SETUP: Error:', tableError.message);
+      
+      res.status(500).json({
+        success: false,
+        error: 'Athletes table does not exist',
+        message: 'Run "npx prisma db push" to create tables',
+        details: tableError.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ SETUP: Database setup error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Database setup failed',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Basic athletes endpoint (with Prisma)
 app.get('/api/athletes', async (req, res) => {
   try {
