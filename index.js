@@ -36,10 +36,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
+// Routes - ORDER MATTERS! Specific routes before parameterized routes
 app.use('/api/athlete', athleteProfileRouter);
-app.use('/api/athlete', athleteRouter);
-app.use('/api/athlete', athleteHydrateRouter);
+app.use('/api/athlete', athleteHydrateRouter); // Hydration routes FIRST
+app.use('/api/athlete', athleteRouter); // Parameterized routes LAST
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
