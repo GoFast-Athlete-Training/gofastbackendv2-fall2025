@@ -199,3 +199,4 @@ export default {
   debugFirebaseToken,
   initializeFirebase
 };
+
