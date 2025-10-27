@@ -7,6 +7,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "postinstall": "npx prisma generate",
+    "db:generate": "npx prisma generate",
+    "db:push": "npx prisma db push",
+    "db:studio": "npx prisma studio",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -21,9 +25,11 @@
   },
   "homepage": "https://github.com/GoFast-Athlete-Training/gofastbackendv2-fall2025#readme",
   "dependencies": {
+    "@prisma/client": "^6.16.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "prisma": "^6.16.3"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

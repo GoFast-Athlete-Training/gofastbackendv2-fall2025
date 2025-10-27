@@ -1,10 +1,12 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
 
 const app = express();
+const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -36,33 +38,27 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Basic athletes endpoint (mock data)
-app.get('/api/athletes', (req, res) => {
-  const mockAthletes = [
-    {
-      id: 'mock-1',
-      firebaseId: 'mock-firebase-1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john@example.com',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: 'mock-2',
-      firebaseId: 'mock-firebase-2',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      email: 'jane@example.com',
-      createdAt: new Date().toISOString()
-    }
-  ];
-  
-  res.json({
-    success: true,
-    count: mockAthletes.length,
-    athletes: mockAthletes,
-    message: 'Mock athletes data - Prisma will be added later'
-  });
+// Basic athletes endpoint (with Prisma)
+app.get('/api/athletes', async (req, res) => {
+  try {
+    const athletes = await prisma.athlete.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    res.json({
+      success: true,
+      count: athletes.length,
+      athletes: athletes,
+      message: 'Athletes from database'
+    });
+  } catch (error) {
+    console.error('Error fetching athletes:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch athletes',
+      message: error.message
+    });
+  }
 });
 
 // Root endpoint
@@ -98,8 +94,9 @@ app.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('Shutting down gracefully...');
+  await prisma.$disconnect();
   process.exit(0);
 });
 
