@@ -1,7 +1,9 @@
 import express from "express";
 import crypto from "crypto";
+import { PrismaClient } from '@prisma/client';
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
 // Garmin OAuth 2.0 PKCE Configuration - Based on community insights
 const GARMIN_CONFIG = {
@@ -48,7 +50,11 @@ router.post("/auth", async (req, res) => {
       // NO scope parameter - Garmin controls this!
     }).toString();
     
-    console.log('Garmin OAuth 2.0 PKCE auth URL generated:', authUrl);
+    console.log('🔍 DEBUG - Garmin OAuth 2.0 PKCE auth URL generated:', authUrl);
+    console.log('🔍 DEBUG - Client ID:', GARMIN_CONFIG.CLIENT_ID);
+    console.log('🔍 DEBUG - Callback URL:', callback_url);
+    console.log('🔍 DEBUG - Code Challenge:', codeChallenge);
+    console.log('🔍 DEBUG - State:', state);
     
     res.json({ 
       success: true,
@@ -105,8 +111,34 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
-    // TODO: Store tokens in database for user
-    // TODO: Update user's garmin_connected status
+    // Get user ID from JWT token (you'll need to implement this)
+    // For now, we'll use a placeholder - you'll need to extract from auth middleware
+    const userId = req.user?.id; // This should come from your auth middleware
+    
+    if (!userId) {
+      return res.status(401).json({ error: "User not authenticated" });
+    }
+    
+    // Save Garmin tokens to database
+    try {
+      await prisma.athlete.update({
+        where: { id: userId },
+        data: {
+          garmin_user_id: tokenData.garmin_user_id || 'unknown', // Garmin might not return this
+          garmin_access_token: tokenData.access_token,
+          garmin_refresh_token: tokenData.refresh_token,
+          garmin_expires_in: tokenData.expires_in,
+          garmin_scope: tokenData.scope,
+          garmin_connected_at: new Date(),
+          garmin_last_sync_at: new Date()
+        }
+      });
+      
+      console.log('✅ Garmin tokens saved to database for user:', userId);
+    } catch (dbError) {
+      console.error('❌ Failed to save Garmin tokens to database:', dbError);
+      // Don't fail the OAuth flow if DB save fails
+    }
     
     res.json({
       success: true,

@@ -2,51 +2,59 @@ import express from "express";
 
 const router = express.Router();
 
-// POST /api/garmin/activity - Handle activity data webhooks
-router.post("/activity", async (req, res) => {
+// POST /api/garmin/webhook - Handle general webhook events
+router.post("/webhook", async (req, res) => {
   try {
-    const { userId, activityId, activityType, timestamp, data } = req.body;
+    const { type, data } = req.body;
     
-    console.log('Garmin activity webhook received:', { 
-      userId, 
-      activityId, 
-      activityType, 
-      timestamp 
-    });
+    console.log('🔍 DEBUG - Garmin webhook received:', { type, data });
     
-    // Handle different activity types
-    switch (activityType) {
-      case 'running':
-        console.log('Running activity received:', data);
-        // TODO: Process running data
-        // TODO: Calculate pace, distance, calories
-        // TODO: Store in database
+    // Handle different webhook types
+    switch (type) {
+      case 'activity':
+        console.log('📊 Activity webhook:', data);
+        // TODO: Process activity data
         break;
-      case 'cycling':
-        console.log('Cycling activity received:', data);
-        // TODO: Process cycling data
+      case 'activity_details':
+        console.log('📋 Activity details webhook:', data);
+        // TODO: Process activity details
         break;
-      case 'walking':
-        console.log('Walking activity received:', data);
-        // TODO: Process walking data
+      case 'activity_files':
+        console.log('📁 Activity files webhook:', data);
+        // TODO: Process activity files
+        break;
+      case 'activity_manual':
+        console.log('✏️ Manual activity webhook:', data);
+        // TODO: Process manually updated activities
+        break;
+      case 'moveiq':
+        console.log('🏃 MoveIQ webhook:', data);
+        // TODO: Process MoveIQ data
+        break;
+      case 'user_update':
+        console.log('👤 User update webhook:', data);
+        // TODO: Process user updates
+        break;
+      case 'connection_status':
+        console.log('🔗 Connection status webhook:', data);
+        // TODO: Process connection changes
         break;
       default:
-        console.log('Unknown activity type:', activityType);
+        console.log('❓ Unknown webhook type:', type);
     }
     
     res.json({
       success: true,
-      message: 'Activity processed',
-      activityId: activityId,
-      activityType: activityType,
+      message: 'Webhook processed',
+      type: type,
       timestamp: new Date().toISOString()
     });
     
   } catch (error) {
-    console.error('Garmin activity webhook error:', error);
+    console.error('❌ Garmin webhook error:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Failed to process activity' 
+      error: 'Failed to process webhook' 
     });
   }
 });

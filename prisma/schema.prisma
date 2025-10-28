@@ -45,6 +45,15 @@ model Athlete {
   paceRange         String?
   runningGoals      String?
   
+  // Garmin OAuth 2.0 PKCE Integration
+  garmin_user_id        String?  // Garmin's unique user ID
+  garmin_access_token   String?  // OAuth access token
+  garmin_refresh_token  String?  // OAuth refresh token
+  garmin_expires_in     Int?     // Token expiration time in seconds
+  garmin_scope          String?  // OAuth scope permissions
+  garmin_connected_at   DateTime? // When Garmin was connected
+  garmin_last_sync_at   DateTime? // Last data sync timestamp
+  
   // System fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -58,12 +58,12 @@ router.post("/permissions", async (req, res) => {
   }
 });
 
-// POST /api/garmin/deregister - Handle user deregistration webhook
-router.post("/deregister", async (req, res) => {
+// POST /api/garmin/deregistration - Handle user deregistration webhooks
+router.post("/deregistration", async (req, res) => {
   try {
     const { userId, garminUserId, timestamp } = req.body;
     
-    console.log('Garmin deregistration webhook received:', { 
+    console.log('🔍 DEBUG - Garmin deregistration webhook received:', { 
       userId, 
       garminUserId, 
       timestamp 
@@ -82,7 +82,7 @@ router.post("/deregister", async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Garmin deregistration webhook error:', error);
+    console.error('❌ Garmin deregistration webhook error:', error);
     res.status(500).json({ 
       success: false,
       error: 'Failed to process deregistration' 
