@@ -9,7 +9,6 @@ import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
-import tokenRetrieveRouter from './routes/Athlete/tokenRetrieveRoute.js';
 // Import modular Garmin routes
 import garminAuthRouter from './routes/Garmin/garminAuthRoute.js';
 import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
@@ -36,8 +35,7 @@ app.use(express.json());
 app.use('/api/athlete', athleteUniversalHydrateRouter); // /retrieve (FIRST - most specific)
 app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
-app.use('/api/athlete', tokenRetrieveRouter); // /tokenretrieve (BEFORE /:id routes!)
-app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
+app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find
 
 // Modular Garmin OAuth routes
 app.use('/api/garmin', garminAuthRouter); // /auth, /callback, /refresh
