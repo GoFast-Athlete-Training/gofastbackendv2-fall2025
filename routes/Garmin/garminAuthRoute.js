@@ -121,7 +121,7 @@ router.post("/callback", async (req, res) => {
       return res.status(400).json({ error: "athleteId is required" });
     }
     
-    console.log('✅ OAuth callback - saving tokens for athleteId:', athleteId);
+    console.log('✅ OAuth callback - saving tokens for athleteId:', athleteId, '- DEPLOYED VERSION');
     
     // Save Garmin tokens to database - user info will be fetched separately
     try {
