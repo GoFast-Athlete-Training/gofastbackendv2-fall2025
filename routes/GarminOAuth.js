@@ -2,46 +2,28 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 
-// Garmin OAuth 1.0a Configuration
+// Garmin OAuth 2.0 PKCE Configuration
 const GARMIN_CONFIG = {
-  CONSUMER_KEY: process.env.GARMIN_CONSUMER_KEY,
-  CONSUMER_SECRET: process.env.GARMIN_CONSUMER_SECRET,
-  REQUEST_TOKEN_URL: 'https://connectapi.garmin.com/oauth-service/oauth/request_token',
-  ACCESS_TOKEN_URL: 'https://connectapi.garmin.com/oauth-service/oauth/access_token',
-  AUTHORIZE_URL: 'https://connect.garmin.com/oauthConfirm'
+  CLIENT_ID: process.env.GARMIN_CLIENT_ID,
+  CLIENT_SECRET: process.env.GARMIN_CLIENT_SECRET,
+  AUTHORIZE_URL: 'https://connect.garmin.com/oauth2Confirm',
+  TOKEN_URL: 'https://diauth.garmin.com/di-oauth2-service/oauth/token'
 };
 
-// OAuth 1.0a signature generation
-function generateOAuthSignature(method, url, params, consumerSecret, tokenSecret = '') {
-  const sortedParams = Object.keys(params)
-    .sort()
-    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
-    .join('&');
+// Generate PKCE code verifier and challenge
+function generatePKCE() {
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  const state = crypto.randomBytes(16).toString('hex');
   
-  const signatureBaseString = `${method.toUpperCase()}&${encodeURIComponent(url)}&${encodeURIComponent(sortedParams)}`;
-  const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(tokenSecret)}`;
-  
-  return crypto.createHmac('sha1', signingKey).update(signatureBaseString).digest('base64');
-}
-
-// Generate OAuth 1.0a header
-function generateOAuthHeader(method, url, params, consumerSecret, tokenSecret = '') {
-  const signature = generateOAuthSignature(method, url, params, consumerSecret, tokenSecret);
-  
-  const oauthParams = {
-    ...params,
-    oauth_signature: signature
+  return {
+    codeVerifier,
+    codeChallenge,
+    state
   };
-  
-  const authHeader = Object.keys(oauthParams)
-    .sort()
-    .map(key => `${encodeURIComponent(key)}="${encodeURIComponent(oauthParams[key])}"`)
-    .join(', ');
-  
-  return `OAuth ${authHeader}`;
 }
 
-// POST /api/garmin/auth - Initiate OAuth 1.0a flow
+// POST /api/garmin/auth - Initiate OAuth 2.0 PKCE flow
 router.post("/auth", async (req, res) => {
   try {
     const { callback_url } = req.body;
@@ -50,131 +32,136 @@ router.post("/auth", async (req, res) => {
       return res.status(400).json({ error: "callback_url is required" });
     }
     
-    // Generate OAuth 1.0a parameters
-    const oauthParams = {
-      oauth_consumer_key: GARMIN_CONFIG.CONSUMER_KEY,
-      oauth_nonce: crypto.randomBytes(16).toString('hex'),
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_version: '1.0',
-      oauth_callback: callback_url
-    };
+    // Generate PKCE parameters
+    const { codeVerifier, codeChallenge, state } = generatePKCE();
     
-    // Generate OAuth header
-    const authHeader = generateOAuthHeader(
-      'POST',
-      GARMIN_CONFIG.REQUEST_TOKEN_URL,
-      oauthParams,
-      GARMIN_CONFIG.CONSUMER_SECRET
-    );
-    
-    // Request token from Garmin
-    const response = await fetch(GARMIN_CONFIG.REQUEST_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Garmin request token failed: ${response.status}`);
-    }
-    
-    const responseText = await response.text();
-    const tokenParams = new URLSearchParams(responseText);
-    
-    const oauthToken = tokenParams.get('oauth_token');
-    const oauthTokenSecret = tokenParams.get('oauth_token_secret');
-    
-    if (!oauthToken || !oauthTokenSecret) {
-      throw new Error('Invalid response from Garmin');
-    }
-    
-    // Store temp token in session or database for callback
-    // For now, we'll include it in the auth URL
-    const authUrl = `${GARMIN_CONFIG.AUTHORIZE_URL}?oauth_token=${oauthToken}`;
+    // Store PKCE parameters in session or database for callback
+    // For now, we'll include them in the response (in production, store securely)
+    const authUrl = `${GARMIN_CONFIG.AUTHORIZE_URL}?` + new URLSearchParams({
+      client_id: GARMIN_CONFIG.CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: callback_url,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      state: state
+    }).toString();
     
     res.json({ 
       success: true,
       authUrl,
-      oauthToken,
-      oauthTokenSecret // Store this securely for callback
+      codeVerifier, // Store this securely for callback
+      state
     });
     
   } catch (error) {
-    console.error('Garmin OAuth auth error:', error);
+    console.error('Garmin OAuth 2.0 auth error:', error);
     res.status(500).json({ 
       success: false,
-      error: 'Failed to initiate Garmin OAuth' 
+      error: 'Failed to initiate Garmin OAuth 2.0' 
     });
   }
 });
 
-// GET /auth/garmin/callback - Handle OAuth 1.0a callback (Garmin redirect URL)
-router.get("/callback", async (req, res) => {
+// POST /api/garmin/callback - Exchange code for tokens
+router.post("/callback", async (req, res) => {
   try {
-    const { oauth_token, oauth_verifier } = req.query;
+    const { code, codeVerifier, state } = req.body;
     
-    if (!oauth_token || !oauth_verifier) {
-      return res.status(400).send('Missing OAuth parameters');
+    if (!code || !codeVerifier) {
+      return res.status(400).json({ error: "code and codeVerifier are required" });
     }
     
-    // TODO: Retrieve oauth_token_secret from storage (session/database)
-    // For now, we'll need to implement proper token storage
-    
-    // Generate OAuth 1.0a parameters for access token exchange
-    const oauthParams = {
-      oauth_consumer_key: GARMIN_CONFIG.CONSUMER_KEY,
-      oauth_nonce: crypto.randomBytes(16).toString('hex'),
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
-      oauth_version: '1.0',
-      oauth_token: oauth_token,
-      oauth_verifier: oauth_verifier
-    };
-    
-    // Generate OAuth header with token secret
-    const authHeader = generateOAuthHeader(
-      'POST',
-      GARMIN_CONFIG.ACCESS_TOKEN_URL,
-      oauthParams,
-      GARMIN_CONFIG.CONSUMER_SECRET,
-      'TEMP_TOKEN_SECRET' // TODO: Get from storage
-    );
-    
-    // Exchange verifier for access token
-    const response = await fetch(GARMIN_CONFIG.ACCESS_TOKEN_URL, {
+    // Exchange authorization code for access token
+    const tokenResponse = await fetch(GARMIN_CONFIG.TOKEN_URL, {
       method: 'POST',
       headers: {
-        'Authorization': authHeader,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        client_id: GARMIN_CONFIG.CLIENT_ID,
+        client_secret: GARMIN_CONFIG.CLIENT_SECRET,
+        code: code,
+        code_verifier: codeVerifier,
+        redirect_uri: 'https://athlete.gofastcrushgoals.com/garmin/callback'
+      })
+    });
+    
+    if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('Garmin token exchange failed:', errorText);
+      throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+    }
+    
+    const tokenData = await tokenResponse.json();
+    console.log('Garmin OAuth 2.0 tokens received:', tokenData);
+    
+    // TODO: Store tokens in database for user
+    // TODO: Update user's garmin_connected status
+    
+    res.json({
+      success: true,
+      message: 'Garmin connected successfully',
+      tokens: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in,
+        scope: tokenData.scope
       }
     });
     
-    if (!response.ok) {
-      throw new Error(`Garmin access token failed: ${response.status}`);
+  } catch (error) {
+    console.error('Garmin OAuth 2.0 callback error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to exchange code for tokens' 
+    });
+  }
+});
+
+// POST /api/garmin/refresh - Refresh access token
+router.post("/refresh", async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+    
+    if (!refresh_token) {
+      return res.status(400).json({ error: "refresh_token is required" });
     }
     
-    const responseText = await response.text();
-    const tokenParams = new URLSearchParams(responseText);
+    const tokenResponse = await fetch(GARMIN_CONFIG.TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: GARMIN_CONFIG.CLIENT_ID,
+        client_secret: GARMIN_CONFIG.CLIENT_SECRET,
+        refresh_token: refresh_token
+      })
+    });
     
-    const accessToken = tokenParams.get('oauth_token');
-    const accessTokenSecret = tokenParams.get('oauth_token_secret');
-    
-    if (!accessToken || !accessTokenSecret) {
-      throw new Error('Invalid access token response from Garmin');
+    if (!tokenResponse.ok) {
+      throw new Error(`Token refresh failed: ${tokenResponse.status}`);
     }
     
-    // TODO: Store access tokens in database for user
-    // TODO: Update user's garmin_connected status
+    const tokenData = await tokenResponse.json();
     
-    // Redirect to frontend success page
-    res.redirect('https://athlete.gofastcrushgoals.com/settings?garmin=connected');
+    res.json({
+      success: true,
+      tokens: {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in
+      }
+    });
     
   } catch (error) {
-    console.error('Garmin OAuth callback error:', error);
-    res.redirect('https://athlete.gofastcrushgoals.com/settings?garmin=error');
+    console.error('Garmin token refresh error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to refresh token' 
+    });
   }
 });
 
