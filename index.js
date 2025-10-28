@@ -4,10 +4,11 @@ import dotenv from 'dotenv';
 import { connectDatabase, getPrismaClient } from './config/database.js';
 import { API_ROUTES } from './config/apiConfig.js';
 
-// Import the 3 routes
+// Import the 4 routes
 import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
+import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
 
 dotenv.config();
 
@@ -29,10 +30,11 @@ app.use(cors({
 
 app.use(express.json());
 
-// The 3 API calls
-app.use('/api/athlete', athleteHydrateRouter);
-app.use('/api/athlete', athleteProfileRouter);
-app.use('/api/athlete', athleteCreateRouter);
+// The 4 API calls - ORDER MATTERS!
+app.use('/api/athlete', athleteUniversalHydrateRouter); // /universal-hydrate (FIRST - most specific)
+app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
+app.use('/api/athlete', athleteProfileRouter); // /:id/profile
+app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -56,6 +58,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2',
     endpoints: {
+      universalHydrate: '/api/athlete/universal-hydrate',
       createAthlete: API_ROUTES.CREATE_ATHLETE.path,
       hydrateAthletes: API_ROUTES.HYDRATE_ATHLETES.path,
       updateProfile: API_ROUTES.UPDATE_PROFILE.path

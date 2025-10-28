@@ -44,6 +44,40 @@ GoFast has multiple frontend applications and one shared backend. This document 
 - **Testing**: `test-database.js` script for debugging
 - **Status**: Committed and deployed to Render
 
+### Database Hydration Flow
+```
+Frontend Request → Backend Route → config/database.js → Prisma Client → PostgreSQL
+```
+
+**Key Components:**
+1. **Frontend**: Makes API call to hydration endpoint
+2. **Backend Route**: `routes/Athlete/athleteHydrateRoute.js`
+3. **Database Config**: `config/database.js` provides `getPrismaClient()`
+4. **Prisma Client**: Connects to PostgreSQL using `DATABASE_URL`
+5. **PostgreSQL**: Render-managed database with `athletes` table
+
+**Hydration Endpoints:**
+```
+GET /api/athlete/hydrate          → All athletes (admin view)
+GET /api/athlete/:id/hydrate      → Single athlete details
+GET /api/athlete/hydrate/summary  → Summary statistics
+```
+
+**Database Connection Pattern:**
+```javascript
+// In any route file:
+import { getPrismaClient } from '../../config/database.js';
+
+const prisma = getPrismaClient();
+const athletes = await prisma.athlete.findMany();
+```
+
+**Deployment Process:**
+1. Render runs `npm install`
+2. Triggers `postinstall` script: `npx prisma generate && npx prisma db push --accept-data-loss`
+3. Creates database tables from `prisma/schema.prisma`
+4. Starts server with database connection ready
+
 ---
 
 ## Frontend Applications
