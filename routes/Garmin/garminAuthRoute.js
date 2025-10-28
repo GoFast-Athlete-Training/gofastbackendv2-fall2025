@@ -102,8 +102,10 @@ router.post("/callback", async (req, res) => {
     
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('Garmin token exchange failed:', errorText);
-      throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      console.error('❌ Garmin token exchange failed:', errorText);
+      console.error('❌ Token response status:', tokenResponse.status);
+      console.error('❌ Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+      throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
     }
     
     const tokenData = await tokenResponse.json();
@@ -160,7 +162,7 @@ router.post("/callback", async (req, res) => {
 
         if (userInfo.ok) {
           const userData = await userInfo.json();
-          console.log("Garmin user info:", userData);
+          console.log("✅ Garmin user info:", userData);
           
           // Update with real UUID
           await prisma.athlete.update({
@@ -172,7 +174,9 @@ router.post("/callback", async (req, res) => {
           
           console.log('✅ Garmin UUID updated:', userData.userId);
         } else {
-          console.log('⚠️ Could not fetch Garmin user info, keeping pending');
+          const errorText = await userInfo.text();
+          console.log('⚠️ Could not fetch Garmin user info:', userInfo.status, errorText);
+          console.log('⚠️ Keeping garmin_user_id as pending');
         }
       } catch (uuidError) {
         console.error('❌ Failed to fetch Garmin UUID:', uuidError);
