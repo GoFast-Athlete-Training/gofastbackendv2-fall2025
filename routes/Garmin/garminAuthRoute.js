@@ -111,10 +111,10 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
-    // Fetch Garmin user ID using access token
+    // Fetch Garmin user ID using Activity API userprofile endpoint
     let garminUserId = 'unknown';
     try {
-      const userResponse = await fetch('https://apis.garmin.com/wellness-api/rest/user/id', {
+      const userResponse = await fetch('https://connectapi.garmin.com/userprofile-service/userprofile', {
         headers: {
           'Authorization': `Bearer ${tokenData.access_token}`
         }
@@ -122,13 +122,18 @@ router.post("/callback", async (req, res) => {
       
       if (userResponse.ok) {
         const userData = await userResponse.json();
-        garminUserId = userData.userId || userData.id || 'unknown';
+        garminUserId = userData.userId || 'unknown';
         console.log('✅ Garmin user ID fetched:', garminUserId);
+        console.log('✅ Garmin user profile:', {
+          displayName: userData.displayName,
+          fullName: userData.fullName,
+          email: userData.email
+        });
       } else {
-        console.log('⚠️ Could not fetch Garmin user ID, using unknown');
+        console.log('⚠️ Could not fetch Garmin user profile, using unknown');
       }
     } catch (userError) {
-      console.error('❌ Error fetching Garmin user ID:', userError);
+      console.error('❌ Error fetching Garmin user profile:', userError);
     }
     
     // Get user ID from JWT token (you'll need to implement this)
