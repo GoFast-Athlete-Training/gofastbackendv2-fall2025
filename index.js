@@ -20,16 +20,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// CORS
+// CORS - Allow all origins for debugging
 app.use(cors({
-  origin: [
-    'https://gofastfrontend-demo.vercel.app',
-    'https://gofastfrontend-mvp1.vercel.app',
-    'https://gofast-user-dashboard.vercel.app',
-    'https://gofast-user-dashboard-e30u68a2q-ignite-stack.vercel.app',
-    'https://dashboard.gofastcrushgoals.com',
-    'https://athlete.gofastcrushgoals.com'
-  ],
+  origin: true, // Allow all origins temporarily
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
