@@ -1,13 +1,13 @@
 {
   "name": "gofastbackendv2-fall2025",
-  "version": "1.0.0",
+  "version": "2.0.2",
   "type": "module",
   "description": "GoFast Backend V2 - Clean Start",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "postinstall": "npx prisma generate",
+    "postinstall": "npx prisma generate && npx prisma db push",
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
