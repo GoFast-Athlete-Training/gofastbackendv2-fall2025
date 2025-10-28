@@ -1,7 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { PrismaClient } from '@prisma/client';
-import { fetchGarminUserId } from '../../config/garminUserIdConfig.js';
+import { GarminIntegrationService } from '../../services/GarminIntegrationService.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();

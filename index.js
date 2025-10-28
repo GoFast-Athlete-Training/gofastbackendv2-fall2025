@@ -22,10 +22,11 @@ const PORT = process.env.PORT || 3001;
 
 // CORS - Allow all origins for debugging
 app.use(cors({
-  origin: true, // Allow all origins temporarily
+  origin: true, // Allow all origins - more explicit than '*'
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: false,
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
 
 app.use(express.json());

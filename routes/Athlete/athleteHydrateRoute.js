@@ -6,6 +6,14 @@ import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
 
+// Handle preflight OPTIONS requests for CORS
+router.options('/admin/hydrate', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.status(200).end();
+});
+
 /**
  * GET /api/athlete/hydrate
  * Hydrate frontend with all athletes (admin view)
@@ -13,6 +21,11 @@ const router = express.Router();
  */
 router.get('/admin/hydrate', async (req, res) => {
   try {
+    // Set CORS headers explicitly
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    
     const prisma = getPrismaClient();
     console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma) - DEPLOY TEST...');
     
