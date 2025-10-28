@@ -65,7 +65,11 @@ router.get('/admin/hydrate', async (req, res) => {
         lastSyncAt: athlete.garmin_last_sync_at || null,
         scope: athlete.garmin_scope || null,
         hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
-        tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+        tokenStatus: athlete.garmin_access_token ? 'active' : 'none',
+        // Include actual tokens for localStorage
+        accessToken: athlete.garmin_access_token || null,
+        refreshToken: athlete.garmin_refresh_token || null,
+        expiresIn: athlete.garmin_expires_in || null
       },
       
       // Computed fields for admin display
@@ -153,7 +157,11 @@ router.get('/:id/hydrate', async (req, res) => {
         lastSyncAt: athlete.garmin_last_sync_at || null,
         scope: athlete.garmin_scope || null,
         hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
-        tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+        tokenStatus: athlete.garmin_access_token ? 'active' : 'none',
+        // Include actual tokens for localStorage
+        accessToken: athlete.garmin_access_token || null,
+        refreshToken: athlete.garmin_refresh_token || null,
+        expiresIn: athlete.garmin_expires_in || null
       },
       
       // Computed fields for detailed view
