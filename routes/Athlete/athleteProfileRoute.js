@@ -18,6 +18,7 @@ router.put('/:id/profile', async (req, res) => {
     const {
       firstName,
       lastName,
+      phoneNumber,
       gofastHandle,
       birthday,
       gender,
@@ -37,6 +38,7 @@ router.put('/:id/profile', async (req, res) => {
       data: {
         firstName,
         lastName,
+        phoneNumber,
         gofastHandle,
         birthday: birthday ? new Date(birthday) : null,
         gender,

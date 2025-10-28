@@ -18,6 +18,7 @@ model Athlete {
   firstName    String?
   lastName     String?
   email        String @unique
+  phoneNumber  String?  // Optional phone number
   gofastHandle String? @unique
   birthday     DateTime?
   gender       String?
