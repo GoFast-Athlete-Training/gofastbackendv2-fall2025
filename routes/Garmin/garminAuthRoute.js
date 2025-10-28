@@ -296,3 +296,5 @@ router.post("/debug", async (req, res) => {
     });
   }
 });
+
+export default router;
