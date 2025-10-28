@@ -4,9 +4,9 @@
 export const DATABASE_CONFIG = {
   // Table Names
   TABLES: {
-    ATHLETES: '"Athletes"',  // Note: Plural with quotes for PostgreSQL
-    ACTIVITIES: '"Activities"',
-    GARMIN_DATA: '"GarminData"'
+    ATHLETES: 'athletes',  // Note: lowercase, no quotes
+    ACTIVITIES: 'athlete_activities',
+    GARMIN_DATA: 'garmin_data'
   },
   
   // Database Connection

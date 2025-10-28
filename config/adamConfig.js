@@ -20,8 +20,8 @@ export const ADAM_CONFIG = {
   
   // SQL Queries for Adam's Data
   SQL_QUERIES: {
-    GET_ADAM: `SELECT * FROM "Athletes" WHERE id = 'cmh9pl5in0000rj1wkijpxl2t';`,
-    GET_ADAM_GARMIN: `SELECT id, email, garmin_user_id, garmin_access_token IS NOT NULL as has_access_token, garmin_refresh_token IS NOT NULL as has_refresh_token, garmin_expires_in, garmin_scope, garmin_connected_at, garmin_last_sync_at, garmin_is_connected FROM "Athletes" WHERE id = 'cmh9pl5in0000rj1wkijpxl2t';`
+    GET_ADAM: `SELECT * FROM athletes WHERE id = 'cmh9pl5in0000rj1wkijpxl2t';`,
+    GET_ADAM_GARMIN: `SELECT id, email, garmin_user_id, garmin_access_token, garmin_refresh_token, garmin_expires_in, garmin_scope, garmin_connected_at, garmin_last_sync_at, garmin_is_connected FROM athletes WHERE id = 'cmh9pl5in0000rj1wkijpxl2t';`
   }
 };
 
