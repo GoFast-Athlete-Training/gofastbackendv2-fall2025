@@ -1,5 +1,6 @@
 import express from "express";
 import { PrismaClient } from '@prisma/client';
+import { fetchGarminUserProfile } from '../../config/garminUserIdConfig.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -33,85 +34,38 @@ router.get("/user", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
     
-    // If connected, try to fetch fresh data from Garmin API
+    // If connected, try to fetch fresh data from Garmin API using config
     let garminApiData = null;
     if (athlete.garmin_access_token && athlete.garmin_is_connected) {
-      try {
-        const garminResponse = await fetch('https://connectapi.garmin.com/userprofile-service/userprofile', {
-          headers: {
-            'Authorization': `Bearer ${athlete.garmin_access_token}`
-          }
-        });
+      const profileResult = await fetchGarminUserProfile(athlete.garmin_access_token);
+      
+      if (profileResult.success) {
+        garminApiData = profileResult.profile;
         
-        if (garminResponse.ok) {
-          garminApiData = await garminResponse.json();
-          console.log('✅ Fresh Garmin API data fetched:', garminApiData);
-          
-          // Parse the rich user data
-          const parsedData = {
-            userId: garminApiData.id,
-            userData: {
-              gender: garminApiData.userData?.gender,
-              weight: garminApiData.userData?.weight,
-              height: garminApiData.userData?.height,
-              timeFormat: garminApiData.userData?.timeFormat,
-              birthDate: garminApiData.userData?.birthDate,
-              measurementSystem: garminApiData.userData?.measurementSystem,
-              activityLevel: garminApiData.userData?.activityLevel,
-              handedness: garminApiData.userData?.handedness,
-              vo2MaxRunning: garminApiData.userData?.vo2MaxRunning,
-              vo2MaxCycling: garminApiData.userData?.vo2MaxCycling,
-              lactateThresholdSpeed: garminApiData.userData?.lactateThresholdSpeed,
-              lactateThresholdHeartRate: garminApiData.userData?.lactateThresholdHeartRate,
-              intensityMinutesCalcMethod: garminApiData.userData?.intensityMinutesCalcMethod,
-              moderateIntensityMinutesHrZone: garminApiData.userData?.moderateIntensityMinutesHrZone,
-              vigorousIntensityMinutesHrZone: garminApiData.userData?.vigorousIntensityMinutesHrZone,
-              hydrationMeasurementUnit: garminApiData.userData?.hydrationMeasurementUnit,
-              firstbeatMaxStressScore: garminApiData.userData?.firstbeatMaxStressScore,
-              thresholdHeartRateAutoDetected: garminApiData.userData?.thresholdHeartRateAutoDetected,
-              ftpAutoDetected: garminApiData.userData?.ftpAutoDetected,
-              availableTrainingDays: garminApiData.userData?.availableTrainingDays,
-              preferredLongTrainingDays: garminApiData.userData?.preferredLongTrainingDays
-            },
-            userSleep: {
-              sleepTime: garminApiData.userSleep?.sleepTime,
-              defaultSleepTime: garminApiData.userSleep?.defaultSleepTime,
-              wakeTime: garminApiData.userSleep?.wakeTime,
-              defaultWakeTime: garminApiData.userSleep?.defaultWakeTime
-            },
-            connectDate: garminApiData.connectDate,
-            sourceType: garminApiData.sourceType
-          };
-          
-          garminApiData = parsedData;
-          console.log('✅ Parsed Garmin user data:', parsedData);
-          
-          // Save rich user data to database
-          try {
-            await prisma.athlete.update({
-              where: { id: userId },
-              data: {
-                garmin_user_profile: parsedData.userData,
-                garmin_user_sleep: parsedData.userSleep,
-                garmin_user_preferences: {
-                  measurementSystem: parsedData.userData.measurementSystem,
-                  timeFormat: parsedData.userData.timeFormat,
-                  intensityMinutesCalcMethod: parsedData.userData.intensityMinutesCalcMethod,
-                  availableTrainingDays: parsedData.userData.availableTrainingDays,
-                  preferredLongTrainingDays: parsedData.userData.preferredLongTrainingDays
-                },
-                garmin_last_sync_at: new Date()
-              }
-            });
-            console.log('✅ Rich Garmin user data saved to database');
-          } catch (dbError) {
-            console.error('❌ Failed to save rich Garmin data:', dbError);
-          }
-        } else {
-          console.log('⚠️ Could not fetch fresh Garmin data, using stored data');
+        // Save rich user data to database
+        try {
+          await prisma.athlete.update({
+            where: { id: userId },
+            data: {
+              garmin_user_profile: profileResult.profile.userData,
+              garmin_user_sleep: profileResult.profile.userSleep,
+              garmin_user_preferences: {
+                measurementSystem: profileResult.profile.userData.measurementSystem,
+                timeFormat: profileResult.profile.userData.timeFormat,
+                intensityMinutesCalcMethod: profileResult.profile.userData.intensityMinutesCalcMethod,
+                availableTrainingDays: profileResult.profile.userData.availableTrainingDays,
+                preferredLongTrainingDays: profileResult.profile.userData.preferredLongTrainingDays
+              },
+              garmin_last_sync_at: new Date()
+            }
+          });
+          console.log('✅ Rich Garmin user data saved to database');
+        } catch (dbError) {
+          console.error('❌ Failed to save rich Garmin data:', dbError);
         }
-      } catch (apiError) {
-        console.log('⚠️ Garmin API error, using stored data:', apiError.message);
+      } else {
+        console.log('⚠️ Could not fetch fresh Garmin data, using stored data');
+        console.log('⚠️ Profile fetch error:', profileResult.error);
       }
     }
     

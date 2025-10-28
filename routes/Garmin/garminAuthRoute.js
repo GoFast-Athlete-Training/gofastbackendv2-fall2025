@@ -1,6 +1,7 @@
 import express from "express";
 import crypto from "crypto";
 import { PrismaClient } from '@prisma/client';
+import { fetchGarminUserId } from '../../config/garminUserIdConfig.js';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -111,34 +112,9 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
-    // Fetch Garmin API User ID using /user-info endpoint (THE REAL UUID!)
-    let garminUserId = 'unknown';
-    try {
-      const userInfoResponse = await fetch('https://connectapi.garmin.com/oauth-service/oauth/user-info', {
-        headers: {
-          'Authorization': `Bearer ${tokenData.access_token}`
-        }
-      });
-      
-      if (userInfoResponse.ok) {
-        const userInfo = await userInfoResponse.json();
-        garminUserId = userInfo.userId || 'unknown';
-        console.log('✅ Garmin API User ID fetched:', garminUserId);
-        console.log('✅ Garmin user info:', {
-          userId: userInfo.userId,
-          garminUserName: userInfo.garminUserName,
-          garminUserEmail: userInfo.garminUserEmail,
-          scopes: userInfo.scopes
-        });
-      } else {
-        const errorText = await userInfoResponse.text();
-        console.log('⚠️ Could not fetch Garmin user info, using unknown');
-        console.log('⚠️ User-info response status:', userInfoResponse.status);
-        console.log('⚠️ User-info response text:', errorText);
-      }
-    } catch (userInfoError) {
-      console.error('❌ Error fetching Garmin user info:', userInfoError);
-    }
+    // Fetch Garmin API User ID using the dedicated config function
+    const userResult = await fetchGarminUserId(tokenData.access_token);
+    const garminUserId = userResult.success ? userResult.userId : 'unknown';
     
     // OAuth callback doesn't have user session - we'll match by codeVerifier later
     // For now, we'll create a temporary record and match it in the registration webhook
@@ -306,6 +282,107 @@ router.post("/debug", async (req, res) => {
   }
 });
 
+// GET /api/garmin/tokens/:athleteId - Check Garmin tokens for specific athlete
+router.get("/tokens/:athleteId", async (req, res) => {
+  try {
+    const { athleteId } = req.params;
+    
+    console.log('🔍 DEBUG - Checking Garmin tokens for athleteId:', athleteId);
+    
+    const athlete = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_access_token: true,
+        garmin_refresh_token: true,
+        garmin_expires_in: true,
+        garmin_scope: true,
+        garmin_connected_at: true,
+        garmin_last_sync_at: true,
+        garmin_is_connected: true
+      }
+    });
+    
+    if (!athlete) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Athlete not found' 
+      });
+    }
+    
+    console.log('✅ DEBUG - Athlete found:', athlete.email);
+    console.log('✅ DEBUG - Garmin tokens status:', {
+      hasAccessToken: !!athlete.garmin_access_token,
+      hasRefreshToken: !!athlete.garmin_refresh_token,
+      userId: athlete.garmin_user_id,
+      connected: athlete.garmin_is_connected,
+      connectedAt: athlete.garmin_connected_at,
+      scope: athlete.garmin_scope
+    });
+    
+    res.json({
+      success: true,
+      athlete: {
+        id: athlete.id,
+        email: athlete.email,
+        garmin: {
+          userId: athlete.garmin_user_id,
+          hasAccessToken: !!athlete.garmin_access_token,
+          hasRefreshToken: !!athlete.garmin_refresh_token,
+          expiresIn: athlete.garmin_expires_in,
+          scope: athlete.garmin_scope,
+          connected: athlete.garmin_is_connected,
+          connectedAt: athlete.garmin_connected_at,
+          lastSyncAt: athlete.garmin_last_sync_at,
+          // Don't expose actual tokens for security
+          accessTokenPreview: athlete.garmin_access_token ? 
+            `${athlete.garmin_access_token.substring(0, 20)}...` : null,
+          refreshTokenPreview: athlete.garmin_refresh_token ? 
+            `${athlete.garmin_refresh_token.substring(0, 20)}...` : null
+        }
+      },
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ DEBUG - Error checking Garmin tokens:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to check Garmin tokens',
+      details: error.message
+    });
+  }
+});
+
+// POST /api/garmin/webhook-test - Test webhook endpoint
+router.post("/webhook-test", async (req, res) => {
+  try {
+    console.log('🔍 WEBHOOK TEST ENDPOINT HIT!');
+    console.log('🔍 Headers:', req.headers);
+    console.log('🔍 Body:', req.body);
+    console.log('🔍 Timestamp:', new Date().toISOString());
+    
+    res.json({
+      success: true,
+      message: 'Webhook test endpoint working',
+      timestamp: new Date().toISOString(),
+      received: {
+        headers: req.headers,
+        body: req.body
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Webhook test error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Webhook test failed' 
+    });
+  }
+});
+
 // POST /api/garmin/registration - Handle Garmin registration webhook (THE KEY ONE!)
 router.post("/registration", async (req, res) => {
   try {
@@ -324,10 +401,14 @@ router.post("/registration", async (req, res) => {
     }
     
     // Find athlete by any existing Garmin connection (they just completed OAuth)
+    // Look for athletes with 'pending' garmin_user_id (recently completed OAuth)
     const athlete = await prisma.athlete.findFirst({
       where: { 
         garmin_access_token: { not: null },
         garmin_user_id: 'pending' // Find the one we just set to 'pending'
+      },
+      orderBy: {
+        garmin_connected_at: 'desc' // Get the most recent one
       }
     });
     
