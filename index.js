@@ -36,8 +36,8 @@ app.use(express.json());
 app.use('/api/athlete', athleteUniversalHydrateRouter); // /retrieve (FIRST - most specific)
 app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
+app.use('/api/athlete', tokenRetrieveRouter); // /tokenretrieve (BEFORE /:id routes!)
 app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
-app.use('/api/athlete', tokenRetrieveRouter); // /tokenretrieve
 
 // Modular Garmin OAuth routes
 app.use('/api/garmin', garminAuthRouter); // /auth, /callback, /refresh
