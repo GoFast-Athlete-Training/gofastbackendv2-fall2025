@@ -112,14 +112,6 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
-    // Fetch Garmin API User ID using the dedicated config function
-    const userResult = await fetchGarminUserId(tokenData.access_token);
-    const garminUserId = userResult.success ? userResult.userId : 'unknown';
-    
-    // OAuth callback doesn't have user session - we'll match by codeVerifier later
-    // For now, we'll create a temporary record and match it in the registration webhook
-    console.log('✅ OAuth callback - no user session required');
-    
     // Get athleteId from frontend localStorage (sent in request body)
     const { athleteId } = req.body;
     
@@ -129,12 +121,12 @@ router.post("/callback", async (req, res) => {
     
     console.log('✅ OAuth callback - saving tokens for athleteId:', athleteId);
     
-    // Save Garmin tokens to database using athleteId
+    // Save Garmin tokens to database - user info will be fetched separately
     try {
       await prisma.athlete.update({
         where: { id: athleteId },
         data: {
-          garmin_user_id: garminUserId, // THE REAL UUID from /user-info!
+          garmin_user_id: 'pending', // Will be updated by garminUserRoute
           garmin_access_token: tokenData.access_token,
           garmin_refresh_token: tokenData.refresh_token,
           garmin_expires_in: tokenData.expires_in,
@@ -153,6 +145,39 @@ router.post("/callback", async (req, res) => {
       });
       
       console.log('✅ Garmin tokens saved to database for athleteId:', athleteId);
+      
+      // Now fetch the UUID using the access token
+      try {
+        const userInfo = await fetch(
+          "https://connectapi.garmin.com/oauth-service/oauth/user-info",
+          {
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+              Accept: "application/json"
+            }
+          }
+        );
+
+        if (userInfo.ok) {
+          const userData = await userInfo.json();
+          console.log("Garmin user info:", userData);
+          
+          // Update with real UUID
+          await prisma.athlete.update({
+            where: { id: athleteId },
+            data: {
+              garmin_user_id: userData.userId || 'unknown'
+            }
+          });
+          
+          console.log('✅ Garmin UUID updated:', userData.userId);
+        } else {
+          console.log('⚠️ Could not fetch Garmin user info, keeping pending');
+        }
+      } catch (uuidError) {
+        console.error('❌ Failed to fetch Garmin UUID:', uuidError);
+      }
+      
     } catch (dbError) {
       console.error('❌ Failed to save Garmin tokens to database:', dbError);
       return res.status(500).json({ error: 'Failed to save tokens' });
@@ -160,12 +185,12 @@ router.post("/callback", async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Garmin connected successfully',
+      message: 'Garmin tokens saved, call user route to complete setup',
       tokens: {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         expires_in: tokenData.expires_in,
-        scope: tokenData.scope // This tells us what permissions we have
+        scope: tokenData.scope
       }
     });
     
