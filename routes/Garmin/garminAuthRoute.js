@@ -115,42 +115,12 @@ router.post("/callback", async (req, res) => {
     let garminUserId = 'pending'; // Will be fetched later
     console.log('✅ OAuth tokens received, user profile will be fetched separately');
     
-    // Get user ID from JWT token (you'll need to implement this)
-    // For now, we'll use a placeholder - you'll need to extract from auth middleware
-    const userId = req.user?.id; // This should come from your auth middleware
+    // OAuth callback doesn't have user session - we'll match by codeVerifier later
+    // For now, we'll create a temporary record and match it in the registration webhook
+    console.log('✅ OAuth callback - no user session required');
     
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
-    }
-    
-    // Save Garmin tokens and permissions to database
-    try {
-      await prisma.athlete.update({
-        where: { id: userId },
-        data: {
-          garmin_user_id: garminUserId, // Fetched from Garmin API
-          garmin_access_token: tokenData.access_token,
-          garmin_refresh_token: tokenData.refresh_token,
-          garmin_expires_in: tokenData.expires_in,
-          garmin_scope: tokenData.scope,
-          garmin_connected_at: new Date(),
-          garmin_last_sync_at: new Date(),
-          garmin_is_connected: true, // Set connected status
-          garmin_permissions: {
-            read: tokenData.scope?.includes('READ') || false,
-            write: tokenData.scope?.includes('WRITE') || false,
-            scope: tokenData.scope,
-            grantedAt: new Date(),
-            lastChecked: new Date()
-          }
-        }
-      });
-      
-      console.log('✅ Garmin tokens and permissions saved to database for user:', userId);
-    } catch (dbError) {
-      console.error('❌ Failed to save Garmin tokens to database:', dbError);
-      // Don't fail the OAuth flow if DB save fails
-    }
+    // Skip database save during OAuth callback - we'll do this in registration webhook
+    console.log('✅ OAuth callback successful - tokens will be saved via registration webhook');
     
     res.json({
       success: true,
