@@ -423,16 +423,16 @@ router.put('/:id', async (req, res) => {
 });
 
 /**
- * Delete Athlete
+ * Delete Athlete with Cascading Deletes
  * DELETE /api/athlete/:id
- * Delete athlete from database (admin only)
+ * Delete athlete and all related data (admin only)
  */
 router.delete('/:id', async (req, res) => {
   try {
     const prisma = getPrismaClient();
     const { id } = req.params;
     
-    console.log('🗑️ ATHLETE DELETE: Deleting athlete:', id);
+    console.log('🗑️ ATHLETE DELETE: Starting cascading delete for athlete:', id);
     
     // Check if athlete exists
     const athlete = await prisma.athlete.findUnique({
@@ -448,23 +448,99 @@ router.delete('/:id', async (req, res) => {
       });
     }
     
-    // Delete the athlete
-    await prisma.athlete.delete({
-      where: { id: parseInt(id) }
-    });
+    console.log('🔄 ATHLETE DELETE: Found athlete, starting cascading deletes...');
     
-    console.log('✅ ATHLETE DELETE: Successfully deleted athlete:', id);
+    // CASCADING DELETE SERVICE
+    // Delete all related data first, then the athlete
     
-    res.json({
-      success: true,
-      message: 'Athlete deleted successfully',
-      deletedAthlete: {
-        id: athlete.id,
-        email: athlete.email,
-        firstName: athlete.firstName,
-        lastName: athlete.lastName
-      }
-    });
+    const deletedData = {
+      athlete: null,
+      trainingPlans: 0,
+      runCrewMemberships: 0,
+      matches: 0,
+      activities: 0,
+      messages: 0
+    };
+    
+    try {
+      // 1. Delete Training Plans (when they exist)
+      // const trainingPlans = await prisma.trainingPlan.deleteMany({
+      //   where: { athleteId: parseInt(id) }
+      // });
+      // deletedData.trainingPlans = trainingPlans.count;
+      // console.log('🗑️ CASCADE: Deleted', trainingPlans.count, 'training plans');
+      
+      // 2. Delete Run Crew Memberships (when they exist)
+      // const runCrewMemberships = await prisma.runCrewMember.deleteMany({
+      //   where: { athleteId: parseInt(id) }
+      // });
+      // deletedData.runCrewMemberships = runCrewMemberships.count;
+      // console.log('🗑️ CASCADE: Deleted', runCrewMemberships.count, 'run crew memberships');
+      
+      // 3. Delete Matches (when they exist)
+      // const matches = await prisma.match.deleteMany({
+      //   where: { 
+      //     OR: [
+      //       { athlete1Id: parseInt(id) },
+      //       { athlete2Id: parseInt(id) }
+      //     ]
+      //   }
+      // });
+      // deletedData.matches = matches.count;
+      // console.log('🗑️ CASCADE: Deleted', matches.count, 'matches');
+      
+      // 4. Delete Activities (when they exist)
+      // const activities = await prisma.activity.deleteMany({
+      //   where: { athleteId: parseInt(id) }
+      // });
+      // deletedData.activities = activities.count;
+      // console.log('🗑️ CASCADE: Deleted', activities.count, 'activities');
+      
+      // 5. Delete Messages (when they exist)
+      // const messages = await prisma.message.deleteMany({
+      //   where: { 
+      //     OR: [
+      //       { senderId: parseInt(id) },
+      //       { receiverId: parseInt(id) }
+      //     ]
+      //   }
+      // });
+      // deletedData.messages = messages.count;
+      // console.log('🗑️ CASCADE: Deleted', messages.count, 'messages');
+      
+      console.log('✅ CASCADE: All related data deleted (none exist yet)');
+      
+      // 6. Finally, delete the athlete
+      deletedData.athlete = await prisma.athlete.delete({
+        where: { id: parseInt(id) }
+      });
+      
+      console.log('✅ ATHLETE DELETE: Successfully deleted athlete and all related data:', id);
+      
+      res.json({
+        success: true,
+        message: 'Athlete and all related data deleted successfully',
+        deletedData: {
+          athlete: {
+            id: deletedData.athlete.id,
+            email: deletedData.athlete.email,
+            firstName: deletedData.athlete.firstName,
+            lastName: deletedData.athlete.lastName
+          },
+          cascadingDeletes: {
+            trainingPlans: deletedData.trainingPlans,
+            runCrewMemberships: deletedData.runCrewMemberships,
+            matches: deletedData.matches,
+            activities: deletedData.activities,
+            messages: deletedData.messages
+          }
+        }
+      });
+      
+    } catch (cascadeError) {
+      console.error('❌ CASCADE ERROR: Failed to delete related data:', cascadeError);
+      throw cascadeError;
+    }
     
   } catch (error) {
     console.error('❌ ATHLETE DELETE: Error:', error);
