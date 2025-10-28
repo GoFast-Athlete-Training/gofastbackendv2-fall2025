@@ -315,7 +315,7 @@ await prisma.athlete.update({
 
 ### 2. User Dashboard (Admin App)
 **Repository**: `gofast-user-dashboard`
-**URL**: `https://gofast-user-dashboard.vercel.app`
+**URL**: `https://dashboard.gofastcrushgoals.com`
 **Purpose**: Admin dashboard for managing athletes
 
 **Auth Flow**:
