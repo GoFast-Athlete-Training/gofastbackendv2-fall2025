@@ -111,6 +111,26 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
+    // Fetch Garmin user ID using access token
+    let garminUserId = 'unknown';
+    try {
+      const userResponse = await fetch('https://apis.garmin.com/wellness-api/rest/user/id', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`
+        }
+      });
+      
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        garminUserId = userData.userId || userData.id || 'unknown';
+        console.log('✅ Garmin user ID fetched:', garminUserId);
+      } else {
+        console.log('⚠️ Could not fetch Garmin user ID, using unknown');
+      }
+    } catch (userError) {
+      console.error('❌ Error fetching Garmin user ID:', userError);
+    }
+    
     // Get user ID from JWT token (you'll need to implement this)
     // For now, we'll use a placeholder - you'll need to extract from auth middleware
     const userId = req.user?.id; // This should come from your auth middleware
@@ -124,7 +144,7 @@ router.post("/callback", async (req, res) => {
       await prisma.athlete.update({
         where: { id: userId },
         data: {
-          garmin_user_id: tokenData.garmin_user_id || 'unknown', // Garmin might not return this
+          garmin_user_id: garminUserId, // Fetched from Garmin API
           garmin_access_token: tokenData.access_token,
           garmin_refresh_token: tokenData.refresh_token,
           garmin_expires_in: tokenData.expires_in,
