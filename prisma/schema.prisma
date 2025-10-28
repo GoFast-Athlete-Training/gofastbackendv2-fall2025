@@ -59,6 +59,11 @@ model Athlete {
   garmin_is_connected  Boolean   @default(false) // Simple connected status
   garmin_disconnected_at DateTime? // When user disconnected
   
+  // Garmin Rich User Data (from API)
+  garmin_user_profile   Json?     // Store rich user profile data from Garmin API
+  garmin_user_sleep     Json?     // Store sleep preferences
+  garmin_user_preferences Json?   // Store user preferences and settings
+  
   // System fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -21,15 +21,98 @@ router.get("/user", async (req, res) => {
         id: true,
         email: true,
         garmin_user_id: true,
+        garmin_access_token: true,
         garmin_connected_at: true,
         garmin_last_sync_at: true,
         garmin_scope: true,
-        // Don't return tokens for security
+        garmin_is_connected: true
       }
     });
     
     if (!athlete) {
       return res.status(404).json({ error: "User not found" });
+    }
+    
+    // If connected, try to fetch fresh data from Garmin API
+    let garminApiData = null;
+    if (athlete.garmin_access_token && athlete.garmin_is_connected) {
+      try {
+        const garminResponse = await fetch('https://connectapi.garmin.com/userprofile-service/userprofile', {
+          headers: {
+            'Authorization': `Bearer ${athlete.garmin_access_token}`
+          }
+        });
+        
+        if (garminResponse.ok) {
+          garminApiData = await garminResponse.json();
+          console.log('✅ Fresh Garmin API data fetched:', garminApiData);
+          
+          // Parse the rich user data
+          const parsedData = {
+            userId: garminApiData.id,
+            userData: {
+              gender: garminApiData.userData?.gender,
+              weight: garminApiData.userData?.weight,
+              height: garminApiData.userData?.height,
+              timeFormat: garminApiData.userData?.timeFormat,
+              birthDate: garminApiData.userData?.birthDate,
+              measurementSystem: garminApiData.userData?.measurementSystem,
+              activityLevel: garminApiData.userData?.activityLevel,
+              handedness: garminApiData.userData?.handedness,
+              vo2MaxRunning: garminApiData.userData?.vo2MaxRunning,
+              vo2MaxCycling: garminApiData.userData?.vo2MaxCycling,
+              lactateThresholdSpeed: garminApiData.userData?.lactateThresholdSpeed,
+              lactateThresholdHeartRate: garminApiData.userData?.lactateThresholdHeartRate,
+              intensityMinutesCalcMethod: garminApiData.userData?.intensityMinutesCalcMethod,
+              moderateIntensityMinutesHrZone: garminApiData.userData?.moderateIntensityMinutesHrZone,
+              vigorousIntensityMinutesHrZone: garminApiData.userData?.vigorousIntensityMinutesHrZone,
+              hydrationMeasurementUnit: garminApiData.userData?.hydrationMeasurementUnit,
+              firstbeatMaxStressScore: garminApiData.userData?.firstbeatMaxStressScore,
+              thresholdHeartRateAutoDetected: garminApiData.userData?.thresholdHeartRateAutoDetected,
+              ftpAutoDetected: garminApiData.userData?.ftpAutoDetected,
+              availableTrainingDays: garminApiData.userData?.availableTrainingDays,
+              preferredLongTrainingDays: garminApiData.userData?.preferredLongTrainingDays
+            },
+            userSleep: {
+              sleepTime: garminApiData.userSleep?.sleepTime,
+              defaultSleepTime: garminApiData.userSleep?.defaultSleepTime,
+              wakeTime: garminApiData.userSleep?.wakeTime,
+              defaultWakeTime: garminApiData.userSleep?.defaultWakeTime
+            },
+            connectDate: garminApiData.connectDate,
+            sourceType: garminApiData.sourceType
+          };
+          
+          garminApiData = parsedData;
+          console.log('✅ Parsed Garmin user data:', parsedData);
+          
+          // Save rich user data to database
+          try {
+            await prisma.athlete.update({
+              where: { id: userId },
+              data: {
+                garmin_user_profile: parsedData.userData,
+                garmin_user_sleep: parsedData.userSleep,
+                garmin_user_preferences: {
+                  measurementSystem: parsedData.userData.measurementSystem,
+                  timeFormat: parsedData.userData.timeFormat,
+                  intensityMinutesCalcMethod: parsedData.userData.intensityMinutesCalcMethod,
+                  availableTrainingDays: parsedData.userData.availableTrainingDays,
+                  preferredLongTrainingDays: parsedData.userData.preferredLongTrainingDays
+                },
+                garmin_last_sync_at: new Date()
+              }
+            });
+            console.log('✅ Rich Garmin user data saved to database');
+          } catch (dbError) {
+            console.error('❌ Failed to save rich Garmin data:', dbError);
+          }
+        } else {
+          console.log('⚠️ Could not fetch fresh Garmin data, using stored data');
+        }
+      } catch (apiError) {
+        console.log('⚠️ Garmin API error, using stored data:', apiError.message);
+      }
     }
     
     res.json({
@@ -38,11 +121,13 @@ router.get("/user", async (req, res) => {
         id: athlete.id,
         email: athlete.email,
         garmin: {
-          connected: !!athlete.garmin_user_id,
+          connected: athlete.garmin_is_connected && !!athlete.garmin_user_id,
           userId: athlete.garmin_user_id,
           connectedAt: athlete.garmin_connected_at,
           lastSyncAt: athlete.garmin_last_sync_at,
-          scope: athlete.garmin_scope
+          scope: athlete.garmin_scope,
+          // Fresh API data if available
+          apiData: garminApiData
         }
       }
     });
