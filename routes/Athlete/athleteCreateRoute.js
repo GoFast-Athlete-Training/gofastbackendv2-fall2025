@@ -376,4 +376,104 @@ router.post('/find', verifyFirebaseToken, async (req, res) => {
   }
 });
 
+/**
+ * Update Athlete
+ * PUT /api/athlete/:id
+ * Update athlete data (admin only)
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    console.log('🔄 ATHLETE UPDATE: Updating athlete:', id);
+    console.log('🔄 ATHLETE UPDATE: Update data:', updateData);
+    
+    // Remove fields that shouldn't be updated
+    delete updateData.id;
+    delete updateData.athleteId;
+    delete updateData.createdAt;
+    delete updateData.firebaseId; // Don't allow changing Firebase ID
+    
+    const updatedAthlete = await prisma.athlete.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...updateData,
+        updatedAt: new Date()
+      }
+    });
+    
+    console.log('✅ ATHLETE UPDATE: Successfully updated athlete:', updatedAthlete.id);
+    
+    res.json({
+      success: true,
+      message: 'Athlete updated successfully',
+      athlete: updatedAthlete
+    });
+    
+  } catch (error) {
+    console.error('❌ ATHLETE UPDATE: Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update athlete',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Delete Athlete
+ * DELETE /api/athlete/:id
+ * Delete athlete from database (admin only)
+ */
+router.delete('/:id', async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { id } = req.params;
+    
+    console.log('🗑️ ATHLETE DELETE: Deleting athlete:', id);
+    
+    // Check if athlete exists
+    const athlete = await prisma.athlete.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!athlete) {
+      console.log('❌ ATHLETE DELETE: Athlete not found:', id);
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found',
+        message: `No athlete found with ID ${id}`
+      });
+    }
+    
+    // Delete the athlete
+    await prisma.athlete.delete({
+      where: { id: parseInt(id) }
+    });
+    
+    console.log('✅ ATHLETE DELETE: Successfully deleted athlete:', id);
+    
+    res.json({
+      success: true,
+      message: 'Athlete deleted successfully',
+      deletedAthlete: {
+        id: athlete.id,
+        email: athlete.email,
+        firstName: athlete.firstName,
+        lastName: athlete.lastName
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ ATHLETE DELETE: Error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete athlete',
+      message: error.message
+    });
+  }
+});
+
 export default router;
