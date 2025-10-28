@@ -1,61 +1,141 @@
 import express from "express";
+import { PrismaClient } from '@prisma/client';
+import GarminFieldMapper from '../../services/GarminFieldMapper.js';
 
 const router = express.Router();
+const prisma = new PrismaClient();
 
-// POST /api/garmin/webhook - Handle general webhook events
-router.post("/webhook", async (req, res) => {
+// POST /api/garmin/activity - Handle Garmin activity webhook
+router.post("/activity", async (req, res) => {
   try {
-    const { type, data } = req.body;
+    const { userId, activityId, activityName, activityType, startTimeLocal, durationInSeconds, distanceInMeters, averageSpeed, calories, averageHeartRate, maxHeartRate, elevationGain, steps, startLatitude, startLongitude, endLatitude, endLongitude, summaryPolyline, deviceMetaData } = req.body;
     
-    console.log('🔍 DEBUG - Garmin webhook received:', { type, data });
+    console.log('🔍 DEBUG - Garmin activity webhook received:', { 
+      userId, 
+      activityId, 
+      activityName, 
+      activityType: activityType?.typeKey,
+      startTimeLocal,
+      durationInSeconds,
+      distanceInMeters,
+      averageSpeed,
+      calories,
+      averageHeartRate,
+      maxHeartRate,
+      elevationGain,
+      steps,
+      deviceName: deviceMetaData?.deviceName
+    });
     
-    // Handle different webhook types
-    switch (type) {
-      case 'activity':
-        console.log('📊 Activity webhook:', data);
-        // TODO: Process activity data
-        break;
-      case 'activity_details':
-        console.log('📋 Activity details webhook:', data);
-        // TODO: Process activity details
-        break;
-      case 'activity_files':
-        console.log('📁 Activity files webhook:', data);
-        // TODO: Process activity files
-        break;
-      case 'activity_manual':
-        console.log('✏️ Manual activity webhook:', data);
-        // TODO: Process manually updated activities
-        break;
-      case 'moveiq':
-        console.log('🏃 MoveIQ webhook:', data);
-        // TODO: Process MoveIQ data
-        break;
-      case 'user_update':
-        console.log('👤 User update webhook:', data);
-        // TODO: Process user updates
-        break;
-      case 'connection_status':
-        console.log('🔗 Connection status webhook:', data);
-        // TODO: Process connection changes
-        break;
-      default:
-        console.log('❓ Unknown webhook type:', type);
+    // Find our athlete by Garmin user ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { garmin_user_id: userId }
+    });
+    
+    if (!athlete) {
+      console.log('⚠️ No athlete found for Garmin user ID:', userId);
+      return res.status(404).json({ success: false, error: 'Athlete not found' });
     }
     
-    res.json({
-      success: true,
-      message: 'Webhook processed',
-      type: type,
-      timestamp: new Date().toISOString()
+    // Check if activity already exists (using sourceActivityId as unique key)
+    const existingActivity = await prisma.athleteActivity.findFirst({
+      where: { 
+        sourceActivityId: activityId?.toString()
+      }
+    });
+    
+    if (existingActivity) {
+      console.log('📝 Updating existing activity summary:', activityId);
+      
+      // Update existing activity with new summary data
+      const updatedActivity = await prisma.athleteActivity.update({
+        where: { id: existingActivity.id },
+        data: GarminFieldMapper.mapActivitySummary(req.body, athlete.id)
+      });
+      
+      console.log('✅ Activity summary updated:', updatedActivity.id);
+      
+      res.json({ 
+        success: true, 
+        message: 'Activity summary updated', 
+        activityId: updatedActivity.id,
+        action: 'updated',
+        phase: 'summary'
+      });
+    } else {
+      console.log('🆕 Creating new activity summary:', activityId);
+      
+      // Create new activity with summary data
+      const newActivity = await prisma.athleteActivity.create({
+        data: GarminFieldMapper.mapActivitySummary(req.body, athlete.id)
+      });
+      
+      console.log('✅ Activity summary created:', newActivity.id);
+      
+      res.json({ 
+        success: true, 
+        message: 'Activity summary created', 
+        activityId: newActivity.id,
+        action: 'created',
+        phase: 'summary'
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Garmin activity webhook error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process activity webhook' });
+  }
+});
+
+// POST /api/garmin/details - Handle Garmin activity details webhook (Phase 2)
+router.post("/details", async (req, res) => {
+  try {
+    const { activityId, lapSummaries, splitSummaries, averageRunCadence, maxRunCadence, averagePower, maxPower, aerobicTrainingEffect, anaerobicTrainingEffect, trainingEffectLabel, timeInHeartRateZones, samples } = req.body;
+    
+    console.log('🔍 DEBUG - Garmin activity details webhook received:', { 
+      activityId, 
+      lapCount: lapSummaries?.length,
+      splitCount: splitSummaries?.length,
+      hasCadence: !!averageRunCadence,
+      hasPower: !!averagePower,
+      hasTrainingEffect: !!aerobicTrainingEffect,
+      hasHeartRateZones: !!timeInHeartRateZones,
+      hasSamples: !!samples
+    });
+    
+    // Find existing activity by sourceActivityId
+    const existingActivity = await prisma.athleteActivity.findFirst({
+      where: { 
+        sourceActivityId: activityId?.toString()
+      }
+    });
+    
+    if (!existingActivity) {
+      console.log('⚠️ No activity found for Garmin activity ID:', activityId);
+      return res.status(404).json({ success: false, error: 'Activity not found' });
+    }
+    
+    console.log('📊 Hydrating activity details:', existingActivity.id);
+    
+    // Update existing activity with detail data (Phase 2)
+    const updatedActivity = await prisma.athleteActivity.update({
+      where: { id: existingActivity.id },
+      data: GarminFieldMapper.mapActivityDetails(req.body)
+    });
+    
+    console.log('✅ Activity details hydrated:', updatedActivity.id);
+    
+    res.json({ 
+      success: true, 
+      message: 'Activity details hydrated', 
+      activityId: updatedActivity.id,
+      action: 'hydrated',
+      phase: 'details'
     });
     
   } catch (error) {
-    console.error('❌ Garmin webhook error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to process webhook' 
-    });
+    console.error('❌ Garmin activity details webhook error:', error);
+    res.status(500).json({ success: false, error: 'Failed to process activity details webhook' });
   }
 });
 

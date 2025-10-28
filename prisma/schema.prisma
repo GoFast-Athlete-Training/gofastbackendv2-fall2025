@@ -54,11 +54,70 @@ model Athlete {
   garmin_connected_at   DateTime? // When Garmin was connected
   garmin_last_sync_at   DateTime? // Last data sync timestamp
   
+  // Garmin Permissions & Status
+  garmin_permissions    Json?     // Store Garmin permission details
+  garmin_is_connected  Boolean   @default(false) // Simple connected status
+  garmin_disconnected_at DateTime? // When user disconnected
+  
   // System fields
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   status    String?  // Optional status field - no default
   
+  // Relations
+  activities AthleteActivity[]
+  
   @@map("athletes")
+}
+
+model AthleteActivity {
+  id        String @id @default(cuid())
+  athleteId String
+  
+  // Source Information
+  sourceActivityId String   @unique // Garmin's unique activity ID (join key)
+  source           String   @default("garmin")
+  
+  // Core Activity Data (Summary from /garmin/activity webhook)
+  activityType     String?   // running, cycling, swimming, etc.
+  activityName     String?   // "Morning Run", "Evening Bike Ride"
+  startTime        DateTime? // when activity started
+  duration         Int?      // duration in seconds
+  distance         Float?    // distance in meters
+  averageSpeed     Float?    // average speed in m/s
+  calories         Int?      // calories burned
+  
+  // Performance Metrics (Summary data)
+  averageHeartRate Int?      // average heart rate
+  maxHeartRate     Int?      // maximum heart rate
+  elevationGain    Float?    // elevation gain in meters
+  steps            Int?      // step count (if applicable)
+  
+  // Location Data (Summary)
+  startLatitude    Float?    // GPS start latitude
+  startLongitude   Float?    // GPS start longitude
+  endLatitude      Float?    // GPS end latitude
+  endLongitude     Float?    // GPS end longitude
+  summaryPolyline  String?   // encoded route polyline
+  
+  // Device Information
+  deviceName       String?   // "Forerunner 255", "Edge 1040"
+  garminUserId     String?   // Garmin user GUID from webhook
+  
+  // Hybrid Data Storage
+  summaryData      Json?     // Phase 1: Summary fields from /garmin/activity
+  detailData       Json?     // Phase 2: Details from /garmin/details (laps, splits, HR zones, etc.)
+  hydratedAt       DateTime? // When details were hydrated
+  
+  // Timestamps
+  syncedAt         DateTime @default(now())
+  lastUpdatedAt    DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  athlete          Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@map("athlete_activities")
 }
 

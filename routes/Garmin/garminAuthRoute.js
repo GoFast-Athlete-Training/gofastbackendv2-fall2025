@@ -106,7 +106,7 @@ router.post("/callback", async (req, res) => {
     }
     
     const tokenData = await tokenResponse.json();
-    console.log('Garmin OAuth 2.0 tokens received:', tokenData);
+    console.log('Garmin OAuth 2.0 tokens received (tokens hidden for security)');
     
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
@@ -144,7 +144,7 @@ router.post("/callback", async (req, res) => {
       return res.status(401).json({ error: "User not authenticated" });
     }
     
-    // Save Garmin tokens to database
+    // Save Garmin tokens and permissions to database
     try {
       await prisma.athlete.update({
         where: { id: userId },
@@ -155,11 +155,19 @@ router.post("/callback", async (req, res) => {
           garmin_expires_in: tokenData.expires_in,
           garmin_scope: tokenData.scope,
           garmin_connected_at: new Date(),
-          garmin_last_sync_at: new Date()
+          garmin_last_sync_at: new Date(),
+          garmin_is_connected: true, // Set connected status
+          garmin_permissions: {
+            read: tokenData.scope?.includes('READ') || false,
+            write: tokenData.scope?.includes('WRITE') || false,
+            scope: tokenData.scope,
+            grantedAt: new Date(),
+            lastChecked: new Date()
+          }
         }
       });
       
-      console.log('✅ Garmin tokens saved to database for user:', userId);
+      console.log('✅ Garmin tokens and permissions saved to database for user:', userId);
     } catch (dbError) {
       console.error('❌ Failed to save Garmin tokens to database:', dbError);
       // Don't fail the OAuth flow if DB save fails
@@ -231,4 +239,60 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
-export default router;
+// POST /api/garmin/debug - Debug endpoint for testing
+router.post("/debug", async (req, res) => {
+  try {
+    const { action, codeVerifier } = req.body;
+    
+    console.log('🔍 DEBUG - Debug request received:', { action, codeVerifier });
+    
+    if (action === 'check_tokens') {
+      // Check if we have any stored tokens in database
+      try {
+        const athletes = await prisma.athlete.findMany({
+          where: {
+            garmin_access_token: { not: null }
+          },
+          select: {
+            id: true,
+            email: true,
+            garmin_user_id: true,
+            garmin_connected_at: true,
+            garmin_scope: true
+          }
+        });
+        
+        console.log('🔍 DEBUG - Found athletes with Garmin tokens:', athletes.length);
+        
+        res.json({
+          success: true,
+          message: 'Debug check completed',
+          athletes: athletes,
+          codeVerifier: codeVerifier,
+          timestamp: new Date().toISOString()
+        });
+      } catch (dbError) {
+        console.error('❌ Database error:', dbError);
+        res.json({
+          success: false,
+          error: 'Database error',
+          details: dbError.message
+        });
+      }
+    } else {
+      res.json({
+        success: false,
+        error: 'Unknown debug action',
+        availableActions: ['check_tokens']
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Debug endpoint failed',
+      details: error.message
+    });
+  }
+});

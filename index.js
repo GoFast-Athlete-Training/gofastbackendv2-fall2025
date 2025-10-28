@@ -13,6 +13,7 @@ import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydr
 import garminAuthRouter from './routes/Garmin/garminAuthRoute.js';
 import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
+import garminUserRouter from './routes/Garmin/garminUserRoute.js';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
 app.use('/api/garmin', garminAuthRouter); // /auth, /callback, /refresh
 app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
 app.use('/api/garmin', garminPermissionsRouter); // /permissions, /deregister, /webhook
+app.use('/api/garmin', garminUserRouter); // /user, /user/connect
 
 // Health check
 app.get('/api/health', (req, res) => {
