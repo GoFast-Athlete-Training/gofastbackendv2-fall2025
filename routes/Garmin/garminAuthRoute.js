@@ -119,8 +119,11 @@ router.post("/callback", async (req, res) => {
     // For now, we'll create a temporary record and match it in the registration webhook
     console.log('✅ OAuth callback - no user session required');
     
-    // Skip database save during OAuth callback - we'll do this in registration webhook
-    console.log('✅ OAuth callback successful - tokens will be saved via registration webhook');
+    // Store tokens temporarily - user will fetch them later via "Get My Garmin ID"
+    console.log('✅ OAuth callback successful - tokens stored temporarily');
+    
+    // For now, just return success - user will fetch tokens later
+    // TODO: Implement proper user identification for OAuth callback
     
     res.json({
       success: true,
