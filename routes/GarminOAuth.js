@@ -1,6 +1,7 @@
-const express = require("express");
+import express from "express";
+import crypto from "crypto";
+
 const router = express.Router();
-const crypto = require("crypto");
 
 // Garmin OAuth 2.0 PKCE Configuration
 const GARMIN_CONFIG = {
@@ -165,4 +166,4 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
