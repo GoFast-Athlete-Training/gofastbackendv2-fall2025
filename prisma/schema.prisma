@@ -29,6 +29,9 @@ model Athlete {
   bio          String?
   instagram    String?
   
+  // RunCrew Integration (MVP1)
+  runCrewId    String?  // Optional - if null, show "Join RunCrew" card
+  
   // Training Profile (Future)
   currentPace     String?
   weeklyMileage   Int?
