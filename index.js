@@ -26,6 +26,8 @@ app.use(cors({
     'https://gofastfrontend-demo.vercel.app',
     'https://gofastfrontend-mvp1.vercel.app',
     'https://gofast-user-dashboard.vercel.app',
+    'https://gofast-user-dashboard-e30u68a2q-ignite-stack.vercel.app',
+    'https://dashboard.gofastcrushgoals.com',
     'https://athlete.gofastcrushgoals.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
