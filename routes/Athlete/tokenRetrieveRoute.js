@@ -6,13 +6,16 @@ const prisma = new PrismaClient();
 
 // Simple route to get tokens by athleteId
 router.get('/tokenretrieve', async (req, res) => {
+  console.log('🎯 TOKEN RETRIEVE ROUTE HIT!', req.query);
   try {
     const { athleteId } = req.query;
     
     if (!athleteId) {
+      console.log('❌ No athleteId provided');
       return res.status(400).json({ error: 'athleteId is required' });
     }
 
+    console.log('🔍 Looking for athlete:', athleteId);
     const athlete = await prisma.athlete.findUnique({
       where: { id: athleteId },
       select: {
@@ -29,9 +32,11 @@ router.get('/tokenretrieve', async (req, res) => {
     });
 
     if (!athlete) {
+      console.log('❌ Athlete not found:', athleteId);
       return res.status(404).json({ error: 'Athlete not found' });
     }
 
+    console.log('✅ Athlete found:', athlete.email, 'Tokens:', !!athlete.garmin_access_token);
     res.json({
       success: true,
       athleteId: athlete.id,
