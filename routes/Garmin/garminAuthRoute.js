@@ -128,7 +128,7 @@ router.post("/callback", async (req, res) => {
       await prisma.athlete.update({
         where: { id: athleteId },
         data: {
-          garmin_user_id: 'pending', // Will be updated by garminUserRoute
+          garmin_user_id: null, // Will be updated by garminUserRoute
           garmin_access_token: tokenData.access_token,
           garmin_refresh_token: tokenData.refresh_token,
           garmin_expires_in: tokenData.expires_in,
