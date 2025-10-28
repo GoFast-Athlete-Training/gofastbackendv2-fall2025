@@ -11,15 +11,15 @@ You were getting this error:
 
 ## ✅ The Solution
 
-**Garmin doesn't provide a user-info endpoint!** The Partner API UUID comes through **webhooks**, not direct API calls.
+**Garmin DOES provide a user-info endpoint!** The Partner API UUID comes through **direct API calls**, not webhooks.
 
 ### What We Fixed
 
-1. **Removed the non-existent user-info API call** from `garminAuthRoute.js`
-2. **Set `garmin_user_id` to 'pending'** after OAuth success
-3. **Updated webhook handler** to properly match and update the UUID
-4. **Fixed user route** to handle the 'pending' state correctly
-5. **Added webhook test endpoint** for debugging
+1. **Removed hallucinated webhook registration** from `garminAuthRoute.js`
+2. **Set `garmin_user_id` to `null`** after OAuth success (not 'pending')
+3. **Created manual UUID fetch** on GarminConnectSuccess page
+4. **Added simple `/tokenretrieve` route** for getting tokens by athleteId
+5. **Fixed token persistence** in localStorage across pages
 
 ## 🔄 The Correct Flow
 
