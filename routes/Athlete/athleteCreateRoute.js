@@ -125,8 +125,8 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         email,
         firstName: firstName || null,
         lastName: lastName || null,
-        photoURL: photoURL || null,
-        status: 'active'
+        photoURL: photoURL || null
+        // Removed hardcoded status: 'active' - we'll track real activity later
       }
     });
     
@@ -134,7 +134,6 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     console.log('✅ ATHLETE: New Athlete ID:', athlete.id);
     console.log('✅ ATHLETE: Athlete Email:', athlete.email);
     console.log('✅ ATHLETE: Athlete Firebase ID:', athlete.firebaseId);
-    console.log('✅ ATHLETE: Athlete Status:', athlete.status);
     console.log('✅ ATHLETE: Athlete Created At:', athlete.createdAt);
     
     res.status(201).json({
@@ -148,7 +147,6 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         firstName: athlete.firstName,
         lastName: athlete.lastName,
         photoURL: athlete.photoURL,
-        status: athlete.status,
         createdAt: athlete.createdAt
       }
     });
