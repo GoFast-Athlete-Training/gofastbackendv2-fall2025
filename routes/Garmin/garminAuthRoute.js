@@ -111,19 +111,73 @@ router.post("/callback", async (req, res) => {
     // Log the scope returned by Garmin
     console.log('Garmin returned scope:', tokenData.scope);
     
-    // Skip user profile fetch during OAuth - we'll do this later via /user endpoint
-    let garminUserId = 'pending'; // Will be fetched later
-    console.log('✅ OAuth tokens received, user profile will be fetched separately');
+    // Fetch Garmin API User ID using /user-info endpoint (THE REAL UUID!)
+    let garminUserId = 'unknown';
+    try {
+      const userInfoResponse = await fetch('https://connectapi.garmin.com/oauth-service/oauth/user-info', {
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`
+        }
+      });
+      
+      if (userInfoResponse.ok) {
+        const userInfo = await userInfoResponse.json();
+        garminUserId = userInfo.userId || 'unknown';
+        console.log('✅ Garmin API User ID fetched:', garminUserId);
+        console.log('✅ Garmin user info:', {
+          userId: userInfo.userId,
+          garminUserName: userInfo.garminUserName,
+          garminUserEmail: userInfo.garminUserEmail,
+          scopes: userInfo.scopes
+        });
+      } else {
+        console.log('⚠️ Could not fetch Garmin user info, using unknown');
+      }
+    } catch (userInfoError) {
+      console.error('❌ Error fetching Garmin user info:', userInfoError);
+    }
     
     // OAuth callback doesn't have user session - we'll match by codeVerifier later
     // For now, we'll create a temporary record and match it in the registration webhook
     console.log('✅ OAuth callback - no user session required');
     
-    // Store tokens temporarily - user will fetch them later via "Get My Garmin ID"
-    console.log('✅ OAuth callback successful - tokens stored temporarily');
+    // Get athleteId from frontend localStorage (sent in request body)
+    const { athleteId } = req.body;
     
-    // For now, just return success - user will fetch tokens later
-    // TODO: Implement proper user identification for OAuth callback
+    if (!athleteId) {
+      return res.status(400).json({ error: "athleteId is required" });
+    }
+    
+    console.log('✅ OAuth callback - saving tokens for athleteId:', athleteId);
+    
+    // Save Garmin tokens to database using athleteId
+    try {
+      await prisma.athlete.update({
+        where: { id: athleteId },
+        data: {
+          garmin_user_id: garminUserId, // THE REAL UUID from /user-info!
+          garmin_access_token: tokenData.access_token,
+          garmin_refresh_token: tokenData.refresh_token,
+          garmin_expires_in: tokenData.expires_in,
+          garmin_scope: tokenData.scope,
+          garmin_connected_at: new Date(),
+          garmin_last_sync_at: new Date(),
+          garmin_is_connected: true,
+          garmin_permissions: {
+            read: tokenData.scope?.includes('READ') || false,
+            write: tokenData.scope?.includes('WRITE') || false,
+            scope: tokenData.scope,
+            grantedAt: new Date(),
+            lastChecked: new Date()
+          }
+        }
+      });
+      
+      console.log('✅ Garmin tokens saved to database for athleteId:', athleteId);
+    } catch (dbError) {
+      console.error('❌ Failed to save Garmin tokens to database:', dbError);
+      return res.status(500).json({ error: 'Failed to save tokens' });
+    }
     
     res.json({
       success: true,
