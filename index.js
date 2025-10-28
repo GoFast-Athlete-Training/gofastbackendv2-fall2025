@@ -9,7 +9,10 @@ import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
-import garminOAuthRouter from './routes/GarminOAuth.js';
+// Import modular Garmin routes
+import garminAuthRouter from './routes/Garmin/garminAuthRoute.js';
+import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
+import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
 
 dotenv.config();
 
@@ -37,9 +40,10 @@ app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summa
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
 
-// Garmin OAuth routes
-app.use('/api/garmin', garminOAuthRouter); // /auth
-app.use('/auth/garmin', garminOAuthRouter); // /callback (Replit URL)
+// Modular Garmin OAuth routes
+app.use('/api/garmin', garminAuthRouter); // /auth, /callback, /refresh
+app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
+app.use('/api/garmin', garminPermissionsRouter); // /permissions, /deregister, /webhook
 
 // Health check
 app.get('/api/health', (req, res) => {
