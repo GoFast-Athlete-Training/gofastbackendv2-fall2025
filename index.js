@@ -43,7 +43,7 @@ app.use('/auth/garmin', garminOAuthRouter); // /callback (Replit URL)
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', version: '2.0.0' });
+  res.json({ status: 'OK', version: '2.0.1' });
 });
 
 // Get all athletes
