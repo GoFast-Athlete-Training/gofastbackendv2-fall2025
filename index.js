@@ -31,7 +31,7 @@ app.use(cors({
 app.use(express.json());
 
 // The 4 API calls - ORDER MATTERS!
-app.use('/api/athlete', athleteUniversalHydrateRouter); // /universal-hydrate (FIRST - most specific)
+app.use('/api/athlete', athleteUniversalHydrateRouter); // /retrieve (FIRST - most specific)
 app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 app.use('/api/athlete', athleteCreateRouter); // /create, /, /:id, /find
@@ -58,7 +58,7 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2',
     endpoints: {
-      universalHydrate: '/api/athlete/universal-hydrate',
+      universalHydrate: '/api/athlete/retrieve',
       createAthlete: API_ROUTES.CREATE_ATHLETE.path,
       hydrateAthletes: API_ROUTES.HYDRATE_ATHLETES.path,
       updateProfile: API_ROUTES.UPDATE_PROFILE.path

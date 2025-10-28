@@ -5,7 +5,7 @@ import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 const router = express.Router();
 
 // UNIVERSAL HYDRATE - Find athlete by Firebase ID and return full data
-router.get('/universal-hydrate', verifyFirebaseToken, async (req, res) => {
+router.get('/retrieve', verifyFirebaseToken, async (req, res) => {
   try {
     const prisma = getPrismaClient();
     const { firebaseId } = req.user; // From Firebase middleware

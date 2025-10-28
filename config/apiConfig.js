@@ -1,5 +1,5 @@
 // GoFast Backend API Configuration
-// The 3 actual API calls we have
+// The 4 actual API calls we have
 
 export const API_ROUTES = {
   // 1. CREATE ATHLETE
@@ -20,7 +20,16 @@ export const API_ROUTES = {
     usedBy: ['AdminHome', 'AdminAthletes']
   },
 
-  // 3. UPDATE ATHLETE PROFILE
+  // 3. RETRIEVE INDIVIDUAL ATHLETE (Universal Hydrate)
+  RETRIEVE_ATHLETE: {
+    method: 'GET',
+    path: '/api/athlete/retrieve',
+    file: 'routes/Athlete/athleteUniversalHydrateRoute.js', 
+    purpose: 'Get individual athlete by Firebase ID for frontend hydration',
+    usedBy: ['AthleteHome', 'Profile pages', 'Any authenticated page']
+  },
+
+  // 4. UPDATE ATHLETE PROFILE
   UPDATE_PROFILE: {
     method: 'PUT',
     path: '/api/athlete/:id/profile', 
