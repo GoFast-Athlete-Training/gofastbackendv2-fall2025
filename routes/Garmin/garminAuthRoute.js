@@ -131,7 +131,10 @@ router.post("/callback", async (req, res) => {
           scopes: userInfo.scopes
         });
       } else {
+        const errorText = await userInfoResponse.text();
         console.log('⚠️ Could not fetch Garmin user info, using unknown');
+        console.log('⚠️ User-info response status:', userInfoResponse.status);
+        console.log('⚠️ User-info response text:', errorText);
       }
     } catch (userInfoError) {
       console.error('❌ Error fetching Garmin user info:', userInfoError);

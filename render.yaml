@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: gofast-backend-v2
+    env: node
+    plan: starter
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
+      - key: PORT
+        value: 10000

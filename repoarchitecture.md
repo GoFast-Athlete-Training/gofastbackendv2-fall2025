@@ -80,6 +80,219 @@ const athletes = await prisma.athlete.findMany();
 
 ---
 
+## Database Workflow: Cloud-First Schema Sync
+
+### Philosophy: No Local Migrations, No Version Files, No Nonsense 😎
+
+This project uses a **cloud-first database workflow** that auto-syncs schema from the Render server on each deploy. We intentionally avoid Prisma migrations because:
+
+- **Auto-sync**: Schema always matches deployed backend
+- **No version conflicts**: No migration files to manage
+- **Simple deployment**: Just push code, database updates automatically
+- **Cloud-native**: Designed for serverless/cloud deployment
+
+### How It Works
+
+**Build Command** (in `package.json`):
+```json
+"build": "npm install && npx prisma generate && npx prisma db push"
+```
+
+**Deployment Flow**:
+1. **Code Push** → Git push to repository
+2. **Render Build** → Runs `npm run build`
+3. **Prisma Generate** → Creates Prisma Client from schema
+4. **Database Push** → Syncs schema to PostgreSQL
+5. **Server Start** → Backend starts with updated database
+
+### Key Commands
+
+**Local Development**:
+```bash
+# Generate Prisma Client (after schema changes)
+npx prisma generate
+
+# Push schema to local database (if you have one)
+npx prisma db push
+
+# View database in Prisma Studio
+npx prisma studio
+```
+
+**Production Deployment**:
+```bash
+# This happens automatically on Render
+npm run build  # Runs: npm install && npx prisma generate && npx prisma db push
+```
+
+### Schema Changes Workflow
+
+1. **Edit Schema**: Modify `prisma/schema.prisma`
+2. **Commit & Push**: `git add . && git commit -m "Add new fields" && git push`
+3. **Render Deploys**: Automatically runs build command
+4. **Database Updates**: Schema syncs to PostgreSQL
+5. **Done**: New fields available in production
+
+### Why `db push` (No Flags)?
+
+- **Clean approach**: No confusing flags or warnings
+- **Cloud-first**: Database is managed, not a dev sandbox
+- **Auto-sync**: Ensures schema always matches code
+- **No conflicts**: Avoids migration versioning issues
+- **Simple**: Just push schema changes directly
+
+### ⚠️ PRODUCTION DATA PROTECTION RULE
+
+**IMPORTANT**: Once your database contains hydrated production data, be careful with schema changes:
+
+**✅ SAFE Changes** (can push from Render):
+- Adding new tables
+- Adding new fields (nullable or with defaults)
+- Adding indexes
+- Adding constraints (that don't conflict with existing data)
+
+**❌ DANGEROUS Changes** (run local migration first):
+- Renaming columns/tables
+- Deleting columns/tables
+- Changing column types
+- Making nullable fields required
+- Removing constraints
+
+**Why Prisma Yells "Migrations!"**:
+- Prisma assumes you need version tracking to protect data
+- We're handling schema drift via controlled pushes instead
+- But we still need to protect production data when it exists
+
+**Production Workflow**:
+1. **Test locally** with sample data
+2. **For destructive changes**: Create migration locally first
+3. **For additive changes**: Safe to push directly from Render
+4. **Always backup** before major schema changes
+
+### Database Connection Pattern
+
+**In Routes** (use this pattern):
+```javascript
+import { getPrismaClient } from '../../config/database.js';
+
+const prisma = getPrismaClient();
+const athletes = await prisma.athlete.findMany();
+```
+
+**Never Do This**:
+```javascript
+// DON'T create new PrismaClient instances
+const prisma = new PrismaClient(); // ❌ Wrong
+```
+
+### Environment Variables
+
+**Required**:
+- `DATABASE_URL` - PostgreSQL connection string
+- `FIREBASE_SERVICE_ACCOUNT` - Firebase admin SDK JSON
+
+**Render Setup**:
+- Set `DATABASE_URL` in Render environment variables
+- Set `FIREBASE_SERVICE_ACCOUNT` in Render environment variables
+- Build command: `npm run build`
+- Start command: `npm start`
+
+### Troubleshooting
+
+**Database Not Updating**:
+- Check if you actually pushed to Render
+- Verify build command runs: `npm run build`
+- Check Render logs for Prisma errors
+
+**Schema Out of Sync**:
+- Push your code changes to Render
+- Let the build process sync the schema
+- Don't try to run migrations locally
+
+**Connection Issues**:
+- Verify `DATABASE_URL` is set in Render
+- Check `config/database.js` connection logic
+- Test with `/api/health` endpoint
+
+### Files Structure
+
+```
+prisma/
+├── schema.prisma          # Database schema definition
+└── migrations/            # Auto-generated (ignore these)
+
+config/
+└── database.js           # Database connection management
+
+package.json
+├── "build": "npm install && npx prisma generate && npx prisma db push --accept-data-loss"
+└── "postinstall": "npx prisma generate"
+```
+
+**Remember**: This is a cloud-first flow, not a dev sandbox. Deal with it. 😎
+
+---
+
+## Garmin Database Issue Resolution (December 2024)
+
+### **The Problem**
+Garmin webhooks were failing because the database schema was missing Garmin-related columns, even though the Prisma schema had them defined.
+
+### **Root Cause**
+1. **Prisma Schema**: Had Garmin fields defined (`garmin_user_id`, `garmin_access_token`, etc.)
+2. **Database Schema**: Missing these columns (never deployed)
+3. **Garmin Webhook**: Tried to upsert user with non-existent columns
+4. **Result**: Prisma threw errors because it couldn't set values on missing columns
+
+### **The Issue**
+```javascript
+// This failed because garmin_user_id column didn't exist in database
+await prisma.athlete.update({
+  where: { id: athleteId },
+  data: {
+    garmin_user_id: "12345",  // ❌ Column doesn't exist!
+    garmin_access_token: "abc" // ❌ Column doesn't exist!
+  }
+});
+```
+
+### **The Solution**
+**Simple fix**: Ensure `npx prisma db push` runs in Render build process.
+
+**Build Command**:
+```json
+"build": "npm install && npx prisma generate && npx prisma db push"
+```
+
+### **What Happened**
+1. **Code had Garmin fields** in Prisma schema
+2. **Database was missing columns** (schema never deployed)
+3. **Garmin webhooks failed** trying to update non-existent columns
+4. **Render build** ran `db push` and created missing columns
+5. **Garmin integration worked** immediately after
+
+### **Key Lesson**
+- **Prisma Client** vs **Database Schema** must be in sync
+- **Missing columns** = Prisma can't set values on them
+- **Solution**: Always ensure schema is deployed before using new fields
+- **No data loss** - just missing column definitions
+
+### **Prevention**
+- Always test Garmin webhooks after schema changes
+- Ensure Render build process includes `db push`
+- Monitor deployment logs for Prisma errors
+- Test upsert functionality with existing users
+
+### **Files Involved**
+- `package.json` - Build command with `db push`
+- `prisma/schema.prisma` - Garmin field definitions
+- `services/AthleteUpsertService.js` - Proper upsert handling
+- Render deployment logs - Confirmed `db push` execution
+
+**Status**: ✅ **RESOLVED** - Garmin integration working
+
+---
+
 ## Frontend Applications
 
 ### 1. MVP1 Frontend (Athlete App)
