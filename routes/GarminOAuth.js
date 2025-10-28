@@ -166,4 +166,116 @@ router.post("/refresh", async (req, res) => {
   }
 });
 
+// POST /api/garmin/deregister - Handle user deregistration webhook
+router.post("/deregister", async (req, res) => {
+  try {
+    const { userId, garminUserId, timestamp } = req.body;
+    
+    console.log('Garmin deregistration webhook received:', { userId, garminUserId, timestamp });
+    
+    // TODO: Update user's garmin_connected status to false
+    // TODO: Remove stored Garmin tokens from database
+    // TODO: Log deregistration event
+    
+    res.json({
+      success: true,
+      message: 'User deregistration processed',
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Garmin deregistration webhook error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process deregistration' 
+    });
+  }
+});
+
+// POST /api/garmin/permissions - Handle user permissions change webhook
+router.post("/permissions", async (req, res) => {
+  try {
+    const { userId, garminUserId, permissions, timestamp } = req.body;
+    
+    console.log('Garmin permissions change webhook received:', { userId, garminUserId, permissions, timestamp });
+    
+    // TODO: Update user's Garmin permissions in database
+    // TODO: Handle scope changes (what data we can access)
+    // TODO: Log permissions change event
+    
+    res.json({
+      success: true,
+      message: 'User permissions updated',
+      permissions: permissions,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Garmin permissions webhook error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process permissions change' 
+    });
+  }
+});
+
+// POST /api/garmin/webhook - Handle general Garmin webhook events
+router.post("/webhook", async (req, res) => {
+  try {
+    const { eventType, userId, data, timestamp } = req.body;
+    
+    console.log('Garmin webhook received:', { eventType, userId, data, timestamp });
+    
+    // Handle different webhook event types
+    switch (eventType) {
+      case 'activity_upload':
+        console.log('Activity uploaded:', data);
+        // TODO: Process new activity data
+        break;
+      case 'user_update':
+        console.log('User profile updated:', data);
+        // TODO: Update user profile data
+        break;
+      case 'connection_status':
+        console.log('Connection status changed:', data);
+        // TODO: Update connection status
+        break;
+      default:
+        console.log('Unknown webhook event type:', eventType);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Webhook processed',
+      eventType: eventType,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Garmin webhook error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process webhook' 
+    });
+  }
+});
+
+// GET /api/garmin/status - Health check for webhook endpoints
+router.get("/status", async (req, res) => {
+  res.json({
+    success: true,
+    message: 'Garmin webhook endpoints active',
+    endpoints: [
+      'POST /api/garmin/auth - OAuth initiation',
+      'POST /api/garmin/callback - OAuth callback',
+      'POST /api/garmin/refresh - Token refresh',
+      'POST /api/garmin/deregister - User deregistration',
+      'POST /api/garmin/permissions - Permissions change',
+      'POST /api/garmin/webhook - General webhooks',
+      'GET /api/garmin/status - Health check'
+    ],
+    timestamp: new Date().toISOString()
+  });
+});
+
 export default router;
