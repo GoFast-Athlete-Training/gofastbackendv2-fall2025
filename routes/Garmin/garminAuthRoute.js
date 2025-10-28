@@ -276,4 +276,61 @@ router.post("/debug", async (req, res) => {
   }
 });
 
+// POST /api/garmin/registration - Handle Garmin registration webhook (THE KEY ONE!)
+router.post("/registration", async (req, res) => {
+  try {
+    const { userId, userAccessToken, userAccessTokenSecret } = req.body;
+    
+    console.log('🎯 GARMIN REGISTRATION WEBHOOK RECEIVED!');
+    console.log('🔍 DEBUG - Registration payload:', { 
+      userId, 
+      userAccessToken: userAccessToken ? '***TOKEN***' : 'MISSING',
+      userAccessTokenSecret: userAccessTokenSecret ? '***SECRET***' : 'MISSING'
+    });
+    
+    if (!userId) {
+      console.error('❌ Missing userId in registration webhook');
+      return res.status(400).json({ success: false, error: 'Missing userId' });
+    }
+    
+    // Find athlete by any existing Garmin connection (they just completed OAuth)
+    const athlete = await prisma.athlete.findFirst({
+      where: { 
+        garmin_access_token: { not: null },
+        garmin_user_id: 'pending' // Find the one we just set to 'pending'
+      }
+    });
+    
+    if (athlete) {
+      // Update with the REAL Partner API UUID from Garmin
+      await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: {
+          garmin_user_id: userId, // THE REAL UUID!
+          garmin_last_sync_at: new Date()
+        }
+      });
+      
+      console.log('✅ Garmin registration processed for athlete:', athlete.id);
+      console.log('✅ Partner API UUID saved:', userId);
+    } else {
+      console.log('⚠️ No athlete found with pending Garmin connection');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Garmin registration processed',
+      userId: userId,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Garmin registration webhook error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to process registration' 
+    });
+  }
+});
+
 export default router;
