@@ -8,16 +8,16 @@ const prisma = new PrismaClient();
 // GET /api/garmin/user - Get current user's Garmin status
 router.get("/user", async (req, res) => {
   try {
-    // TODO: Get user ID from JWT token/auth middleware
-    const userId = req.user?.id; // This should come from your auth middleware
+    // Get athleteId from query params or body
+    const athleteId = req.query.athleteId || req.body?.athleteId;
     
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    if (!athleteId) {
+      return res.status(400).json({ error: "athleteId is required" });
     }
     
     // Get user's Garmin connection status
     const athlete = await prisma.athlete.findUnique({
-      where: { id: userId },
+      where: { id: athleteId },
       select: {
         id: true,
         email: true,
