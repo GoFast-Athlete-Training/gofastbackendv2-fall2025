@@ -44,6 +44,17 @@ router.get('/admin/hydrate', async (req, res) => {
       createdAt: athlete.createdAt,
       updatedAt: athlete.updatedAt,
       
+      // Garmin Integration Status
+      garmin: {
+        connected: athlete.garmin_is_connected || false,
+        userId: athlete.garmin_user_id || null,
+        connectedAt: athlete.garmin_connected_at || null,
+        lastSyncAt: athlete.garmin_last_sync_at || null,
+        scope: athlete.garmin_scope || null,
+        hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
+        tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+      },
+      
       // Computed fields for admin display
       fullName: athlete.firstName && athlete.lastName 
         ? `${athlete.firstName} ${athlete.lastName}` 
@@ -120,6 +131,17 @@ router.get('/:id/hydrate', async (req, res) => {
       status: athlete.status,
       createdAt: athlete.createdAt,
       updatedAt: athlete.updatedAt,
+      
+      // Garmin Integration Status
+      garmin: {
+        connected: athlete.garmin_is_connected || false,
+        userId: athlete.garmin_user_id || null,
+        connectedAt: athlete.garmin_connected_at || null,
+        lastSyncAt: athlete.garmin_last_sync_at || null,
+        scope: athlete.garmin_scope || null,
+        hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
+        tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+      },
       
       // Computed fields for detailed view
       fullName: athlete.firstName && athlete.lastName 
