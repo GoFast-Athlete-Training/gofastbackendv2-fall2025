@@ -153,7 +153,7 @@ export const debugFirebaseToken = async (req, res, next) => {
       if (authHeader.startsWith('Bearer ')) {
         const token = authHeader.split('Bearer ')[1];
         console.log('🔍 FIREBASE DEBUG: Token length:', token.length);
-        console.log('🔍 FIREBASE DEBUG: Token preview:', token.substring(0, 20) + '...');
+        console.log('🔍 FIREBASE DEBUG: Token preview: [REDACTED]');
         
         // Try to verify without failing
         try {
