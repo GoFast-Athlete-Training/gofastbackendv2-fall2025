@@ -40,7 +40,7 @@ router.post("/activity", async (req, res) => {
         }
         
         // Lookup athlete by garmin_user_id
-        const athlete = await prisma.athlete.findUnique({
+        const athlete = await prisma.athlete.findFirst({
           where: { garmin_user_id: userId },
         });
         
