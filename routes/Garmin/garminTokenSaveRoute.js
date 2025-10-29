@@ -10,9 +10,6 @@ export const saveGarminTokens = async (athleteId, tokens) => {
     // Get database client from container
     const prisma = getPrismaClient();
     
-    // Calculate expiration time
-    const expiresAt = new Date(Date.now() + (tokens.expires_in * 1000));
-    
     // Step 1: Save tokens to database
     const updatedAthlete = await prisma.athlete.update({
       where: { id: athleteId },
@@ -20,7 +17,6 @@ export const saveGarminTokens = async (athleteId, tokens) => {
         garmin_access_token: tokens.access_token,
         garmin_refresh_token: tokens.refresh_token,
         garmin_expires_in: tokens.expires_in,
-        garmin_expires_at: expiresAt,
         garmin_scope: tokens.scope,
         garmin_connected_at: new Date(),
         garmin_last_sync_at: new Date(),
@@ -72,8 +68,6 @@ export const saveGarminTokens = async (athleteId, tokens) => {
           where: { id: athleteId },
           data: {
             garmin_user_id: profileData.userId,
-            garmin_user_name: profileData.displayName || profileData.userName,
-            garmin_profile_id: profileData.profileId,
             garmin_last_sync_at: new Date()
           }
         });
