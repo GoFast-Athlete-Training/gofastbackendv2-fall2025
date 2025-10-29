@@ -3,6 +3,12 @@ import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
 
+// Top-level middleware logger for all Garmin webhooks
+router.use((req, res, next) => {
+  console.log(`📡 Garmin webhook incoming: ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // GET /api/garmin/status - Get user's Garmin connection status and scopes
 router.get("/status", async (req, res) => {
   try {
