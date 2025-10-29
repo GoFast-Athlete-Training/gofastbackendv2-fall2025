@@ -16,6 +16,7 @@ import garminCodeCatchRouter from './routes/Garmin/garminCodeCatchRoute.js';
 import garminUserProfileRouter from './routes/Garmin/garminUserProfileRoute.js';
 import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
+import garminDeregistrationRouter from './routes/Garmin/garminDeregistrationRoute.js';
 
 dotenv.config();
 
@@ -45,7 +46,8 @@ app.use('/api/garmin', garminUrlGenRouter); // /auth-url (FIRST - most specific)
 app.use('/api/garmin', garminCodeCatchRouter); // /callback
 app.use('/api/garmin', garminUserProfileRouter); // /user
 app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
-app.use('/api/garmin', garminPermissionsRouter); // /permissions, /deregister, /webhook
+app.use('/api/garmin', garminPermissionsRouter); // /permissions, /webhook
+app.use('/api/garmin', garminDeregistrationRouter); // /deregistration
 
 // Health check
 app.get('/api/health', (req, res) => {
