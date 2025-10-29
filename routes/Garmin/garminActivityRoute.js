@@ -1,13 +1,13 @@
 import express from "express";
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database.js';
 import GarminFieldMapper from '../../services/GarminFieldMapper.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // POST /api/garmin/activity - Handle Garmin activity webhook
 router.post("/activity", async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { userId, activityId, activityName, activityType, startTimeLocal, durationInSeconds, distanceInMeters, averageSpeed, calories, averageHeartRate, maxHeartRate, elevationGain, steps, startLatitude, startLongitude, endLatitude, endLongitude, summaryPolyline, deviceMetaData } = req.body;
     
     console.log('🔍 DEBUG - Garmin activity webhook received:', { 

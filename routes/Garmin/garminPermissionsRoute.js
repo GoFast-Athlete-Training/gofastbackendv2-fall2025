@@ -1,8 +1,7 @@
 import express from "express";
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/garmin/status - Get user's Garmin connection status and scopes
 router.get("/status", async (req, res) => {
