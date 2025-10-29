@@ -9,6 +9,7 @@ import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
+import athleteActivitiesRouter from './routes/Athlete/athleteActivitiesRoute.js';
 // Import modular Garmin routes
 import garminUrlGenRouter from './routes/Garmin/garminUrlGenRoute.js';
 import garminCodeCatchRouter from './routes/Garmin/garminCodeCatchRoute.js';
@@ -34,6 +35,7 @@ app.use(express.json());
 
 // The 4 API calls - ORDER MATTERS!
 app.use('/api/athlete', athleteUniversalHydrateRouter); // /retrieve (FIRST - most specific)
+app.use('/api/athlete', athleteActivitiesRouter); // /activities, /:athleteId/activities (BEFORE /:id routes)
 app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find

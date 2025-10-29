@@ -8,23 +8,30 @@ const router = express.Router();
 router.post("/activity", async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { userId, activityId, activityName, activityType, startTimeLocal, durationInSeconds, distanceInMeters, averageSpeed, calories, averageHeartRate, maxHeartRate, elevationGain, steps, startLatitude, startLongitude, endLatitude, endLongitude, summaryPolyline, deviceMetaData } = req.body;
     
-    console.log('🔍 DEBUG - Garmin activity webhook received:', { 
+    // Log the COMPLETE raw body to see what Garmin is actually sending
+    console.log('🔍 RAW Garmin webhook body:', JSON.stringify(req.body, null, 2));
+    
+    // Try multiple possible field names from Garmin webhook
+    const garminActivity = req.body;
+    
+    // Extract data - try different possible field structures
+    const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId;
+    const activityId = garminActivity.activityId || garminActivity.activity_id || garminActivity.id;
+    const activityName = garminActivity.activityName || garminActivity.activity_name || garminActivity.name;
+    const activityType = garminActivity.activityType || garminActivity.activity_type;
+    const startTimeLocal = garminActivity.startTimeLocal || garminActivity.start_time_local || garminActivity.startTime || garminActivity.start_time;
+    const durationInSeconds = garminActivity.durationInSeconds || garminActivity.duration_in_seconds || garminActivity.duration;
+    const distanceInMeters = garminActivity.distanceInMeters || garminActivity.distance_in_meters || garminActivity.distance;
+    
+    console.log('🔍 Parsed Garmin activity webhook:', { 
       userId, 
       activityId, 
       activityName, 
-      activityType: activityType?.typeKey,
+      activityType: activityType?.typeKey || activityType,
       startTimeLocal,
       durationInSeconds,
-      distanceInMeters,
-      averageSpeed,
-      calories,
-      averageHeartRate,
-      maxHeartRate,
-      elevationGain,
-      steps,
-      deviceName: deviceMetaData?.deviceName
+      distanceInMeters
     });
     
     // Find our athlete by Garmin user ID
@@ -48,10 +55,14 @@ router.post("/activity", async (req, res) => {
     if (existingActivity) {
       console.log('📝 Updating existing activity summary:', activityId);
       
-      // Update existing activity with new summary data
+      // Update existing activity with new summary data - use the parsed garminActivity object
+      const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
+      
+      console.log('📝 Updating activity with mapped data:', mappedData);
+      
       const updatedActivity = await prisma.athleteActivity.update({
         where: { id: existingActivity.id },
-        data: GarminFieldMapper.mapActivitySummary(req.body, athlete.id)
+        data: mappedData
       });
       
       console.log('✅ Activity summary updated:', updatedActivity.id);
@@ -67,9 +78,23 @@ router.post("/activity", async (req, res) => {
     } else {
       console.log('🆕 Creating new activity summary:', activityId);
       
-      // Create new activity with summary data
+      // Create new activity with summary data - use the parsed garminActivity object
+      const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
+      
+      // Ensure sourceActivityId has a value or generate one from activityId
+      if (!mappedData.sourceActivityId && activityId) {
+        mappedData.sourceActivityId = activityId.toString();
+      }
+      
+      // If still no sourceActivityId, generate a temporary one to avoid null constraint
+      if (!mappedData.sourceActivityId) {
+        mappedData.sourceActivityId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
+      console.log('📝 Creating activity with mapped data:', mappedData);
+      
       const newActivity = await prisma.athleteActivity.create({
-        data: GarminFieldMapper.mapActivitySummary(req.body, athlete.id)
+        data: mappedData
       });
       
       console.log('✅ Activity summary created:', newActivity.id);
