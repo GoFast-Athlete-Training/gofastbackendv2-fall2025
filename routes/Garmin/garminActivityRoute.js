@@ -12,27 +12,13 @@ router.post("/activity", async (req, res) => {
     // Log the COMPLETE raw body to see what Garmin is actually sending
     console.log('🔍 RAW Garmin webhook body:', JSON.stringify(req.body, null, 2));
     
-    // Try multiple possible field names from Garmin webhook
+    // Just use the raw body - let the mapper handle parsing
     const garminActivity = req.body;
     
-    // Extract data - try different possible field structures
-    const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId;
-    const activityId = garminActivity.activityId || garminActivity.activity_id || garminActivity.id;
-    const activityName = garminActivity.activityName || garminActivity.activity_name || garminActivity.name;
-    const activityType = garminActivity.activityType || garminActivity.activity_type;
-    const startTimeLocal = garminActivity.startTimeLocal || garminActivity.start_time_local || garminActivity.startTime || garminActivity.start_time;
-    const durationInSeconds = garminActivity.durationInSeconds || garminActivity.duration_in_seconds || garminActivity.duration;
-    const distanceInMeters = garminActivity.distanceInMeters || garminActivity.distance_in_meters || garminActivity.distance;
+    // Extract userId from various possible locations
+    const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId || garminActivity.userIdString;
     
-    console.log('🔍 Parsed Garmin activity webhook:', { 
-      userId, 
-      activityId, 
-      activityName, 
-      activityType: activityType?.typeKey || activityType,
-      startTimeLocal,
-      durationInSeconds,
-      distanceInMeters
-    });
+    console.log('🔍 Looking for athlete with garmin_user_id:', userId);
     
     // Find our athlete by Garmin user ID
     const athlete = await prisma.athlete.findFirst({
@@ -44,13 +30,18 @@ router.post("/activity", async (req, res) => {
       return res.status(404).json({ success: false, error: 'Athlete not found' });
     }
     
+    // Get activityId from various possible field names
+    const activityId = garminActivity.activityId || garminActivity.activity_id || garminActivity.id || garminActivity.activityUUID;
+    console.log('🔍 Activity ID from webhook:', activityId);
+    
     // Check if activity already exists (using sourceActivityId as unique key)
-    const existingActivity = await prisma.athleteActivity.findFirst({
+    const sourceActivityId = activityId?.toString() || garminActivity.sourceActivityId;
+    const existingActivity = sourceActivityId ? await prisma.athleteActivity.findFirst({
       where: { 
-        sourceActivityId: activityId?.toString(),
+        sourceActivityId: sourceActivityId,
         athleteId: athlete.id // Ensure we're checking within the correct athlete
       }
-    });
+    }) : null;
     
     if (existingActivity) {
       console.log('📝 Updating existing activity summary:', activityId);
@@ -78,17 +69,18 @@ router.post("/activity", async (req, res) => {
     } else {
       console.log('🆕 Creating new activity summary:', activityId);
       
-      // Create new activity with summary data - use the parsed garminActivity object
+      // Create new activity with summary data - use the raw garminActivity object
       const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
       
-      // Ensure sourceActivityId has a value or generate one from activityId
-      if (!mappedData.sourceActivityId && activityId) {
-        mappedData.sourceActivityId = activityId.toString();
-      }
-      
-      // If still no sourceActivityId, generate a temporary one to avoid null constraint
+      // CRITICAL: Ensure sourceActivityId always has a value (it's required and unique)
+      // Try to get it from mapped data, or activityId, or generate one
       if (!mappedData.sourceActivityId) {
-        mappedData.sourceActivityId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        if (activityId) {
+          mappedData.sourceActivityId = activityId.toString();
+        } else {
+          // Generate unique ID if Garmin doesn't provide one
+          mappedData.sourceActivityId = `garmin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
       }
       
       console.log('📝 Creating activity with mapped data:', mappedData);
