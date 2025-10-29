@@ -6,15 +6,18 @@ const router = express.Router();
 // GET /api/garmin/status - Get user's Garmin connection status and scopes
 router.get("/status", async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const athleteId = req.query.athleteId;
     
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    if (!athleteId) {
+      return res.status(400).json({ error: "athleteId is required" });
     }
+    
+    // Get database client
+    const prisma = getPrismaClient();
     
     // Get athlete's Garmin integration status
     const athlete = await prisma.athlete.findUnique({
-      where: { id: userId },
+      where: { id: athleteId },
       select: {
         garmin_user_id: true,
         garmin_access_token: true,
