@@ -15,70 +15,85 @@ router.post("/activity", async (req, res) => {
     // Log the raw payload for debugging
     console.log('🔍 Garmin activity webhook received:', JSON.stringify(req.body, null, 2));
     
-    // Use garminMapper to parse and normalize the payload
+    // Handle both single activity and array of activities
     const payload = req.body;
-    const mappedData = GarminFieldMapper.mapActivitySummary(payload, null); // athleteId will be set after finding athlete
+    const activities = payload.activities || [payload]; // Support both formats
     
-    // Extract userId from payload (Garmin sends this in various formats)
-    const garminUserId = payload.userId || payload.user_id || payload.userIdString || payload.garminUserId;
+    console.log(`🔍 Processing ${activities.length} activities from webhook`);
     
-    if (!garminUserId) {
-      console.warn('⚠️ No userId found in Garmin webhook payload');
-      return; // Already sent 200 response
+    // Process each activity
+    for (const activityPayload of activities) {
+      try {
+        // Extract userId from activity (Garmin sends this in various formats)
+        const garminUserId = activityPayload.userId || activityPayload.user_id || activityPayload.userIdString || activityPayload.garminUserId;
+        
+        if (!garminUserId) {
+          console.warn('⚠️ No userId found in activity:', activityPayload);
+          continue; // Skip this activity
+        }
+        
+        console.log('🔍 Looking for athlete with garmin_user_id:', garminUserId);
+        
+        // Find the corresponding athlete
+        const athlete = await prisma.athlete.findUnique({
+          where: { garmin_user_id: garminUserId },
+        });
+        
+        if (!athlete) {
+          console.warn('⚠️ No athlete found for Garmin user ID:', garminUserId);
+          continue; // Skip this activity
+        }
+        
+        // Use garminMapper to parse and normalize the activity
+        const mappedData = GarminFieldMapper.mapActivitySummary(activityPayload, null);
+        
+        // Prepare activity data with proper field mappings
+        const activityData = {
+          athleteId: athlete.id,
+          source: 'garmin',
+          sourceActivityId: activityPayload.activityId?.toString() || mappedData.sourceActivityId || null,
+          activityType: mappedData.activityType || activityPayload.activityType || 'UNKNOWN',
+          duration: mappedData.duration || activityPayload.durationInSeconds || 0,
+          distance: mappedData.distance || activityPayload.distanceInMeters || 0,
+          averageSpeed: mappedData.averageSpeed || activityPayload.averageSpeedInMetersPerSecond || null,
+          calories: mappedData.calories || activityPayload.activeKilocalories || null,
+          averageHeartRate: mappedData.averageHeartRate || activityPayload.averageHeartRateInBeatsPerMinute || null,
+          maxHeartRate: mappedData.maxHeartRate || activityPayload.maxHeartRateInBeatsPerMinute || null,
+          elevationGain: mappedData.elevationGain || activityPayload.totalElevationGainInMeters || null,
+          steps: mappedData.steps || activityPayload.steps || activityPayload.pushes || null,
+          garminUserId: garminUserId,
+          syncedAt: new Date(),
+          lastUpdatedAt: new Date(),
+          // Include additional mapped fields
+          activityName: mappedData.activityName || activityPayload.activityName || null,
+          startTime: mappedData.startTime || (activityPayload.startTimeInSeconds ? new Date(activityPayload.startTimeInSeconds * 1000) : null),
+          startLatitude: mappedData.startLatitude || activityPayload.startLatitude || null,
+          startLongitude: mappedData.startLongitude || activityPayload.startLongitude || null,
+          endLatitude: mappedData.endLatitude || activityPayload.endLatitude || null,
+          endLongitude: mappedData.endLongitude || activityPayload.endLongitude || null,
+          summaryPolyline: mappedData.summaryPolyline || activityPayload.summaryPolyline || null,
+          deviceName: mappedData.deviceName || activityPayload.deviceMetaData?.deviceName || null,
+          summaryData: mappedData.summaryData || activityPayload,
+        };
+        
+        // Create new record in athleteActivity
+        const newActivity = await prisma.athleteActivity.create({
+          data: activityData
+        });
+        
+        console.log('✅ Activity created:', {
+          id: newActivity.id,
+          athleteId: athlete.id,
+          sourceActivityId: activityData.sourceActivityId,
+          activityType: activityData.activityType,
+          activityName: activityData.activityName
+        });
+        
+      } catch (activityError) {
+        console.error('❌ Error processing individual activity:', activityError);
+        // Continue with next activity
+      }
     }
-    
-    console.log('🔍 Looking for athlete with garmin_user_id:', garminUserId);
-    
-    // Find the corresponding athlete via helper
-    const athlete = await prisma.athlete.findUnique({
-      where: { garmin_user_id: garminUserId },
-    });
-    
-    if (!athlete) {
-      console.warn('⚠️ No athlete found for Garmin user ID:', garminUserId);
-      return; // Already sent 200 response
-    }
-    
-    // Prepare activity data with proper field mappings
-    const activityData = {
-      athleteId: athlete.id,
-      source: 'garmin',
-      sourceActivityId: payload.activityId?.toString() || mappedData.sourceActivityId || null,
-      activityType: mappedData.activityType || payload.activityType || 'UNKNOWN',
-      duration: mappedData.duration || payload.durationInSeconds || 0,
-      distance: mappedData.distance || payload.distanceInMeters || 0,
-      averageSpeed: mappedData.averageSpeed || payload.averageSpeed || null,
-      calories: mappedData.calories || payload.calories || null,
-      averageHeartRate: mappedData.averageHeartRate || payload.averageHeartRate || null,
-      maxHeartRate: mappedData.maxHeartRate || payload.maxHeartRate || null,
-      elevationGain: mappedData.elevationGain || payload.elevationGain || null,
-      steps: mappedData.steps || payload.steps || null,
-      garminUserId: garminUserId,
-      syncedAt: new Date(),
-      lastUpdatedAt: new Date(),
-      // Include additional mapped fields
-      activityName: mappedData.activityName || payload.activityName || null,
-      startTime: mappedData.startTime || (payload.startTimeLocal ? new Date(payload.startTimeLocal) : null),
-      startLatitude: mappedData.startLatitude || payload.startLatitude || null,
-      startLongitude: mappedData.startLongitude || payload.startLongitude || null,
-      endLatitude: mappedData.endLatitude || payload.endLatitude || null,
-      endLongitude: mappedData.endLongitude || payload.endLongitude || null,
-      summaryPolyline: mappedData.summaryPolyline || payload.summaryPolyline || null,
-      deviceName: mappedData.deviceName || payload.deviceMetaData?.deviceName || null,
-      summaryData: mappedData.summaryData || null,
-    };
-    
-    // Create new record in athleteActivity
-    const newActivity = await prisma.athleteActivity.create({
-      data: activityData
-    });
-    
-    console.log('✅ Activity created:', {
-      id: newActivity.id,
-        athleteId: athlete.id,
-      sourceActivityId: activityData.sourceActivityId,
-      activityType: activityData.activityType
-      });
     
   } catch (error) {
     console.error('❌ Garmin activity webhook processing error:', error);
