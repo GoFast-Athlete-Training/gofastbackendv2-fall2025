@@ -193,19 +193,13 @@ router.post("/disconnect", async (req, res) => {
 // POST /api/garmin/permissions - Handle user permissions change webhook
 router.post("/permissions", async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { userId, garminUserId, permissions, scope, timestamp } = req.body;
     
-    console.log('Garmin permissions change webhook received:', { 
-      userId, 
-      garminUserId, 
-      permissions, 
-      scope, 
-      timestamp 
-    });
+    console.log(`📩 Garmin permissions update for ${userId}`);
     
     // Parse the scope string (e.g., "PARTNER_WRITE PARTNER_READ CONNECT_READ CONNECT_WRITE")
     const scopes = scope ? scope.split(' ') : [];
-    console.log('Parsed scopes:', scopes);
     
     // Check what permissions we have
     const hasPartnerWrite = scopes.includes('PARTNER_WRITE');
@@ -213,68 +207,66 @@ router.post("/permissions", async (req, res) => {
     const hasConnectRead = scopes.includes('CONNECT_READ');
     const hasConnectWrite = scopes.includes('CONNECT_WRITE');
     
-    console.log('Permission breakdown:', {
+    // Create permissions object
+    const permissionsData = {
+      scopes: scopes,
       hasPartnerWrite,
       hasPartnerRead,
       hasConnectRead,
-      hasConnectWrite
+      hasConnectWrite,
+      lastUpdated: new Date().toISOString(),
+      rawPermissions: permissions
+    };
+    
+    // Update athlete's Garmin permissions in database
+    const result = await prisma.athlete.updateMany({
+      where: { garmin_user_id: garminUserId },
+      data: {
+        garmin_permissions: permissionsData,
+        garmin_last_sync_at: new Date()
+      }
     });
     
-    // TODO: Update user's Garmin permissions in database
-    // TODO: Handle scope changes (what data we can access)
-    // TODO: Log permissions change event
+    console.log(`✅ Permissions updated for Garmin user ${userId} (${result.count} record(s) updated)`);
     
-    res.json({
-      success: true,
-      message: 'User permissions updated',
-      permissions: {
-        scopes: scopes,
-        hasPartnerWrite,
-        hasPartnerRead,
-        hasConnectRead,
-        hasConnectWrite
-      },
-      timestamp: new Date().toISOString()
-    });
+    // Always return 200 quickly for webhooks
+    return res.sendStatus(200);
     
   } catch (error) {
-    console.error('Garmin permissions webhook error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to process permissions change' 
-    });
+    console.error('❌ Garmin permissions webhook error:', error);
+    // Always return 200 even on error to prevent webhook retries
+    return res.sendStatus(200);
   }
 });
 
 // POST /api/garmin/deregistration - Handle user deregistration webhooks
 router.post("/deregistration", async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { userId, garminUserId, timestamp } = req.body;
     
-    console.log('🔍 DEBUG - Garmin deregistration webhook received:', { 
-      userId, 
-      garminUserId, 
-      timestamp 
+    console.log(`📩 Garmin deregistration for ${userId}`);
+    
+    // Wipe all Garmin tokens and set disconnected status
+    const result = await prisma.athlete.updateMany({
+      where: { garmin_user_id: garminUserId },
+      data: {
+        garmin_access_token: null,
+        garmin_refresh_token: null,
+        garmin_is_connected: false,
+        garmin_disconnected_at: new Date()
+      }
     });
     
-    // TODO: Update user's garmin_connected status to false
-    // TODO: Remove stored Garmin tokens from database
-    // TODO: Log deregistration event
-    // TODO: Clean up any cached data
+    console.log(`✅ Tokens wiped for Garmin user ${userId} (${result.count} record(s) updated)`);
     
-    res.json({
-      success: true,
-      message: 'User deregistration processed',
-      userId: userId,
-      timestamp: new Date().toISOString()
-    });
+    // Always return 200 quickly for webhooks
+    return res.sendStatus(200);
     
   } catch (error) {
     console.error('❌ Garmin deregistration webhook error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to process deregistration' 
-    });
+    // Always return 200 even on error to prevent webhook retries
+    return res.sendStatus(200);
   }
 });
 
