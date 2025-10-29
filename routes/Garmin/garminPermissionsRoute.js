@@ -197,7 +197,65 @@ router.post("/disconnect", async (req, res) => {
   }
 });
 
-// POST /api/garmin/permissions - Handle user permissions change webhook
+// PUT /api/garmin/permissions - Handle user permissions change webhook (Garmin preferred method)
+router.put("/permissions", async (req, res) => {
+  // 1️⃣ Acknowledge Garmin immediately
+  res.sendStatus(200);
+
+  try {
+    const prisma = getPrismaClient();
+    const payload = req.body?.userPermissionsChange?.[0];
+
+    if (!payload) {
+      console.log("⚠️ Empty permissions payload", req.body);
+      return;
+    }
+
+    const { userId } = payload;
+    console.log(`📩 Garmin permissions change for ${userId}`);
+
+    // 2️⃣ Find the athlete using the service
+    const athlete = await findAthleteByGarminUserId(userId);
+    
+    if (!athlete?.garmin_access_token) {
+      console.log(`⚠️ No access token for ${userId}`);
+      return;
+    }
+
+    // 3️⃣ Fetch current permission state from Garmin
+    const resp = await fetch(
+      "https://apis.garmin.com/wellness-api/rest/user/permissions",
+      {
+        headers: {
+          Authorization: `Bearer ${athlete.garmin_access_token}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const currentPerms = resp.ok ? await resp.json() : [];
+    console.log(`🔍 Current permissions from Garmin API for ${userId}:`, currentPerms);
+
+    // 4️⃣ Store the new permission set
+    const result = await prisma.athlete.updateMany({
+      where: { garmin_user_id: userId },
+      data: {
+        garmin_permissions: {
+          current: currentPerms,
+          updatedAt: new Date().toISOString()
+        },
+        garmin_last_sync_at: new Date()
+      }
+    });
+
+    console.log(`✅ Permissions updated for Garmin user ${userId} (${result.count} record(s) updated):`, currentPerms);
+
+  } catch (err) {
+    console.error("❌ Garmin permissions handler error:", err);
+  }
+});
+
+// POST /api/garmin/permissions - Handle user permissions change webhook (fallback method)
 router.post("/permissions", async (req, res) => {
   // 1️⃣ Acknowledge Garmin immediately
   res.sendStatus(200);
