@@ -17,21 +17,71 @@ if (redisUrl.includes('redis-cli')) {
 
 console.log('🔍 Redis URL:', redisUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')); // Hide credentials
 
-const client = redis.createClient({
-  url: redisUrl
-});
-
-client.on('error', (err) => {
-  console.error('Redis Client Error:', err);
-});
-
 // Fallback in-memory store for development
 const fallbackStore = new Map();
+let client = null;
+let isConnected = false;
+
+// Create Redis client with better error handling
+const createRedisClient = () => {
+  if (client && isConnected) return client;
+  
+  try {
+    client = redis.createClient({
+      url: redisUrl,
+      socket: {
+        reconnectStrategy: (retries) => {
+          if (retries > 10) {
+            console.warn('⚠️ Redis max reconnection attempts reached, using fallback');
+            return false;
+          }
+          return Math.min(retries * 100, 3000);
+        }
+      }
+    });
+
+    client.on('error', (err) => {
+      console.error('❌ Redis Client Error:', err.message);
+      isConnected = false;
+    });
+
+    client.on('connect', () => {
+      console.log('✅ Redis Client Connected');
+      isConnected = true;
+    });
+
+    client.on('ready', () => {
+      console.log('✅ Redis Client Ready');
+      isConnected = true;
+    });
+
+    client.on('end', () => {
+      console.log('⚠️ Redis Client Disconnected');
+      isConnected = false;
+    });
+
+    // Connect asynchronously
+    client.connect().catch(err => {
+      console.warn('⚠️ Redis connection failed, using fallback:', err.message);
+      isConnected = false;
+    });
+
+  } catch (error) {
+    console.warn('⚠️ Redis client creation failed, using fallback:', error.message);
+    isConnected = false;
+  }
+
+  return client;
+};
+
+// Initialize client
+createRedisClient();
 
 export const storeCodeVerifier = async (athleteId, codeVerifier, ttlSeconds = 600) => {
   try {
-    if (client.isOpen) {
-      await client.setEx(`garmin_code_verifier:${athleteId}`, ttlSeconds, codeVerifier);
+    const redisClient = createRedisClient();
+    if (redisClient && isConnected && redisClient.isOpen) {
+      await redisClient.setEx(`garmin_code_verifier:${athleteId}`, ttlSeconds, codeVerifier);
       console.log(`✅ Code verifier stored in Redis for athleteId: ${athleteId}`);
     } else {
       // Fallback to in-memory store
@@ -47,8 +97,9 @@ export const storeCodeVerifier = async (athleteId, codeVerifier, ttlSeconds = 60
 
 export const getCodeVerifier = async (athleteId) => {
   try {
-    if (client.isOpen) {
-      const codeVerifier = await client.get(`garmin_code_verifier:${athleteId}`);
+    const redisClient = createRedisClient();
+    if (redisClient && isConnected && redisClient.isOpen) {
+      const codeVerifier = await redisClient.get(`garmin_code_verifier:${athleteId}`);
       if (codeVerifier) {
         console.log(`✅ Code verifier retrieved from Redis for athleteId: ${athleteId}`);
         return codeVerifier;
@@ -71,8 +122,9 @@ export const getCodeVerifier = async (athleteId) => {
 
 export const deleteCodeVerifier = async (athleteId) => {
   try {
-    if (client.isOpen) {
-      await client.del(`garmin_code_verifier:${athleteId}`);
+    const redisClient = createRedisClient();
+    if (redisClient && isConnected && redisClient.isOpen) {
+      await redisClient.del(`garmin_code_verifier:${athleteId}`);
     }
     fallbackStore.delete(`garmin_code_verifier:${athleteId}`);
     console.log(`✅ Code verifier deleted for athleteId: ${athleteId}`);
@@ -81,7 +133,4 @@ export const deleteCodeVerifier = async (athleteId) => {
   }
 };
 
-// Connect to Redis
-client.connect().catch(console.error);
-
-export default client;
+export default createRedisClient;
