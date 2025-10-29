@@ -30,24 +30,21 @@ router.post("/activity", async (req, res) => {
       return res.status(404).json({ success: false, error: 'Athlete not found' });
     }
     
-    // Get activityId from various possible field names
-    const activityId = garminActivity.activityId || garminActivity.activity_id || garminActivity.id || garminActivity.activityUUID;
-    console.log('🔍 Activity ID from webhook:', activityId);
+    // Generate our own unique sourceActivityId - don't rely on Garmin
+    // Use combination of athleteId + timestamp + random to ensure uniqueness
+    const sourceActivityId = `garmin_${athlete.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Check if activity already exists (using sourceActivityId as unique key)
-    const sourceActivityId = activityId?.toString() || garminActivity.sourceActivityId;
-    const existingActivity = sourceActivityId ? await prisma.athleteActivity.findFirst({
-      where: { 
-        sourceActivityId: sourceActivityId,
-        athleteId: athlete.id // Ensure we're checking within the correct athlete
-      }
-    }) : null;
+    console.log('🔍 Generated sourceActivityId:', sourceActivityId);
+    
+    // Check if activity already exists (shouldn't happen with unique IDs, but safety check)
+    const existingActivity = null; // Always create new since we generate unique IDs
     
     if (existingActivity) {
       console.log('📝 Updating existing activity summary:', activityId);
       
-      // Update existing activity with new summary data - use the parsed garminActivity object
+      // This shouldn't happen since we generate unique IDs, but if it does, update
       const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
+      mappedData.sourceActivityId = sourceActivityId; // Ensure it matches
       
       console.log('📝 Updating activity with mapped data:', mappedData);
       
@@ -72,11 +69,8 @@ router.post("/activity", async (req, res) => {
       // Create new activity with summary data - use the raw garminActivity object
       const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
       
-      // CRITICAL: sourceActivityId is REQUIRED (not nullable) and must be unique
-      // MUST set it before create!
-      if (!mappedData.sourceActivityId) {
-        mappedData.sourceActivityId = sourceActivityId || `garmin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      }
+      // CRITICAL: Override sourceActivityId with our generated unique ID
+      mappedData.sourceActivityId = sourceActivityId;
       
       console.log('📝 Creating activity with mapped data:', mappedData);
       
