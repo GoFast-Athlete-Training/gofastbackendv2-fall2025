@@ -99,20 +99,20 @@ router.get('/by-id', async (req, res) => {
 router.get('/retrieve', async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { athleteId } = req.query; // Get athleteId from query params
+    const { athleteId, firebaseId } = req.query; // Get athleteId or firebaseId from query params
     
-    if (!athleteId) {
+    if (!athleteId && !firebaseId) {
       return res.status(400).json({
         success: false,
-        error: 'athleteId is required'
+        error: 'athleteId or firebaseId is required'
       });
     }
     
-    console.log('🚀 UNIVERSAL HYDRATE: Finding athlete by ID:', athleteId);
+    console.log('🚀 UNIVERSAL HYDRATE: Finding athlete by ID:', athleteId, 'or Firebase ID:', firebaseId);
     
-    // Find athlete by ID
+    // Find athlete by ID or Firebase ID
     const athlete = await prisma.athlete.findUnique({
-      where: { id: athleteId }
+      where: athleteId ? { id: athleteId } : { firebaseId: firebaseId }
     });
     
     if (!athlete) {
