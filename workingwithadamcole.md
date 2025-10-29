@@ -15,12 +15,14 @@ Adam will look up stuff and tell me what to do next.
 - ❌ Make assumptions about the system
 - ❌ Go too fast without understanding
 - ❌ Try to do everything at once
+- ❌ Create new tools/pages without checking if docs already explain it
 
 ## What I Should Do
 - ✅ Wait for Adam's instructions
 - ✅ Follow the repo architecture patterns
 - ✅ Use existing systems properly
 - ✅ Ask questions when unclear
+- ✅ **READ THE DOCS FOLDER FIRST** - check repoarchitecture.md and docs/ before building anything
 
 ---
 *Waiting for Adam's next instructions...*
