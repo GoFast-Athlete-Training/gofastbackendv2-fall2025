@@ -1,7 +1,7 @@
 // garminUrlGenRoute.js - Generate PKCE pair + Garmin authorization URL
 import express from 'express';
 import { generatePKCE, buildAuthUrl } from '../../services/garminUtils.js';
-import { setCodeVerifier } from '../../utils/redis.js';
+import { storeCodeVerifier } from '../../utils/redis.js';
 
 const router = express.Router();
 
