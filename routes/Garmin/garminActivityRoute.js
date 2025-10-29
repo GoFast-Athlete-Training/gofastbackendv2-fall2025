@@ -4,6 +4,12 @@ import GarminFieldMapper from '../../services/GarminFieldMapper.js';
 
 const router = express.Router();
 
+// GET /api/garmin/ping - Garmin health check endpoint
+router.get('/ping', (req, res) => {
+  console.log('📡 Garmin Ping received:', new Date().toISOString());
+  res.status(200).send('pong');
+});
+
 // POST /api/garmin/activity - Handle Garmin activity webhook
 router.post("/activity", async (req, res) => {
   try {
