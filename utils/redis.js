@@ -1,8 +1,24 @@
 // Redis helper for storing short-lived code verifiers
 import redis from 'redis';
 
+// Parse REDIS_URL properly - handle command line format
+let redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+
+// If it's a command line format, extract the actual URL
+if (redisUrl.includes('redis-cli')) {
+  const urlMatch = redisUrl.match(/redis:\/\/[^@]+@[^:]+:\d+/);
+  if (urlMatch) {
+    redisUrl = urlMatch[0];
+  } else {
+    console.warn('⚠️ Could not parse REDIS_URL, using fallback');
+    redisUrl = 'redis://localhost:6379';
+  }
+}
+
+console.log('🔍 Redis URL:', redisUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')); // Hide credentials
+
 const client = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379'
+  url: redisUrl
 });
 
 client.on('error', (err) => {
