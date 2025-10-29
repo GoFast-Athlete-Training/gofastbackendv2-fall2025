@@ -1,6 +1,6 @@
 // garminTokenSaveRoute.js - Internal service for saving tokens to database
-import { getPrismaClient } from '../config/database.js';
-import { fetchGarminUserInfo, fetchGarminProfile } from '../services/garminUtils.js';
+import { getPrismaClient } from '../../config/database.js';
+import { fetchGarminUserInfo, fetchGarminProfile } from '../../services/garminUtils.js';
 
 // Internal service function to save Garmin tokens
 export const saveGarminTokens = async (athleteId, tokens) => {

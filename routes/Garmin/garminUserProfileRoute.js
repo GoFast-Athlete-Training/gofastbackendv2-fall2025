@@ -1,7 +1,7 @@
 // garminUserProfileRoute.js - Retrieve and save Garmin user profile data
 import express from 'express';
-import { getPrismaClient } from '../config/database.js';
-import { fetchGarminProfile } from '../services/garminUtils.js';
+import { getPrismaClient } from '../../config/database.js';
+import { fetchGarminProfile } from '../../services/garminUtils.js';
 
 const router = express.Router();
 

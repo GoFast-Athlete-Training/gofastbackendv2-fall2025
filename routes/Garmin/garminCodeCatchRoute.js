@@ -1,7 +1,7 @@
 // garminCodeCatchRoute.js - Catch Garmin's redirect and handle token exchange
 import express from 'express';
-import { exchangeCodeForTokens, validateState, GARMIN_CONFIG } from '../services/garminUtils.js';
-import { getCodeVerifier, deleteCodeVerifier } from '../utils/redis.js';
+import { exchangeCodeForTokens, validateState, GARMIN_CONFIG } from '../../services/garminUtils.js';
+import { getCodeVerifier, deleteCodeVerifier } from '../../utils/redis.js';
 import { saveGarminTokens } from './garminTokenSaveRoute.js';
 
 const router = express.Router();
