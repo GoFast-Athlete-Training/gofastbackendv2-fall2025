@@ -213,8 +213,8 @@ router.post("/permissions", async (req, res) => {
     const { userId } = payload;
     console.log(`📩 Garmin permissions change for ${userId}`);
 
-    // 2️⃣ Find the athlete's access token
-    const athlete = await prisma.athlete.findFirst({
+    // 2️⃣ Find the athlete by garmin_user_id
+    const athlete = await prisma.athlete.findUnique({
       where: { garmin_user_id: userId },
       select: { garmin_access_token: true }
     });
@@ -239,7 +239,7 @@ router.post("/permissions", async (req, res) => {
     console.log(`🔍 Current permissions from Garmin API for ${userId}:`, currentPerms);
 
     // 4️⃣ Store the new permission set
-    await prisma.athlete.updateMany({
+    const result = await prisma.athlete.updateMany({
       where: { garmin_user_id: userId },
       data: {
         garmin_permissions: {
@@ -250,7 +250,7 @@ router.post("/permissions", async (req, res) => {
       }
     });
 
-    console.log(`✅ Updated permissions for ${userId}:`, currentPerms);
+    console.log(`✅ Permissions updated for Garmin user ${userId} (${result.count} record(s) updated):`, currentPerms);
 
   } catch (err) {
     console.error("❌ Garmin permissions handler error:", err);
