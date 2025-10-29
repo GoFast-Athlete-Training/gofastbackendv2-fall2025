@@ -1,6 +1,7 @@
 import express from "express";
 import { getPrismaClient } from '../../config/database.js';
 import GarminFieldMapper from '../../services/GarminFieldMapper.js';
+import { findAthleteByGarminUserId } from '../../services/garminFindAthleteService.js';
 
 const router = express.Router();
 
@@ -45,15 +46,13 @@ router.post("/activity", async (req, res) => {
           continue;
         }
     
-        // Lookup athlete by garmin_user_id
-    const athlete = await prisma.athlete.findUnique({
-          where: { garmin_user_id: userId },
-    });
-    
-    if (!athlete) {
+        // Lookup athlete using the service
+        const athlete = await findAthleteByGarminUserId(userId);
+        
+        if (!athlete) {
           console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
           continue;
-    }
+        }
     
         // Normalize webhook format to mapper expected format
         const normalizedActivity = {
@@ -139,10 +138,8 @@ router.post("/activity-details", async (req, res) => {
     
     console.log('📩 Garmin details webhook received:', { activityId, userId });
     
-    // Find matching athlete by garmin_user_id
-    const athlete = await prisma.athlete.findUnique({
-      where: { garmin_user_id: userId }
-    });
+    // Find matching athlete using the service
+    const athlete = await findAthleteByGarminUserId(userId);
     
     if (!athlete) {
       console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
@@ -206,10 +203,8 @@ router.post("/activities", async (req, res) => {
           continue;
         }
         
-        // Lookup athlete by garmin_user_id
-        const athlete = await prisma.athlete.findUnique({
-          where: { garmin_user_id: userId },
-        });
+        // Lookup athlete using the service
+        const athlete = await findAthleteByGarminUserId(userId);
         
         if (!athlete) {
           console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);

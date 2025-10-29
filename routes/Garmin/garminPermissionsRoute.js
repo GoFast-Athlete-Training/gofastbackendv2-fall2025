@@ -1,5 +1,6 @@
 import express from "express";
 import { getPrismaClient } from '../../config/database.js';
+import { findAthleteByGarminUserId } from '../../services/garminFindAthleteService.js';
 
 const router = express.Router();
 
@@ -213,11 +214,8 @@ router.post("/permissions", async (req, res) => {
     const { userId } = payload;
     console.log(`📩 Garmin permissions change for ${userId}`);
 
-    // 2️⃣ Find the athlete by garmin_user_id
-    const athlete = await prisma.athlete.findUnique({
-      where: { garmin_user_id: userId },
-      select: { garmin_access_token: true }
-    });
+    // 2️⃣ Find the athlete using the service
+    const athlete = await findAthleteByGarminUserId(userId);
     
     if (!athlete?.garmin_access_token) {
       console.log(`⚠️ No access token for ${userId}`);
@@ -259,15 +257,26 @@ router.post("/permissions", async (req, res) => {
 
 // POST /api/garmin/deregistration - Handle user deregistration webhooks
 router.post("/deregistration", async (req, res) => {
+  // 1️⃣ Acknowledge Garmin immediately
+  res.sendStatus(200);
+
   try {
     const prisma = getPrismaClient();
     const { userId, garminUserId, timestamp } = req.body;
     
     console.log(`📩 Garmin deregistration for ${userId}`);
+
+    // 2️⃣ Find the athlete using the service
+    const athlete = await findAthleteByGarminUserId(garminUserId || userId);
     
-    // Wipe all Garmin tokens and set disconnected status
+    if (!athlete) {
+      console.log(`⚠️ No athlete found for Garmin user ${garminUserId || userId}`);
+      return;
+    }
+    
+    // 3️⃣ Wipe all Garmin tokens and set disconnected status
     const result = await prisma.athlete.updateMany({
-      where: { garmin_user_id: garminUserId },
+      where: { garmin_user_id: garminUserId || userId },
       data: {
         garmin_access_token: null,
         garmin_refresh_token: null,
@@ -276,15 +285,10 @@ router.post("/deregistration", async (req, res) => {
       }
     });
     
-    console.log(`✅ Tokens wiped for Garmin user ${userId} (${result.count} record(s) updated)`);
-    
-    // Always return 200 quickly for webhooks
-    return res.sendStatus(200);
+    console.log(`✅ Tokens wiped for Garmin user ${athlete.id} (${result.count} record(s) updated)`);
     
   } catch (error) {
     console.error('❌ Garmin deregistration webhook error:', error);
-    // Always return 200 even on error to prevent webhook retries
-    return res.sendStatus(200);
   }
 });
 
