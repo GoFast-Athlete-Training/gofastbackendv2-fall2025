@@ -32,23 +32,23 @@ router.post("/activity", async (req, res) => {
         if (!userId) {
           console.warn('⚠️ No userId found in activity:', garminActivity);
           continue;
-        }
-        
+    }
+    
         if (!activityId) {
           console.warn('⚠️ No activityId found in activity:', garminActivity);
           continue;
         }
-        
+    
         // Lookup athlete by garmin_user_id
-        const athlete = await prisma.athlete.findFirst({
+    const athlete = await prisma.athlete.findUnique({
           where: { garmin_user_id: userId },
-        });
-        
-        if (!athlete) {
+    });
+    
+    if (!athlete) {
           console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
           continue;
-        }
-        
+    }
+    
         // Normalize webhook format to mapper expected format
         const normalizedActivity = {
           ...garminActivity,
@@ -85,7 +85,7 @@ router.post("/activity", async (req, res) => {
         
         // Remove timestamps from mapped activity (we set them in upsert)
         const { syncedAt, lastUpdatedAt, ...activityData } = mappedActivity;
-        
+    
         // Upsert into athleteActivity
         const upsertedActivity = await prisma.athleteActivity.upsert({
           where: { sourceActivityId: mappedActivity.sourceActivityId },
@@ -98,8 +98,8 @@ router.post("/activity", async (req, res) => {
             syncedAt: new Date(),
             lastUpdatedAt: new Date()
           }
-        });
-        
+    });
+    
         console.log(`✅ Saved Garmin activity ${activityId} for athlete ${athlete.id}`);
         
       } catch (activityError) {

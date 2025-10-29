@@ -46,7 +46,7 @@ model Athlete {
   runningGoals      String?
   
   // Garmin OAuth 2.0 PKCE Integration
-  garmin_user_id        String?  // Garmin's unique user ID
+  garmin_user_id        String? @unique  // Garmin's unique user ID
   garmin_access_token   String?  // OAuth access token
   garmin_refresh_token  String?  // OAuth refresh token
   garmin_expires_in     Int?     // Token expiration time in seconds
