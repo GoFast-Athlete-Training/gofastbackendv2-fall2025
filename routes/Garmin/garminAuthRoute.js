@@ -351,4 +351,50 @@ router.get("/tokens/:athleteId", async (req, res) => {
   }
 });
 
+// POST /api/garmin/save-tokens - Save tokens to database (called from frontend)
+router.post("/save-tokens", async (req, res) => {
+  try {
+    const { athleteId, tokens } = req.body;
+    
+    if (!athleteId || !tokens) {
+      return res.status(400).json({ error: "athleteId and tokens are required" });
+    }
+    
+    console.log('💾 SAVE TOKENS: Saving tokens for athleteId:', athleteId);
+    
+    // Save Garmin tokens to database
+    await prisma.athlete.update({
+      where: { id: athleteId },
+      data: {
+        garmin_user_id: null, // Will be updated by garminUserRoute
+        garmin_access_token: tokens.access_token,
+        garmin_refresh_token: tokens.refresh_token,
+        garmin_expires_in: tokens.expires_in,
+        garmin_scope: tokens.scope,
+        garmin_connected_at: new Date(),
+        garmin_last_sync_at: new Date(),
+        garmin_is_connected: true,
+        garmin_permissions: {
+          read: tokens.scope?.includes('READ') || false,
+          write: tokens.scope?.includes('WRITE') || false,
+          scope: tokens.scope,
+          grantedAt: new Date(),
+          lastChecked: new Date()
+        }
+      }
+    });
+    
+    console.log('✅ Tokens saved to database for athleteId:', athleteId);
+    
+    res.json({
+      success: true,
+      message: 'Tokens saved to database'
+    });
+    
+  } catch (error) {
+    console.error('❌ Save tokens error:', error);
+    res.status(500).json({ error: 'Failed to save tokens' });
+  }
+});
+
 export default router;
