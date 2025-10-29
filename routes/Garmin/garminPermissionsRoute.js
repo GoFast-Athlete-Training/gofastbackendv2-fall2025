@@ -198,59 +198,62 @@ router.post("/disconnect", async (req, res) => {
 
 // POST /api/garmin/permissions - Handle user permissions change webhook
 router.post("/permissions", async (req, res) => {
+  // 1️⃣ Acknowledge Garmin immediately
+  res.sendStatus(200);
+
   try {
     const prisma = getPrismaClient();
-    const payload = req.body;
+    const payload = req.body?.userPermissionsChange?.[0];
     
-    // Garmin sends: {"userPermissionsChange":[{ "userId" : "...", "summaryId" : "...", "permissions" : [...], "changeTimeInSeconds": ... }]}
-    const userPermissionsChanges = payload.userPermissionsChange || [];
-    
-    if (userPermissionsChanges.length === 0) {
-      console.warn('⚠️ No userPermissionsChange found in payload');
-      return res.sendStatus(200);
+    if (!payload) {
+      console.log("⚠️ Empty permissions payload", req.body);
+      return;
     }
+
+    const { userId } = payload;
+    console.log(`📩 Garmin permissions change for ${userId}`);
+
+    // 2️⃣ Find the athlete's access token
+    const athlete = await prisma.athlete.findFirst({
+      where: { garmin_user_id: userId },
+      select: { garmin_access_token: true }
+    });
     
-    // Process each permission change
-    for (const change of userPermissionsChanges) {
-      const garminUserId = change.userId;
-      const permissions = change.permissions || [];
-      const changeTimeInSeconds = change.changeTimeInSeconds;
-      const summaryId = change.summaryId;
-      
-      console.log(`📩 Garmin permissions update for ${garminUserId}`);
-      
-      // Create permissions object with Garmin's actual permission flags
-      const permissionsData = {
-        permissions: permissions, // Array like ["ACTIVITY_EXPORT", "WORKOUT_IMPORT", "HEALTH_EXPORT", etc.]
-        hasActivityExport: permissions.includes('ACTIVITY_EXPORT'),
-        hasWorkoutImport: permissions.includes('WORKOUT_IMPORT'),
-        hasHealthExport: permissions.includes('HEALTH_EXPORT'),
-        hasCourseImport: permissions.includes('COURSE_IMPORT'),
-        hasMctExport: permissions.includes('MCT_EXPORT'),
-        changeTimeInSeconds: changeTimeInSeconds,
-        summaryId: summaryId,
-        lastUpdated: new Date().toISOString()
-      };
-      
-      // Update athlete's Garmin permissions in database
-      const result = await prisma.athlete.updateMany({
-        where: { garmin_user_id: garminUserId },
-        data: {
-          garmin_permissions: permissionsData,
-          garmin_last_sync_at: new Date()
+    if (!athlete?.garmin_access_token) {
+      console.log(`⚠️ No access token for ${userId}`);
+      return;
+    }
+
+    // 3️⃣ Fetch current permission state from Garmin
+    const resp = await fetch(
+      "https://apis.garmin.com/wellness-api/rest/user/permissions",
+      {
+        headers: {
+          Authorization: `Bearer ${athlete.garmin_access_token}`,
+          "Content-Type": "application/json"
         }
-      });
-      
-      console.log(`✅ Permissions updated for Garmin user ${garminUserId} (${result.count} record(s) updated)`);
-    }
+      }
+    );
     
-    // Always return 200 quickly for webhooks
-    return res.sendStatus(200);
-    
-  } catch (error) {
-    console.error('❌ Garmin permissions webhook error:', error);
-    // Always return 200 even on error to prevent webhook retries
-    return res.sendStatus(200);
+    const currentPerms = resp.ok ? await resp.json() : [];
+    console.log(`🔍 Current permissions from Garmin API for ${userId}:`, currentPerms);
+
+    // 4️⃣ Store the new permission set
+    await prisma.athlete.updateMany({
+      where: { garmin_user_id: userId },
+      data: {
+        garmin_permissions: {
+          current: currentPerms,
+          updatedAt: new Date().toISOString()
+        },
+        garmin_last_sync_at: new Date()
+      }
+    });
+
+    console.log(`✅ Updated permissions for ${userId}:`, currentPerms);
+
+  } catch (err) {
+    console.error("❌ Garmin permissions handler error:", err);
   }
 });
 
