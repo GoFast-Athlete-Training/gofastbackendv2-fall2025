@@ -96,24 +96,31 @@ router.get('/by-id', async (req, res) => {
 });
 
 // UNIVERSAL HYDRATE - Find athlete by Firebase ID and return full data
-router.get('/retrieve', verifyFirebaseToken, async (req, res) => {
+router.get('/retrieve', async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { firebaseId } = req.user; // From Firebase middleware
+    const { athleteId } = req.query; // Get athleteId from query params
     
-    console.log('🚀 UNIVERSAL HYDRATE: Finding athlete by Firebase ID:', firebaseId);
+    if (!athleteId) {
+      return res.status(400).json({
+        success: false,
+        error: 'athleteId is required'
+      });
+    }
     
-    // Find athlete by Firebase ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
+    console.log('🚀 UNIVERSAL HYDRATE: Finding athlete by ID:', athleteId);
+    
+    // Find athlete by ID
+    const athlete = await prisma.athlete.findUnique({
+      where: { id: athleteId }
     });
     
     if (!athlete) {
-      console.log('❌ UNIVERSAL HYDRATE: No athlete found for Firebase ID:', firebaseId);
+      console.log('❌ UNIVERSAL HYDRATE: No athlete found for ID:', athleteId);
       return res.status(404).json({
         success: false,
         error: 'Athlete not found',
-        message: 'No athlete found for this Firebase user. Please sign up first.',
+        message: 'No athlete found for this ID.',
         code: 'ATHLETE_NOT_FOUND'
       });
     }
