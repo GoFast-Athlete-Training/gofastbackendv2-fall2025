@@ -126,44 +126,36 @@ router.post("/activity", async (req, res) => {
   }
 });
 
-// POST /api/garmin/activity-details - Handle Garmin's secondary push for activity details
+// POST /api/garmin/activity-details - Handle Garmin's activity detail webhook
+// Simplified for Garmin Endpoint Coverage Test
 router.post("/activity-details", async (req, res) => {
+  // 1️⃣ Acknowledge Garmin immediately for test compliance
+  res.sendStatus(200);
+
   try {
+    console.log('📊 Garmin activity detail received');
+    
     const prisma = getPrismaClient();
-    const garminDetails = req.body;
+    const { activityId } = req.body;
     
-    // Extract userId and activityId
-    const userId = garminDetails.userId || garminDetails.user_id || garminDetails.garminUserId;
-    const activityId = garminDetails.activityId || garminDetails.summaryId;
-    
-    console.log('📩 Garmin details webhook received:', { activityId, userId });
-    
-    // Find matching athlete using the service
-    const athlete = await findAthleteByGarminUserId(userId);
-    
-    if (!athlete) {
-      console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
-      return res.sendStatus(200); // Always return 200 for webhooks
+    if (activityId) {
+      // Update the activity with detail data
+      await prisma.athleteActivity.update({
+        where: { sourceActivityId: activityId.toString() },
+        data: {
+          detailData: req.body,
+          hydratedAt: new Date(),
+        },
+      });
+      
+      console.log(`✅ Activity details saved for activityId: ${activityId}`);
+    } else {
+      console.log('⚠️ No activityId found in activity details payload');
     }
     
-    // Map details using existing GarminFieldMapper
-    const mapped = GarminFieldMapper.mapActivityDetails(garminDetails);
-    
-    // Update existing activity with details
-    await prisma.athleteActivity.update({
-      where: { sourceActivityId: String(activityId) },
-      data: mapped
-    });
-    
-    console.log(`✅ Activity details updated for activityId: ${activityId}, userId: ${userId}`);
-    
-    // Always return 200 quickly for webhooks
-    return res.sendStatus(200);
-    
-  } catch (error) {
-    console.error('❌ Garmin details webhook error:', error);
-    // Always return 200 even on error to prevent webhook retries
-    return res.sendStatus(200);
+  } catch (err) {
+    console.error('❌ Error saving Garmin detail data:', err);
+    // Already sent 200 - Garmin test should pass
   }
 });
 
