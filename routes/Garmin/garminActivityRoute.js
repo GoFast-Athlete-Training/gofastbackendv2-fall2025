@@ -72,15 +72,10 @@ router.post("/activity", async (req, res) => {
       // Create new activity with summary data - use the raw garminActivity object
       const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
       
-      // CRITICAL: Ensure sourceActivityId always has a value (it's required and unique)
-      // Try to get it from mapped data, or activityId, or generate one
+      // CRITICAL: sourceActivityId is REQUIRED (not nullable) and must be unique
+      // MUST set it before create!
       if (!mappedData.sourceActivityId) {
-        if (activityId) {
-          mappedData.sourceActivityId = activityId.toString();
-        } else {
-          // Generate unique ID if Garmin doesn't provide one
-          mappedData.sourceActivityId = `garmin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        }
+        mappedData.sourceActivityId = sourceActivityId || `garmin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       }
       
       console.log('📝 Creating activity with mapped data:', mappedData);
