@@ -74,4 +74,80 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// GET /api/garmin/exchange?code=XYZ&athleteId=123 - Exchange code for tokens (called from frontend)
+router.get('/exchange', async (req, res) => {
+  try {
+    const { code, athleteId } = req.query;
+    
+    console.log('🎯 Garmin OAuth exchange received:', { code: code ? 'present' : 'missing', athleteId });
+    
+    // Validate required parameters
+    if (!code || !athleteId) {
+      console.error('❌ Missing required parameters:', { code: !!code, athleteId: !!athleteId });
+      return res.status(400).json({ 
+        success: false,
+        error: 'code and athleteId are required' 
+      });
+    }
+    
+    // Step 1: Get code verifier from Redis
+    const codeVerifier = await getCodeVerifier(athleteId);
+    if (!codeVerifier) {
+      console.error(`❌ No code verifier found for athleteId: ${athleteId}`);
+      return res.status(400).json({ 
+        success: false,
+        error: 'code_verifier_expired' 
+      });
+    }
+    
+    console.log(`🔍 Exchanging code for tokens for athleteId: ${athleteId}`);
+    
+    // Step 2: Exchange code for tokens with Garmin
+    const tokenResult = await exchangeCodeForTokens(code, codeVerifier);
+    
+    if (!tokenResult.success) {
+      console.error(`❌ Token exchange failed for athleteId ${athleteId}:`, tokenResult.error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'token_exchange_failed',
+        details: tokenResult.error
+      });
+    }
+    
+    console.log(`✅ Tokens received for athleteId: ${athleteId}`);
+    
+    // Step 3: Save tokens to database
+    const saveResult = await saveGarminTokens(athleteId, tokenResult.tokens);
+    
+    if (!saveResult.success) {
+      console.error(`❌ Token save failed for athleteId ${athleteId}:`, saveResult.error);
+      return res.status(500).json({ 
+        success: false,
+        error: 'token_save_failed',
+        details: saveResult.error
+      });
+    }
+    
+    // Step 4: Clean up Redis
+    await deleteCodeVerifier(athleteId);
+    
+    console.log(`✅ OAuth exchange completed successfully for athleteId: ${athleteId}`);
+    
+    res.json({
+      success: true,
+      message: 'Garmin connected successfully',
+      athleteId: athleteId,
+      garminUserId: saveResult.garminUserId
+    });
+    
+  } catch (error) {
+    console.error('❌ OAuth exchange error:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'exchange_error',
+      details: error.message
+    });
+  }
+});
+
 export default router;

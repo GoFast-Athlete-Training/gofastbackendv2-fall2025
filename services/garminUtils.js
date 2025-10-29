@@ -30,7 +30,7 @@ export const buildAuthUrl = (codeChallenge, state) => {
   const params = new URLSearchParams({
     client_id: GARMIN_CONFIG.CLIENT_ID,
     response_type: 'code',
-    redirect_uri: `${GARMIN_CONFIG.BACKEND_URL}/api/garmin/callback`,
+    redirect_uri: 'https://athlete.gofastcrushgoals.com/garmin/callback',
     scope: 'profile wellness',
     state: state,
     code_challenge: codeChallenge,
@@ -56,7 +56,7 @@ export const exchangeCodeForTokens = async (code, codeVerifier) => {
         client_secret: GARMIN_CONFIG.CLIENT_SECRET,
         code: code,
         code_verifier: codeVerifier,
-        redirect_uri: `${GARMIN_CONFIG.BACKEND_URL}/api/garmin/callback`
+        redirect_uri: 'https://athlete.gofastcrushgoals.com/garmin/callback'
       })
     });
     
