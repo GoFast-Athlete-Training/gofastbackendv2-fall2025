@@ -150,4 +150,76 @@ router.post("/user/connect", async (req, res) => {
   }
 });
 
+// POST /api/garmin/user/get-uuid - Get UUID from Garmin API (server-to-server)
+router.post("/user/get-uuid", async (req, res) => {
+  try {
+    const { athleteId } = req.body;
+    
+    if (!athleteId) {
+      return res.status(400).json({ error: "athleteId is required" });
+    }
+    
+    // Get athlete's access token from database
+    const athlete = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        id: true,
+        garmin_access_token: true
+      }
+    });
+    
+    if (!athlete || !athlete.garmin_access_token) {
+      return res.status(404).json({ error: "No Garmin access token found" });
+    }
+    
+    console.log('🔍 Getting UUID from Garmin API for athleteId:', athleteId);
+    
+    // Call Garmin API server-to-server
+    const garminResponse = await fetch('https://connectapi.garmin.com/oauth-service/oauth/user-info', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${athlete.garmin_access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!garminResponse.ok) {
+      const errorText = await garminResponse.text();
+      console.error('❌ Garmin API error:', garminResponse.status, errorText);
+      return res.status(garminResponse.status).json({ 
+        error: 'Garmin API error',
+        details: errorText
+      });
+    }
+    
+    const garminData = await garminResponse.json();
+    const garminUserId = garminData.userId;
+    
+    if (!garminUserId) {
+      return res.status(400).json({ error: 'No userId in Garmin response' });
+    }
+    
+    // Save UUID to database
+    await prisma.athlete.update({
+      where: { id: athleteId },
+      data: {
+        garmin_user_id: garminUserId,
+        garmin_last_sync_at: new Date()
+      }
+    });
+    
+    console.log('✅ UUID fetched and saved:', garminUserId);
+    
+    res.json({
+      success: true,
+      garminUserId: garminUserId,
+      message: 'UUID fetched and saved successfully'
+    });
+    
+  } catch (error) {
+    console.error('❌ Get UUID error:', error);
+    res.status(500).json({ error: 'Failed to get UUID' });
+  }
+});
+
 export default router;

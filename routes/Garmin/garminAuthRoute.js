@@ -148,6 +148,35 @@ router.post("/callback", async (req, res) => {
       
       console.log('✅ Garmin tokens saved to database for athleteId:', athleteId);
       
+      // NOW GET THE UUID - call garminUserRoute logic
+      console.log('🔍 Getting UUID from Garmin API...');
+      const garminResponse = await fetch('https://connectapi.garmin.com/oauth-service/oauth/user-info', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenData.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (garminResponse.ok) {
+        const garminData = await garminResponse.json();
+        const garminUserId = garminData.userId;
+        
+        if (garminUserId) {
+          // Save UUID to database
+          await prisma.athlete.update({
+            where: { id: athleteId },
+            data: {
+              garmin_user_id: garminUserId,
+              garmin_last_sync_at: new Date()
+            }
+          });
+          console.log('✅ UUID fetched and saved:', garminUserId);
+        }
+      } else {
+        console.log('⚠️ Could not fetch UUID, will be null for now');
+      }
+      
     } catch (dbError) {
       console.error('❌ Failed to save Garmin tokens to database:', dbError);
       return res.status(500).json({ error: 'Failed to save tokens' });
@@ -155,7 +184,7 @@ router.post("/callback", async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Garmin tokens saved, call user route to complete setup',
+      message: 'Garmin tokens and UUID saved successfully',
       tokens: {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
