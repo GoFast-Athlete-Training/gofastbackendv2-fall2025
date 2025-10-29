@@ -124,15 +124,17 @@ router.patch("/scopes", async (req, res) => {
 // POST /api/garmin/disconnect - Disconnect Garmin integration
 router.post("/disconnect", async (req, res) => {
   try {
-    const userId = req.user?.id;
+    const { athleteId } = req.body;
     
-    if (!userId) {
-      return res.status(401).json({ error: "User not authenticated" });
+    if (!athleteId) {
+      return res.status(400).json({ error: "athleteId is required" });
     }
+
+    const prisma = getPrismaClient();
     
     // Get current Garmin tokens
     const athlete = await prisma.athlete.findUnique({
-      where: { id: userId },
+      where: { id: athleteId },
       select: {
         garmin_access_token: true,
         garmin_user_id: true
@@ -153,14 +155,14 @@ router.post("/disconnect", async (req, res) => {
         },
         body: 'token=' + encodeURIComponent(athlete.garmin_access_token)
       });
-      console.log('✅ Garmin tokens revoked for user:', userId);
+      console.log('✅ Garmin tokens revoked for athlete:', athleteId);
     } catch (revokeError) {
       console.log('⚠️ Could not revoke Garmin tokens (they will expire anyway):', revokeError.message);
     }
     
     // Clear Garmin data from database
     await prisma.athlete.update({
-      where: { id: userId },
+      where: { id: athleteId },
       data: {
         garmin_user_id: null,
         garmin_access_token: null,
@@ -175,7 +177,7 @@ router.post("/disconnect", async (req, res) => {
       }
     });
     
-    console.log('✅ Garmin disconnected for user:', userId);
+    console.log('✅ Garmin disconnected for athlete:', athleteId);
     
     res.json({
       success: true,

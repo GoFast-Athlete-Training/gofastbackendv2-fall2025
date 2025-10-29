@@ -6,99 +6,90 @@ const router = express.Router();
 
 // POST /api/garmin/activity - Handle Garmin activity webhook
 router.post("/activity", async (req, res) => {
+  // Immediately return 200 OK to stop Garmin retries
+  res.status(200).json({ success: true, message: 'Webhook received' });
+  
   try {
     const prisma = getPrismaClient();
     
-    // Log the COMPLETE raw body to see what Garmin is actually sending
-    console.log('🔍 RAW Garmin webhook body:', JSON.stringify(req.body, null, 2));
+    // Log the raw payload for debugging
+    console.log('🔍 Garmin activity webhook received:', JSON.stringify(req.body, null, 2));
     
-    // Just use the raw body - let the mapper handle parsing
-    const garminActivity = req.body;
+    // Use garminMapper to parse and normalize the payload
+    const payload = req.body;
+    const mappedData = GarminFieldMapper.mapActivitySummary(payload, null); // athleteId will be set after finding athlete
     
-    // Extract userId from various possible locations
-    const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId || garminActivity.userIdString;
+    // Extract userId from payload (Garmin sends this in various formats)
+    const garminUserId = payload.userId || payload.user_id || payload.userIdString || payload.garminUserId;
     
-    console.log('🔍 Looking for athlete with garmin_user_id:', userId);
+    if (!garminUserId) {
+      console.warn('⚠️ No userId found in Garmin webhook payload');
+      return; // Already sent 200 response
+    }
     
-    // Find our athlete by Garmin user ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { garmin_user_id: userId }
+    console.log('🔍 Looking for athlete with garmin_user_id:', garminUserId);
+    
+    // Find the corresponding athlete via helper
+    const athlete = await prisma.athlete.findUnique({
+      where: { garmin_user_id: garminUserId },
     });
     
     if (!athlete) {
-      console.log('⚠️ No athlete found for Garmin user ID:', userId);
-      return res.status(404).json({ success: false, error: 'Athlete not found' });
+      console.warn('⚠️ No athlete found for Garmin user ID:', garminUserId);
+      return; // Already sent 200 response
     }
     
-    // Generate our own unique sourceActivityId - don't rely on Garmin
-    // Use combination of athleteId + timestamp + random to ensure uniqueness
-    const sourceActivityId = `garmin_${athlete.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Prepare activity data with proper field mappings
+    const activityData = {
+      athleteId: athlete.id,
+      source: 'garmin',
+      sourceActivityId: payload.activityId?.toString() || mappedData.sourceActivityId || null,
+      activityType: mappedData.activityType || payload.activityType || 'UNKNOWN',
+      duration: mappedData.duration || payload.durationInSeconds || 0,
+      distance: mappedData.distance || payload.distanceInMeters || 0,
+      averageSpeed: mappedData.averageSpeed || payload.averageSpeed || null,
+      calories: mappedData.calories || payload.calories || null,
+      averageHeartRate: mappedData.averageHeartRate || payload.averageHeartRate || null,
+      maxHeartRate: mappedData.maxHeartRate || payload.maxHeartRate || null,
+      elevationGain: mappedData.elevationGain || payload.elevationGain || null,
+      steps: mappedData.steps || payload.steps || null,
+      garminUserId: garminUserId,
+      syncedAt: new Date(),
+      lastUpdatedAt: new Date(),
+      // Include additional mapped fields
+      activityName: mappedData.activityName || payload.activityName || null,
+      startTime: mappedData.startTime || (payload.startTimeLocal ? new Date(payload.startTimeLocal) : null),
+      startLatitude: mappedData.startLatitude || payload.startLatitude || null,
+      startLongitude: mappedData.startLongitude || payload.startLongitude || null,
+      endLatitude: mappedData.endLatitude || payload.endLatitude || null,
+      endLongitude: mappedData.endLongitude || payload.endLongitude || null,
+      summaryPolyline: mappedData.summaryPolyline || payload.summaryPolyline || null,
+      deviceName: mappedData.deviceName || payload.deviceMetaData?.deviceName || null,
+      summaryData: mappedData.summaryData || null,
+    };
     
-    console.log('🔍 Generated sourceActivityId:', sourceActivityId);
+    // Create new record in athleteActivity
+    const newActivity = await prisma.athleteActivity.create({
+      data: activityData
+    });
     
-    // Check if activity already exists (shouldn't happen with unique IDs, but safety check)
-    const existingActivity = null; // Always create new since we generate unique IDs
-    
-    if (existingActivity) {
-      console.log('📝 Updating existing activity summary:', activityId);
-      
-      // This shouldn't happen since we generate unique IDs, but if it does, update
-      const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
-      mappedData.sourceActivityId = sourceActivityId; // Ensure it matches
-      
-      console.log('📝 Updating activity with mapped data:', mappedData);
-      
-      const updatedActivity = await prisma.athleteActivity.update({
-        where: { id: existingActivity.id },
-        data: mappedData
-      });
-      
-      console.log('✅ Activity summary updated:', updatedActivity.id);
-      
-      res.json({ 
-        success: true, 
-        message: 'Activity summary updated', 
-        activityId: updatedActivity.id,
+    console.log('✅ Activity created:', {
+      id: newActivity.id,
         athleteId: athlete.id,
-        action: 'updated',
-        phase: 'summary'
+      sourceActivityId: activityData.sourceActivityId,
+      activityType: activityData.activityType
       });
-    } else {
-      console.log('🆕 Creating new activity summary:', activityId);
-      
-      // Create new activity with summary data - use the raw garminActivity object
-      const mappedData = GarminFieldMapper.mapActivitySummary(garminActivity, athlete.id);
-      
-      // CRITICAL: Override sourceActivityId with our generated unique ID
-      mappedData.sourceActivityId = sourceActivityId;
-      
-      console.log('📝 Creating activity with mapped data:', mappedData);
-      
-      const newActivity = await prisma.athleteActivity.create({
-        data: mappedData
-      });
-      
-      console.log('✅ Activity summary created:', newActivity.id);
-      
-      res.json({ 
-        success: true, 
-        message: 'Activity summary created', 
-        activityId: newActivity.id,
-        athleteId: athlete.id,
-        action: 'created',
-        phase: 'summary'
-      });
-    }
     
   } catch (error) {
-    console.error('❌ Garmin activity webhook error:', error);
-    res.status(500).json({ success: false, error: 'Failed to process activity webhook' });
+    console.error('❌ Garmin activity webhook processing error:', error);
+    // Don't send error response - already sent 200 OK
   }
 });
 
 // POST /api/garmin/details - Handle Garmin activity details webhook (Phase 2)
 router.post("/details", async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { activityId, lapSummaries, splitSummaries, averageRunCadence, maxRunCadence, averagePower, maxPower, aerobicTrainingEffect, anaerobicTrainingEffect, trainingEffectLabel, timeInHeartRateZones, samples } = req.body;
     
     console.log('🔍 DEBUG - Garmin activity details webhook received:', { 

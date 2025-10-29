@@ -3,6 +3,25 @@
 ## Overview
 **HYBRID MODEL: Single Table, Two Phases** - This model handles both `/garmin/activity` (summary) and `/garmin/details` (telemetry) webhooks in one unified table.
 
+## Data Flow Breadcrumbs
+
+```
+Garmin (push webhook)
+  → POST /api/garmin/activity
+  → garminMapper.parse() (GarminFieldMapper.mapActivitySummary)
+  → db.js (Prisma client via getPrismaClient())
+  → athleteActivity table
+  → visible in athlete dashboard
+```
+
+### Code Flow
+1. **Garmin Webhook**: `POST /api/garmin/activity` → `routes/Garmin/garminActivityRoute.js`
+2. **Immediate Response**: Returns 200 OK immediately to prevent Garmin retries
+3. **Payload Parsing**: `services/GarminFieldMapper.js` → `mapActivitySummary(payload, athleteId)`
+4. **Athlete Lookup**: `prisma.athlete.findUnique({ where: { garmin_user_id: garminUserId } })`
+5. **Database Insert**: `prisma.athleteActivity.create({ data: activityData })` via `config/database.js`
+6. **Frontend Display**: Available via `/api/athlete/:id/activities`
+
 ## Hybrid Architecture Benefits
 ✅ **Simpler architecture** - 1 table instead of 2 — easier joins, easier API responses  
 ✅ **Idempotent updates** - Details always "patch" the same row  
@@ -146,10 +165,12 @@ Query params:
 
 ### Phase 1: Summary Processing
 1. **Webhook Received**: Garmin sends activity data to `/api/garmin/activity`
-2. **User Lookup**: Find athlete by `garmin_user_id`
-3. **Duplicate Check**: Check if activity already exists by `sourceActivityId`
-4. **Create/Update**: Either create new activity or update existing with summary data
-5. **Response**: Return success with activity ID and action taken
+2. **Immediate Response**: Return 200 OK immediately to stop Garmin retries
+3. **Payload Parsing**: Use `GarminFieldMapper.mapActivitySummary()` to normalize payload
+4. **User Lookup**: Find athlete by `garmin_user_id` using `prisma.athlete.findUnique()`
+5. **Athlete Found**: If athlete found, create new `athleteActivity` record with mapped data
+6. **Athlete Not Found**: Log warning and skip database insert (already sent 200 OK)
+7. **Database Access**: All DB operations use Prisma client from `config/database.js` → `getPrismaClient()`
 
 ### Phase 2: Details Processing
 1. **Webhook Received**: Garmin sends details data to `/api/garmin/details`
