@@ -7,7 +7,7 @@ export const GARMIN_CONFIG = {
   CLIENT_SECRET: process.env.GARMIN_CLIENT_SECRET,
   AUTHORIZE_URL: 'https://connect.garmin.com/oauthConfirm',
   TOKEN_URL: 'https://diauth.garmin.com/di-oauth2-service/oauth/token',
-  USER_INFO_URL: 'https://connectapi.garmin.com/oauth-service/oauth/user-info',
+  USER_INFO_URL: 'https://connectapi.garmin.com/oauth-service/oauth/user/identity',
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://athlete.gofastcrushgoals.com',
   BACKEND_URL: process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'
 };
@@ -122,7 +122,7 @@ export const fetchGarminProfile = async (accessToken) => {
   try {
     console.log('🔄 Fetching Garmin profile...');
     
-    const response = await fetch('https://connectapi.garmin.com/userprofile-service/userprofile', {
+    const response = await fetch('https://connectapi.garmin.com/oauth-service/oauth/user/identity', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
