@@ -147,15 +147,11 @@ router.get('/retrieve', async (req, res) => {
       createdAt: athlete.createdAt,
       updatedAt: athlete.updatedAt,
       
-      // Garmin Integration Status
+      // Garmin Integration Status (safe data only)
       garmin: {
         connected: athlete.garmin_is_connected || false,
-        userId: athlete.garmin_user_id || null,
         connectedAt: athlete.garmin_connected_at || null,
-        lastSyncAt: athlete.garmin_last_sync_at || null,
-        scope: athlete.garmin_scope || null,
-        hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
-        tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+        lastSyncAt: athlete.garmin_last_sync_at || null
       },
       
       // Computed fields
