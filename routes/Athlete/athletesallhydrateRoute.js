@@ -15,11 +15,11 @@ router.options('/admin/hydrate', (req, res) => {
 });
 
 /**
- * GET /api/athlete/hydrate
+ * GET /api/athlete/athletesallhydrate
  * Hydrate frontend with all athletes (admin view)
  * Pattern: Query container athlete (SQL/Prisma version)
  */
-router.get('/admin/hydrate', async (req, res) => {
+router.get('/athletepersonhydrate', async (req, res) => {
   try {
     // Set CORS headers explicitly
     res.header('Access-Control-Allow-Origin', '*');
@@ -57,19 +57,11 @@ router.get('/admin/hydrate', async (req, res) => {
       createdAt: athlete.createdAt,
       updatedAt: athlete.updatedAt,
       
-      // Garmin Integration Status
+      // Garmin Integration Status (safe data only - no tokens)
       garmin: {
         connected: athlete.garmin_is_connected || false,
-        userId: athlete.garmin_user_id || null,
         connectedAt: athlete.garmin_connected_at || null,
-        lastSyncAt: athlete.garmin_last_sync_at || null,
-        scope: athlete.garmin_scope || null,
-        hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
-        tokenStatus: athlete.garmin_access_token ? 'active' : 'none',
-        // Include actual tokens for localStorage
-        accessToken: athlete.garmin_access_token || null,
-        refreshToken: athlete.garmin_refresh_token || null,
-        expiresIn: athlete.garmin_expires_in || null
+        lastSyncAt: athlete.garmin_last_sync_at || null
       },
       
       // Computed fields for admin display

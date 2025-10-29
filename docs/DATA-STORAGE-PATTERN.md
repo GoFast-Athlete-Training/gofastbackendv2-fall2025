@@ -134,3 +134,4 @@ const renderAthleteCard = (athlete) => {
 ---
 *This is the perfect data storage and population pattern!*
 
+

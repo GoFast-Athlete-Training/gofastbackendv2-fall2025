@@ -6,9 +6,9 @@ import { API_ROUTES } from './config/apiConfig.js';
 
 // Import the 4 routes
 import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
-import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
+import athletesallhydrateRouter from './routes/Athlete/athletesallhydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
-import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
+import athletepersonhydrateRouter from './routes/Athlete/athletepersonhydrateRoute.js';
 import athleteActivitiesRouter from './routes/Athlete/athleteActivitiesRoute.js';
 // Import modular Garmin routes
 import garminUrlGenRouter from './routes/Garmin/garminUrlGenRoute.js';
@@ -35,9 +35,9 @@ app.use(cors({
 app.use(express.json());
 
 // The 4 API calls - ORDER MATTERS!
-app.use('/api/athlete', athleteUniversalHydrateRouter); // /retrieve (FIRST - most specific)
+app.use('/api/athlete', athletepersonhydrateRouter); // /athletepersonhydrate (FIRST - most specific)
 app.use('/api/athlete', athleteActivitiesRouter); // /activities, /:athleteId/activities (BEFORE /:id routes)
-app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summary, /:id/hydrate
+app.use('/api/athlete', athletesallhydrateRouter); // /athletesallhydrate, /hydrate/summary, /:id/hydrate
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find
 
@@ -71,7 +71,8 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2',
     endpoints: {
-      universalHydrate: '/api/athlete/retrieve',
+      athletepersonhydrate: '/api/athlete/athletepersonhydrate',
+      athletesallhydrate: '/api/athlete/athletesallhydrate',
       createAthlete: API_ROUTES.CREATE_ATHLETE.path,
       hydrateAthletes: API_ROUTES.HYDRATE_ATHLETES.path,
       updateProfile: API_ROUTES.UPDATE_PROFILE.path

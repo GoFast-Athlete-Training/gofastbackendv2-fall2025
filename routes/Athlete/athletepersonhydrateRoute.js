@@ -1,6 +1,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { findAthleteByFirebaseId } from '../../services/firebaseidathletelookup.js';
 
 const router = express.Router();
 
@@ -95,37 +96,37 @@ router.get('/by-id', async (req, res) => {
   }
 });
 
-// UNIVERSAL HYDRATE - Find athlete by Firebase ID and return full data
-router.get('/retrieve', async (req, res) => {
+// ATHLETE PERSON HYDRATE - Find athlete by Firebase ID (from verified token) and return full data
+// Uses Firebase middleware to verify token and get firebaseId from req.user.uid
+router.get('/athletesallhydrate', verifyFirebaseToken, async (req, res) => {
   try {
-    const prisma = getPrismaClient();
-    const { athleteId, firebaseId } = req.query; // Get athleteId or firebaseId from query params
+    // Get firebaseId from verified token (set by middleware)
+    const firebaseId = req.user?.uid;
     
-    if (!athleteId && !firebaseId) {
-      return res.status(400).json({
+    if (!firebaseId) {
+      return res.status(401).json({
         success: false,
-        error: 'athleteId or firebaseId is required'
+        error: 'Firebase authentication required',
+        message: 'Unable to get Firebase ID from token'
       });
     }
     
-    console.log('🚀 UNIVERSAL HYDRATE: Finding athlete by ID:', athleteId, 'or Firebase ID:', firebaseId);
+    console.log('🚀 ATHLETE PERSON HYDRATE: Finding athlete by Firebase ID:', firebaseId);
     
-    // Find athlete by ID or Firebase ID
-    const athlete = await prisma.athlete.findUnique({
-      where: athleteId ? { id: athleteId } : { firebaseId: firebaseId }
-    });
+    // Use service to find athlete (separation of concerns)
+    const athlete = await findAthleteByFirebaseId(firebaseId);
     
     if (!athlete) {
-      console.log('❌ UNIVERSAL HYDRATE: No athlete found for ID:', athleteId);
+      console.log('❌ ATHLETE PERSON HYDRATE: No athlete found for Firebase ID:', firebaseId);
       return res.status(404).json({
         success: false,
         error: 'Athlete not found',
-        message: 'No athlete found for this ID.',
+        message: 'No athlete found for this Firebase ID.',
         code: 'ATHLETE_NOT_FOUND'
       });
     }
     
-    console.log('✅ UNIVERSAL HYDRATE: Found athlete:', athlete.id, athlete.email);
+    console.log('✅ ATHLETE PERSON HYDRATE: Found athlete:', athlete.id, athlete.email);
     
     // Format athlete data for frontend consumption
     const hydratedAthlete = {
@@ -164,7 +165,7 @@ router.get('/retrieve', async (req, res) => {
       hasBio: !!athlete.bio
     };
     
-    console.log('🎯 UNIVERSAL HYDRATE: Returning hydrated athlete data');
+    console.log('🎯 ATHLETE PERSON HYDRATE: Returning hydrated athlete data');
     
     res.json({
       success: true,
@@ -174,7 +175,7 @@ router.get('/retrieve', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('❌ UNIVERSAL HYDRATE: Error:', error);
+    console.error('❌ ATHLETE PERSON HYDRATE: Error:', error);
     res.status(500).json({
       success: false,
       error: 'Database error',
