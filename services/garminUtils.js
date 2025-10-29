@@ -30,11 +30,9 @@ export const buildAuthUrl = (codeChallenge, state) => {
   const params = new URLSearchParams({
     client_id: GARMIN_CONFIG.CLIENT_ID,
     response_type: 'code',
-    redirect_uri: 'https://athlete.gofastcrushgoals.com/garmin/callback',
-    scope: 'profile wellness',
-    state: state,
     code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
+    code_challenge_method: 'S256',
+    state: state
   });
   
   return `${GARMIN_CONFIG.AUTHORIZE_URL}?${params.toString()}`;
@@ -56,7 +54,7 @@ export const exchangeCodeForTokens = async (code, codeVerifier) => {
         client_secret: GARMIN_CONFIG.CLIENT_SECRET,
         code: code,
         code_verifier: codeVerifier,
-        redirect_uri: 'https://athlete.gofastcrushgoals.com/garmin/callback'
+        redirect_uri: 'https://gofastbackendv2-fall2025.onrender.com/api/garmin/callback'
       })
     });
     
