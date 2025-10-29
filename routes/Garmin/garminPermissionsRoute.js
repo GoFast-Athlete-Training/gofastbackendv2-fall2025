@@ -200,40 +200,49 @@ router.post("/disconnect", async (req, res) => {
 router.post("/permissions", async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { userId, garminUserId, permissions, scope, timestamp } = req.body;
+    const payload = req.body;
     
-    console.log(`📩 Garmin permissions update for ${userId}`);
+    // Garmin sends: {"userPermissionsChange":[{ "userId" : "...", "summaryId" : "...", "permissions" : [...], "changeTimeInSeconds": ... }]}
+    const userPermissionsChanges = payload.userPermissionsChange || [];
     
-    // Parse the scope string (e.g., "PARTNER_WRITE PARTNER_READ CONNECT_READ CONNECT_WRITE")
-    const scopes = scope ? scope.split(' ') : [];
+    if (userPermissionsChanges.length === 0) {
+      console.warn('⚠️ No userPermissionsChange found in payload');
+      return res.sendStatus(200);
+    }
     
-    // Check what permissions we have
-    const hasPartnerWrite = scopes.includes('PARTNER_WRITE');
-    const hasPartnerRead = scopes.includes('PARTNER_READ');
-    const hasConnectRead = scopes.includes('CONNECT_READ');
-    const hasConnectWrite = scopes.includes('CONNECT_WRITE');
-    
-    // Create permissions object
-    const permissionsData = {
-      scopes: scopes,
-      hasPartnerWrite,
-      hasPartnerRead,
-      hasConnectRead,
-      hasConnectWrite,
-      lastUpdated: new Date().toISOString(),
-      rawPermissions: permissions
-    };
-    
-    // Update athlete's Garmin permissions in database
-    const result = await prisma.athlete.updateMany({
-      where: { garmin_user_id: garminUserId },
-      data: {
-        garmin_permissions: permissionsData,
-        garmin_last_sync_at: new Date()
-      }
-    });
-    
-    console.log(`✅ Permissions updated for Garmin user ${userId} (${result.count} record(s) updated)`);
+    // Process each permission change
+    for (const change of userPermissionsChanges) {
+      const garminUserId = change.userId;
+      const permissions = change.permissions || [];
+      const changeTimeInSeconds = change.changeTimeInSeconds;
+      const summaryId = change.summaryId;
+      
+      console.log(`📩 Garmin permissions update for ${garminUserId}`);
+      
+      // Create permissions object with Garmin's actual permission flags
+      const permissionsData = {
+        permissions: permissions, // Array like ["ACTIVITY_EXPORT", "WORKOUT_IMPORT", "HEALTH_EXPORT", etc.]
+        hasActivityExport: permissions.includes('ACTIVITY_EXPORT'),
+        hasWorkoutImport: permissions.includes('WORKOUT_IMPORT'),
+        hasHealthExport: permissions.includes('HEALTH_EXPORT'),
+        hasCourseImport: permissions.includes('COURSE_IMPORT'),
+        hasMctExport: permissions.includes('MCT_EXPORT'),
+        changeTimeInSeconds: changeTimeInSeconds,
+        summaryId: summaryId,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      // Update athlete's Garmin permissions in database
+      const result = await prisma.athlete.updateMany({
+        where: { garmin_user_id: garminUserId },
+        data: {
+          garmin_permissions: permissionsData,
+          garmin_last_sync_at: new Date()
+        }
+      });
+      
+      console.log(`✅ Permissions updated for Garmin user ${garminUserId} (${result.count} record(s) updated)`);
+    }
     
     // Always return 200 quickly for webhooks
     return res.sendStatus(200);
