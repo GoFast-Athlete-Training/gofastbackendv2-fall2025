@@ -10,10 +10,11 @@ import athleteHydrateRouter from './routes/Athlete/athleteHydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athleteUniversalHydrateRouter from './routes/Athlete/athleteUniversalHydrateRoute.js';
 // Import modular Garmin routes
-import garminAuthRouter from './routes/Garmin/garminAuthRoute.js';
+import garminUrlGenRouter from './routes/Garmin/garminUrlGenRoute.js';
+import garminCodeCatchRouter from './routes/Garmin/garminCodeCatchRoute.js';
+import garminUserProfileRouter from './routes/Garmin/garminUserProfileRoute.js';
 import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
-import garminUserRouter from './routes/Garmin/garminUserRoute.js';
 
 dotenv.config();
 
@@ -37,11 +38,12 @@ app.use('/api/athlete', athleteHydrateRouter); // /admin/hydrate, /hydrate/summa
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
 app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find
 
-// Modular Garmin OAuth routes
-app.use('/api/garmin', garminAuthRouter); // /auth, /callback, /refresh
+// Modular Garmin OAuth routes - ORDER MATTERS!
+app.use('/api/garmin', garminUrlGenRouter); // /auth-url (FIRST - most specific)
+app.use('/api/garmin', garminCodeCatchRouter); // /callback
+app.use('/api/garmin', garminUserProfileRouter); // /user
 app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
 app.use('/api/garmin', garminPermissionsRouter); // /permissions, /deregister, /webhook
-app.use('/api/garmin', garminUserRouter); // /user, /user/connect
 
 // Health check
 app.get('/api/health', (req, res) => {
