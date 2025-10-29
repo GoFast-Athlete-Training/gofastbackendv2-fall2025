@@ -40,7 +40,8 @@ router.post("/activity", async (req, res) => {
     // Check if activity already exists (using sourceActivityId as unique key)
     const existingActivity = await prisma.athleteActivity.findFirst({
       where: { 
-        sourceActivityId: activityId?.toString()
+        sourceActivityId: activityId?.toString(),
+        athleteId: athlete.id // Ensure we're checking within the correct athlete
       }
     });
     
@@ -59,6 +60,7 @@ router.post("/activity", async (req, res) => {
         success: true, 
         message: 'Activity summary updated', 
         activityId: updatedActivity.id,
+        athleteId: athlete.id,
         action: 'updated',
         phase: 'summary'
       });
@@ -76,6 +78,7 @@ router.post("/activity", async (req, res) => {
         success: true, 
         message: 'Activity summary created', 
         activityId: newActivity.id,
+        athleteId: athlete.id,
         action: 'created',
         phase: 'summary'
       });
