@@ -127,8 +127,8 @@ router.post("/activity", async (req, res) => {
   }
 });
 
-// POST /api/garmin/details - Handle Garmin's secondary push for activity details
-router.post("/details", async (req, res) => {
+// POST /api/garmin/activity-details - Handle Garmin's secondary push for activity details
+router.post("/activity-details", async (req, res) => {
   try {
     const prisma = getPrismaClient();
     const garminDetails = req.body;
