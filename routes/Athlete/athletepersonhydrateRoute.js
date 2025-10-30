@@ -98,7 +98,7 @@ router.get('/by-id', async (req, res) => {
 
 // ATHLETE PERSON HYDRATE - Find athlete by Firebase ID (from verified token) and return full data
 // Uses Firebase middleware to verify token and get firebaseId from req.user.uid
-router.get('/athletesallhydrate', verifyFirebaseToken, async (req, res) => {
+router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
   try {
     // Get firebaseId from verified token (set by middleware)
     const firebaseId = req.user?.uid;
