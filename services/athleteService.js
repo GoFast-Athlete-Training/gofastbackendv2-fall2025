@@ -73,3 +73,22 @@ class AthleteService {
 
 export default AthleteService;
 
+export async function findAthleteByStravaId(stravaId) {
+  return await prisma.athlete.findUnique({ where: { strava_id: stravaId } });
+}
+
+// Resolve athleteId from various client param spellings
+export function resolveAthleteId(source) {
+  if (!source) return undefined;
+  const candidates = [
+    'athleteId', 'athletesId', 'athlete_id', 'athletes_id', 'athleteid', 'athletesid', 'state'
+  ];
+  for (const key of candidates) {
+    const val = source[key];
+    if (val !== undefined && val !== null && String(val).trim() !== '') {
+      return String(val).trim();
+    }
+  }
+  return undefined;
+}
+

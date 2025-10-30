@@ -59,6 +59,12 @@ model Athlete {
   garmin_is_connected  Boolean   @default(false) // Simple connected status
   garmin_disconnected_at DateTime? // When user disconnected
   
+  // STRAVA
+  strava_id             Int?    @unique
+  strava_access_token   String?
+  strava_refresh_token  String?
+  strava_expires_at     Int?
+
   // Garmin Rich User Data (from API)
   garmin_user_profile   Json?     // Store rich user profile data from Garmin API
   garmin_user_sleep     Json?     // Store sleep preferences

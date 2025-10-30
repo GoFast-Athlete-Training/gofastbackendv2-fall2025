@@ -18,6 +18,10 @@ import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
 import garminActivityDetailsRouter from './routes/Garmin/garminActivityDetailsRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
 import garminDeregistrationRouter from './routes/Garmin/garminDeregistrationRoute.js';
+import stravaUrlRoute from './routes/stravaUrlRoute.js';
+import stravaCallbackRoute from './routes/stravaCallbackRoute.js';
+import stravaTokenRoute from './routes/stravaTokenRoute.js';
+import stravaAthleteRoute from './routes/stravaAthleteRoute.js';
 
 dotenv.config();
 
@@ -50,6 +54,11 @@ app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activi
 app.use('/api/garmin', garminActivityDetailsRouter); // /activity-details (dedicated file)
 app.use('/api/garmin', garminPermissionsRouter); // /permissions, /webhook
 app.use('/api/garmin', garminDeregistrationRouter); // /deregistration
+// Strava routes
+app.use('/api/strava', stravaUrlRoute); // /auth
+app.use('/api/strava', stravaCallbackRoute); // /callback
+app.use('/api/strava', stravaTokenRoute); // /token
+app.use('/api/strava', stravaAthleteRoute); // /activities
 
 // Health check
 app.get('/api/health', (req, res) => {
