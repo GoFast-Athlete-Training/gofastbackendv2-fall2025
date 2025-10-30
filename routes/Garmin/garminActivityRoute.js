@@ -126,39 +126,6 @@ router.post("/activity", async (req, res) => {
   }
 });
 
-// POST /api/garmin/activity-details - Handle Garmin's activity detail webhook
-// Simplified for Garmin Endpoint Coverage Test
-router.post("/activity-details", async (req, res) => {
-  // 1️⃣ Acknowledge Garmin immediately for test compliance
-  res.sendStatus(200);
-
-  try {
-    console.log('📊 Garmin activity detail received');
-    
-    const prisma = getPrismaClient();
-    const { activityId } = req.body;
-    
-    if (activityId) {
-      // Update the activity with detail data
-      await prisma.athleteActivity.update({
-        where: { sourceActivityId: activityId.toString() },
-        data: {
-          detailData: req.body,
-          hydratedAt: new Date(),
-        },
-      });
-      
-      console.log(`✅ Activity details saved for activityId: ${activityId}`);
-    } else {
-      console.log('⚠️ No activityId found in activity details payload');
-    }
-    
-  } catch (err) {
-    console.error('❌ Error saving Garmin detail data:', err);
-    // Already sent 200 - Garmin test should pass
-  }
-});
-
 // POST /api/garmin/activities - Handle manually updated activities webhook
 router.post("/activities", async (req, res) => {
   try {

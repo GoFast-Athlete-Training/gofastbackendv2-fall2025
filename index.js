@@ -15,6 +15,7 @@ import garminUrlGenRouter from './routes/Garmin/garminUrlGenRoute.js';
 import garminCodeCatchRouter from './routes/Garmin/garminCodeCatchRoute.js';
 import garminUserProfileRouter from './routes/Garmin/garminUserProfileRoute.js';
 import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
+import garminActivityDetailsRouter from './routes/Garmin/garminActivityDetailsRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
 import garminDeregistrationRouter from './routes/Garmin/garminDeregistrationRoute.js';
 
@@ -46,6 +47,7 @@ app.use('/api/garmin', garminUrlGenRouter); // /auth-url (FIRST - most specific)
 app.use('/api/garmin', garminCodeCatchRouter); // /callback
 app.use('/api/garmin', garminUserProfileRouter); // /user
 app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
+app.use('/api/garmin', garminActivityDetailsRouter); // /activity-details (dedicated file)
 app.use('/api/garmin', garminPermissionsRouter); // /permissions, /webhook
 app.use('/api/garmin', garminDeregistrationRouter); // /deregistration
 
