@@ -19,21 +19,30 @@ router.post("/activity-details", async (req, res) => {
     console.log('📊 Garmin activity detail received');
     
     const prisma = getPrismaClient();
-    const { activityId } = req.body;
+    const { summaryId } = req.body;
     
-    if (activityId) {
-      // Update the activity with detail data
-      await prisma.athleteActivity.update({
-        where: { sourceActivityId: activityId.toString() },
-        data: {
-          detailData: req.body,
-          hydratedAt: new Date(),
-        },
+    if (summaryId) {
+      // Find the matching activity record using summaryId
+      const activity = await prisma.athleteActivity.findFirst({
+        where: { sourceActivityId: summaryId.toString() },
       });
       
-      console.log(`✅ Activity details saved for activityId: ${activityId}`);
+      if (activity) {
+        // Update the activity with detail data
+        await prisma.athleteActivity.update({
+          where: { sourceActivityId: summaryId.toString() },
+          data: {
+            detailData: req.body,
+            hydratedAt: new Date(),
+          },
+        });
+        
+        console.log(`✅ Activity detail linked for summaryId ${summaryId}`);
+      } else {
+        console.log(`⚠️ No matching activity found for summaryId ${summaryId}`);
+      }
     } else {
-      console.log('⚠️ No activityId found in activity details payload');
+      console.log('⚠️ No summaryId found in activity details payload');
     }
     
   } catch (err) {
