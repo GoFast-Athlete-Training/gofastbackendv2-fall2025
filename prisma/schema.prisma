@@ -85,10 +85,7 @@ model Athlete {
   runCrewLeaderboards RunCrewLeaderboard[] // Leaderboard entries for this athlete
 
   // Training Relations
-  createdRaces     Race[]            @relation("RaceCreator") // Races this athlete created (optional)
-  trainingGoals    TrainingGoal[]
-  trainingDays     TrainingDay[] // Training days for this athlete
-  trainingSessions TrainingSession[] // Training sessions for this athlete
+  createdRaces Race[] @relation("RaceCreator") // Races this athlete created (optional)
 
   // Founder Relations
   founder Founder?
@@ -142,8 +139,7 @@ model AthleteActivity {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  athlete      Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  trainingDays TrainingDay[] // Training days linked to this activity
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@map("athlete_activities")
 }
@@ -267,7 +263,7 @@ model RunCrewLeaderboard {
 }
 
 // =====================================================
-// TRAINING MODELS - MyTraining Container System
+// RACE MODEL - Race Event Details
 // =====================================================
 
 model Race {
@@ -293,168 +289,9 @@ model Race {
   updatedAt DateTime @updatedAt
 
   // Relations (ALL OPTIONAL - race is independent)
-  createdByAthlete Athlete?       @relation("RaceCreator", fields: [createdByAthleteId], references: [id], onDelete: SetNull)
-  trainingGoals    TrainingGoal[]
+  createdByAthlete Athlete? @relation("RaceCreator", fields: [createdByAthleteId], references: [id], onDelete: SetNull)
 
   @@map("races")
-}
-
-model TrainingGoal {
-  id        String @id @default(cuid())
-  athleteId String
-  raceId    String
-
-  // GOAL - what athlete wants to achieve for this race
-  goalTime String // "1:45:00"
-  goalPace String? // "8:00" per mile
-
-  // BASELINE - fitness at signup
-  baseline5k            String
-  baselineWeeklyMileage Int?
-
-  // PLAN METADATA
-  startDate  DateTime
-  totalWeeks Int
-  status     String   @default("planning") // planning, training, taper, race_week, completed, cancelled
-
-  // PREDICTIONS (updated throughout training)
-  currentPrediction Json? // { adaptive5kTime, projectedTime, projectedPace, deltaFromGoal, confidence, lastUpdated }
-
-  // PLAN STRUCTURE (flattened)
-  phaseOverview     Json? // { base: {weeks, start, end}, build: {}, peak: {}, taper: {} }
-  weeklyMileagePlan Json? // [{ weekIndex, targetMileage, phase }]
-
-  // RESULTS (post-race)
-  actualResult Json? // { finishTime, pace, placement, ageGroupPlacement, notes, completedAt }
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  athlete      Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  race         Race          @relation(fields: [raceId], references: [id], onDelete: Cascade)
-  trainingDays TrainingDay[]
-
-  @@map("training_goals")
-}
-
-model TrainingDay {
-  id             String  @id @default(cuid())
-  athleteId      String
-  trainingGoalId String
-  activityId     String? // Optional link to completed activity
-
-  // Day Identification
-  date      DateTime
-  weekIndex Int // 0-based
-  dayIndex  Int // 0-6 (Mon-Sun)
-  dayName   String? // "Monday", "Tuesday", etc.
-
-  // Training Context
-  phase String // base, build, peak, taper
-
-  // PLANNED WORKOUT
-  plannedType String // rest, easy, tempo, intervals, long_run, race_pace, hills, fartlek, recovery, sharpener, over_unders, cross_train
-  plannedData Json? // { mileage, duration, paceRange, targetPace, hrZone, hrRange, segments, label, description, coachNotes }
-
-  // ACTUAL WORKOUT (from Garmin)
-  actualData Json? // { completed, mileage, duration, pace, avgHR, maxHR, hrZoneDistribution, cadence, elevationGain, calories, sessionId, garminActivityId, completedAt, syncedAt }
-
-  // ANALYSIS & COMPARISON
-  analysis Json? // { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, qualityScore, performanceNotes }
-
-  // USER FEEDBACK
-  feedback Json? // { mood, effort, injuryFlag, notes, submittedAt }
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  athlete          Athlete           @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  trainingGoal     TrainingGoal      @relation(fields: [trainingGoalId], references: [id], onDelete: Cascade)
-  activity         AthleteActivity?  @relation(fields: [activityId], references: [id], onDelete: SetNull) // Link to completed activity
-  trainingSessions TrainingSession[] // Training sessions linked to this day
-
-  @@unique([athleteId, date]) // One workout per athlete per day
-  @@map("training_days")
-}
-
-model TrainingSession {
-  id            String  @id @default(cuid())
-  athleteId     String
-  trainingDayId String?
-
-  // Garmin identifiers
-  garminActivityId String? @unique
-  garminUserId     String?
-
-  // Activity basics
-  activityType String    @default("running")
-  activityDate DateTime
-  startTime    DateTime?
-
-  // Summary metrics
-  distance    Float? // miles
-  duration    Int? // seconds
-  movingTime  Int? // seconds
-  elapsedTime Int? // seconds
-
-  // Pace
-  avgPace        String? // "8:45"
-  avgPaceSeconds Int? // seconds per mile
-
-  // Heart Rate
-  avgHR              Int?
-  maxHR              Int?
-  minHR              Int?
-  hrZoneDistribution Json? // { z1Minutes, z2Minutes, z3Minutes, z4Minutes, z5Minutes }
-
-  // Cadence
-  avgCadence Int?
-  maxCadence Int?
-
-  // Elevation
-  elevationGain Float? // feet
-  elevationLoss Float? // feet
-
-  // Power (if available)
-  avgPower        Float?
-  normalizedPower Float?
-
-  // Calories
-  calories Int?
-
-  // Weather (if available)
-  temperature Float?
-  humidity    Float?
-
-  // Splits (lap data)
-  splits Json? // [{ lapNumber, distance, duration, pace, avgHR, elevationGain }]
-
-  // Advanced metrics
-  metrics Json? // { aerobicEffect, anaerobicEffect, vo2max, lactateThreshold, recoveryTime, performanceCondition, groundContactTime, verticalOscillation, strideLength }
-
-  // GPS data (optional - can be large)
-  gpsData Json? // { points: [{ lat, lng, elevation, timestamp, hr, pace }], enabled }
-
-  // Raw Garmin payload
-  rawData Json? // For debugging/future use
-
-  // Sync tracking
-  syncedAt DateTime @default(now())
-  source   String   @default("garmin_webhook")
-
-  // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  athlete     Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  trainingDay TrainingDay? @relation(fields: [trainingDayId], references: [id], onDelete: SetNull)
-
-  @@map("training_sessions")
 }
 
 // =====================================================
