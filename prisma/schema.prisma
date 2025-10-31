@@ -86,6 +86,9 @@ model Athlete {
 
   // Training Relations
   createdRaces Race[] @relation("RaceCreator") // Races this athlete created (optional)
+  trainingPlans TrainingPlan[]
+  plannedDays TrainingDayPlanned[]
+  executedDays TrainingDayExecuted[]
 
   // Founder Relations
   founder Founder?
@@ -290,8 +293,125 @@ model Race {
 
   // Relations (ALL OPTIONAL - race is independent)
   createdByAthlete Athlete? @relation("RaceCreator", fields: [createdByAthleteId], references: [id], onDelete: SetNull)
+  trainingPlans TrainingPlan[]
 
   @@map("races")
+}
+
+// =====================================================
+// TRAINING MODELS - MyTraining Container System
+// =====================================================
+
+model TrainingPlan {
+  id String @id @default(cuid())
+  athleteId String
+  raceId String
+  
+  // GOALS
+  goalTime String // "1:45:00"
+  goalPace String? // "8:00" per mile
+  baseline5k String // "24:30"
+  baselineWeeklyMileage Int?
+  
+  // PLAN STRUCTURE (JSON arrays) - THE BLUEPRINT
+  startDate DateTime
+  totalWeeks Int
+  phaseOverview Json? // { base: { weeks, startWeek, endWeek }, build: {...}, peak: {...}, taper: {...} }
+  weeklyMileagePlan Json? // [{ weekIndex, targetMileage, phase }]
+  weeks Json? // [{ weekIndex, startDate, endDate, phase, targetMileage, workoutTypes, keyWorkouts }]
+  
+  // MONEY METRIC
+  adaptive5kTime String? // Only persistent predictive metric!
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race Race @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  plannedDays TrainingDayPlanned[]
+  executions TrainingPlanExecution[]
+  
+  @@map("training_plans")
+}
+
+model TrainingDayPlanned {
+  id String @id @default(cuid())
+  trainingPlanId String
+  athleteId String
+  
+  // Day Identification
+  date DateTime
+  weekIndex Int // 0-based
+  dayIndex Int // 0-6 (Mon-Sun)
+  dayName String? // "Monday", "Tuesday", etc.
+  
+  // Training Context
+  phase String // base, build, peak, taper
+  
+  // PLANNED WORKOUT (all the details)
+  plannedData Json // { type, mileage, duration, paceRange, targetPace, hrZone, hrRange, segments, label, description, coachNotes }
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([trainingPlanId, weekIndex, dayIndex]) // One planned day per position in plan
+  @@map("training_days_planned")
+}
+
+model TrainingPlanExecution {
+  id String @id @default(cuid())
+  trainingPlanId String
+  
+  // Execution metadata
+  startedAt DateTime
+  status String @default("active") // active, completed, cancelled
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  executedDays TrainingDayExecuted[]
+  
+  @@map("training_plan_executions")
+}
+
+model TrainingDayExecuted {
+  id String @id @default(cuid())
+  executionId String
+  athleteId String
+  
+  // THE LINK - shell container for AthleteActivity
+  activityId String? @unique
+  
+  // Optional metadata for context
+  weekIndex Int
+  dayIndex Int
+  date DateTime
+  
+  // Snapshot/computed fields (can be derived from activityId)
+  plannedData Json? // Snapshot when executed
+  analysis Json? // { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, qualityScore, performanceNotes }
+  feedback Json? // { mood, effort, injuryFlag, notes, submittedAt }
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  execution TrainingPlanExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([executionId, date]) // One execution per day per plan execution
+  @@map("training_days_executed")
 }
 
 // =====================================================

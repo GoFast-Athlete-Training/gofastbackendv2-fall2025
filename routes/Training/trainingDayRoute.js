@@ -339,3 +339,4 @@ router.put('/:trainingDayId/actual', verifyFirebaseToken, async (req, res) => {
 
 export default router;
 
+

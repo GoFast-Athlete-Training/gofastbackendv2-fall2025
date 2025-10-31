@@ -4,12 +4,13 @@ import dotenv from 'dotenv';
 import { connectDatabase, getPrismaClient } from './config/database.js';
 import { API_ROUTES } from './config/apiConfig.js';
 
-// Import the 4 routes
+// Import Athlete routes
 import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
 import athletesallhydrateRouter from './routes/Athlete/athletesallhydrateRoute.js';
 import athleteProfileRouter from './routes/Athlete/athleteProfileRoute.js';
 import athletepersonhydrateRouter from './routes/Athlete/athletepersonhydrateRoute.js';
 import athleteActivitiesRouter from './routes/Athlete/athleteActivitiesRoute.js';
+import athleteUpdateRouter from './routes/Athlete/athleteUpdateRoute.js';
 // Import modular Garmin routes
 import garminUrlGenRouter from './routes/Garmin/garminUrlGenRoute.js';
 import garminCodeCatchRouter from './routes/Garmin/garminCodeCatchRoute.js';
@@ -18,10 +19,11 @@ import garminActivityRouter from './routes/Garmin/garminActivityRoute.js';
 import garminActivityDetailsRouter from './routes/Garmin/garminActivityDetailsRoute.js';
 import garminPermissionsRouter from './routes/Garmin/garminPermissionsRoute.js';
 import garminDeregistrationRouter from './routes/Garmin/garminDeregistrationRoute.js';
-import stravaUrlRoute from './routes/stravaUrlRoute.js';
-import stravaCallbackRoute from './routes/stravaCallbackRoute.js';
-import stravaTokenRoute from './routes/stravaTokenRoute.js';
-import stravaAthleteRoute from './routes/stravaAthleteRoute.js';
+// Import Strava routes
+import stravaUrlRoute from './routes/Strava/stravaUrlRoute.js';
+import stravaCallbackRoute from './routes/Strava/stravaCallbackRoute.js';
+import stravaTokenRoute from './routes/Strava/stravaTokenRoute.js';
+import stravaAthleteRoute from './routes/Strava/stravaAthleteRoute.js';
 // RunCrew routes
 import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
 import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
@@ -29,6 +31,13 @@ import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
 import trainingDayRouter from './routes/Training/trainingDayRoute.js';
+// Founder routes
+import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
+import founderCrmRouter from './routes/Founder/founderCrmRoute.js';
+import founderProductRouter from './routes/Founder/founderProductRoute.js';
+// Admin routes
+import adminHydrateRouter from './routes/Admin/adminHydrateRoute.js';
+import adminUpsertRouter from './routes/Admin/adminUpsertRoute.js';
 
 dotenv.config();
 
@@ -46,12 +55,13 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity details
 
-// The 4 API calls - ORDER MATTERS!
+// Athlete routes - ORDER MATTERS!
 app.use('/api/athlete', athletepersonhydrateRouter); // /athletepersonhydrate (FIRST - most specific)
 app.use('/api/athlete', athleteActivitiesRouter); // /activities, /:athleteId/activities (BEFORE /:id routes)
-app.use('/api/athlete', athletesallhydrateRouter); // /athletesallhydrate, /hydrate/summary, /:id/hydrate
+app.use('/api/athlete', athletesallhydrateRouter); // /athletesallhydrate (legacy)
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
-app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find
+app.use('/api/athlete', athleteUpdateRouter); // /config, /status/:athleteId, /update/:athleteId, /bulk-update/:athleteId
+app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, /find (LAST - catch-all /:id)
 
 // Modular Garmin OAuth routes - ORDER MATTERS!
 app.use('/api/garmin', garminUrlGenRouter); // /auth-url (FIRST - most specific)
@@ -73,6 +83,15 @@ app.use('/api/runcrew', runCrewJoinRouter); // /join
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
 app.use('/api/training/day', trainingDayRouter); // /today, /date/:date, /week/:weekIndex, /:trainingDayId/feedback
+// Founder routes
+app.use('/api/founder', founderTaskRouter); // /tasks, /tasks/:taskId
+app.use('/api/founder', founderCrmRouter); // /crm, /crm/pipelines, /crm/:contactId
+app.use('/api/founder', founderProductRouter); // /product, /gtm, /personal, /roadmap, /roadmap/:itemId
+// Admin routes
+app.use('/api/admin', adminHydrateRouter); // /athletes/hydrate, /athletes/:id/hydrate, /athletes/hydrate/summary
+app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/founder
+// Legacy admin route compatibility - /api/athlete/admin/hydrate
+app.use('/api/athlete/admin', adminHydrateRouter); // /hydrate (redirects to /api/admin/athletes/hydrate)
 
 // Health check
 app.get('/api/health', (req, res) => {
