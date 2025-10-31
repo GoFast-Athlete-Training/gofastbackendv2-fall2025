@@ -360,9 +360,39 @@ await prisma.athlete.update({
 - `src/api/axiosConfig.js` - API configuration
 - `src/firebase.js` - Firebase config
 
+**MVP1 ↔ Demo Relationship**:
+- **Demo is source of truth** for UX/design patterns
+- **MVP1 references demo** when building new features
+- **If demo gets broken**: Fix demo first (restore source of truth), then port fixes back to MVP1
+- **Workflow**: Build in demo → Test UX → Port to MVP1 → Connect to real backend
+
 ---
 
-### 2. User Dashboard (Admin App)
+### 2. Frontend Demo (Source of Truth for UX)
+**Repository**: `gofastfrontend-demo`
+**URL**: `https://gofastfrontend-demo.vercel.app` (or `app.gofastcrushgoals.com`)
+**Purpose**: Demo/prototype repository - source of truth for UX patterns
+
+**Demo → MVP1 Workflow**:
+1. **Build in Demo**: Create new features/UX in demo repo first
+2. **Test UX**: Validate design and user flow in demo
+3. **Port to MVP1**: Copy working demo code to MVP1
+4. **Connect Backend**: Wire MVP1 to real backend APIs
+
+**If Demo Gets Broken**:
+1. Fix demo first (restore source of truth)
+2. Port fixes back to MVP1
+3. Keep demo as clean reference for future builds
+
+**Demo Features**:
+- Mock data for rapid prototyping
+- Complete UX flows (RunCrew, Training, etc.)
+- Demo navigation (`RunCrewDemoNav`) for easy viewing
+- No backend dependencies (pure frontend)
+
+---
+
+### 3. User Dashboard (Admin App)
 **Repository**: `gofast-user-dashboard`
 **URL**: `https://dashboard.gofastcrushgoals.com`
 **Purpose**: Admin dashboard for managing athletes
@@ -391,10 +421,51 @@ await prisma.athlete.update({
 
 ---
 
-### 4. Frontend Demo (Legacy?)
-**Repository**: `gofastfrontend-demo`
-**URL**: `https://gofastfrontend-demo.vercel.app`
-**Purpose**: Unknown - possibly legacy/demo
+
+---
+
+### 5. FounderOutlook (Founder Stack)
+**Repository**: `gofastfounderoutlook`
+**URL**: TBD (local development)
+**Purpose**: Founder-facing application for tasks, CRM, product management, and roadmaps
+
+**Frontend Stack**:
+- React 18 + Vite
+- React Router for navigation
+- Tailwind CSS + shadcn/ui components
+- Dark mode support
+
+**Pages & Features**:
+- **Dashboard** (`/`): Stats (Investor Leads, Funding, Customers), Today's Tasks, Roadmap links
+- **Personal Roadmap** (`/personal`): Mindset, Habits, Networking milestones
+- **GTM Roadmap** (`/gtm`): Go-to-market milestones and strategy
+- **Product Roadmap** (`/product`): Quarterly product milestones (Q4 2025, Q1 2026, Q2 2026)
+- **My CRM** (`/crm`): Contact pipelines (Founders, Collaborators, Funders, Advisors)
+
+**Navigation Structure**:
+```
+Dashboard → Personal Roadmap
+         → GTM Roadmap
+         → Product Roadmap
+         → My CRM
+```
+
+**Key Components**:
+- `FounderDashboard.jsx` - Main dashboard with stats and tasks
+- `PersonalRoadmap.jsx` - Personal development milestones
+- `GtmRoadmap.jsx` - Go-to-market strategy
+- `ProductRoadmap.jsx` - Quarterly product roadmap
+- `MyCRM.jsx` - CRM with contact pipelines
+
+**Auth Flow**: TBD - Will integrate with Firebase (similar to MVP1)
+
+**Backend Integration**:
+- Needs `/api/founder/*` endpoints for:
+  - Tasks management (CRUD)
+  - CRM contacts (CRUD, pipelines)
+  - Product roadmap items
+  - GTM roadmap items
+  - Personal roadmap milestones
 
 ---
 
