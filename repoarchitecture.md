@@ -16,7 +16,55 @@ GoFast has multiple frontend applications and one shared backend. This document 
 /api/athlete/:id     → Get athlete by ID
 /api/athlete/:id     → Update athlete (PUT)
 /api/athlete/:id     → Delete athlete (DELETE)
+/api/runcrew/create  → Create RunCrew
+/api/runcrew/join    → Join RunCrew with invite code
 ```
+
+### Route File Naming Conventions
+
+**Standard Pattern**: `[feature]Route.js`
+
+All route files follow the pattern: `[feature]Route.js` where:
+- `[feature]` is the feature name in camelCase (e.g., `runCrew`, `athlete`, `garmin`)
+- All endpoints for a feature go in the same file
+- File location: `routes/[Feature]/[feature]Route.js` (folder optional for simple features)
+
+**Examples**:
+- `routes/RunCrew/runCrewRoute.js` - All RunCrew endpoints (create, join, get, etc.)
+- `routes/Athlete/athleteRoute.js` - All Athlete endpoints (if consolidated)
+- `routes/Garmin/garminRoute.js` - All Garmin endpoints (if consolidated)
+- `routes/stravaRoute.js` - All Strava endpoints (if consolidated)
+
+**Why This Pattern**:
+- **Consistency**: One file per feature, easy to find
+- **Maintainability**: All related endpoints in one place
+- **Scalability**: Easy to add new endpoints to existing features
+- **Clarity**: Clear file naming convention
+
+**File Structure**:
+```
+routes/
+├── RunCrew/
+│   └── runCrewRoute.js        # All RunCrew endpoints
+├── Athlete/
+│   ├── athleteRoute.js        # Main athlete endpoints (future consolidation)
+│   ├── athleteActivitiesRoute.js  # Activity-specific (if separate)
+│   └── athleteProfileRoute.js     # Profile-specific (if separate)
+├── Garmin/
+│   └── garminRoute.js         # All Garmin endpoints (future consolidation)
+└── stravaRoute.js             # All Strava endpoints
+```
+
+**Route Registration in index.js**:
+```javascript
+// Import route files
+import runCrewRouter from './routes/RunCrew/runCrewRoute.js';
+
+// Register routes
+app.use('/api/runcrew', runCrewRouter); // Handles /api/runcrew/create, /api/runcrew/join, etc.
+```
+
+**Note**: Some older routes may still use `[feature][Action]Route.js` pattern (e.g., `athleteCreateRoute.js`). These will be consolidated over time to follow the standard `[feature]Route.js` pattern.
 
 ### Database
 - **Prisma** with PostgreSQL

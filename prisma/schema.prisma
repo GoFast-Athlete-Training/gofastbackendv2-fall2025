@@ -29,8 +29,7 @@ model Athlete {
   bio          String?
   instagram    String?
   
-  // RunCrew Integration (MVP1)
-  runCrewId    String?  // Optional - if null, show "Join RunCrew" card
+  // RunCrew Integration (MVP1) - Relationships handled via RunCrewMembership
   
   // Training Profile (Future)
   currentPace     String?
@@ -77,6 +76,14 @@ model Athlete {
   
   // Relations
   activities AthleteActivity[]
+  
+  // RunCrew Relations
+  adminRunCrews RunCrew[] @relation("RunCrewAdmin")
+  runCrewMemberships RunCrewMembership[]
+  
+  // Training Relations
+  trainingRaces TrainingRace[]
+  trainingPlans TrainingPlan[]
   
   @@map("athletes")
 }
@@ -130,5 +137,243 @@ model AthleteActivity {
   athlete          Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   
   @@map("athlete_activities")
+}
+
+// RunCrew Models
+model RunCrew {
+  id              String   @id @default(cuid())
+  name            String
+  joinCode        String   @unique // Unique invite code for joining
+  runcrewAdminId  String   // Athlete ID of the admin/creator (using runcrewAdminId to avoid conflict with master adminId)
+  
+  // System fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  admin     Athlete            @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  memberships RunCrewMembership[]
+  
+  @@map("run_crews")
+}
+
+model RunCrewMembership {
+  id        String   @id @default(cuid())
+  runCrewId String
+  athleteId String
+  
+  // Membership status
+  status    String   @default("active") // active, left, removed
+  
+  // Timestamps
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  runCrew   RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([runCrewId, athleteId]) // Prevent duplicate memberships
+  @@map("run_crew_memberships")
+}
+
+// =====================================================
+// TRAINING MODELS - MyTraining Container System
+// =====================================================
+
+model TrainingRace {
+  id        String @id @default(cuid())
+  athleteId String
+  
+  // Race Details
+  raceName  String
+  raceType  String   // 5k, 10k, 10m, half, marathon, other
+  raceDate  DateTime
+  
+  // Goals
+  goalTime  String   // "1:45:00"
+  goalPace  String?  // "8:00" per mile
+  
+  // Baseline Fitness (at time of plan creation)
+  baseline5k           String
+  baselineWeeklyMileage Int?
+  
+  // Race Info
+  distanceMiles Float
+  weeksAway     Int?
+  location      String?
+  
+  // Predictions (updated throughout training)
+  currentPrediction Json? // { adaptive5kTime, projectedTime, projectedPace, deltaFromGoal, confidence, lastUpdated }
+  
+  // Status
+  status      String   @default("planning") // planning, training, taper, race_week, completed, cancelled
+  
+  // Course Profile (if available)
+  courseProfile Json? // { elevationGain, difficulty, surface, weather }
+  
+  // Results (post-race)
+  actualResult Json? // { finishTime, pace, placement, ageGroupPlacement, notes, completedAt }
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  athlete    Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  trainingPlans TrainingPlan[]
+  
+  @@map("training_races")
+}
+
+model TrainingPlan {
+  id          String @id @default(cuid())
+  athleteId   String
+  raceId      String
+  
+  // Plan metadata
+  startDate   DateTime
+  raceDate    DateTime
+  totalWeeks  Int
+  
+  // Phase breakdown
+  phaseOverview Json // { base: {weeks, start, end}, build: {}, peak: {}, taper: {} }
+  
+  // Mileage progression
+  weeklyMileagePlan Json // [{ weekIndex, targetMileage, phase }]
+  
+  // Plan status
+  status      String @default("draft") // draft, active, completed, archived
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  athlete     Athlete         @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race        TrainingRace    @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  trainingDays TrainingDay[]
+  
+  @@map("training_plans")
+}
+
+model TrainingDay {
+  id              String @id @default(cuid())
+  athleteId       String
+  raceId          String
+  trainingPlanId  String
+  
+  // Day Identification
+  date          DateTime
+  weekIndex     Int    // 0-based
+  dayIndex      Int    // 0-6 (Mon-Sun)
+  dayName       String? // "Monday", "Tuesday", etc.
+  
+  // Training Context
+  phase         String // base, build, peak, taper
+  
+  // PLANNED WORKOUT
+  plannedType   String // rest, easy, tempo, intervals, long_run, race_pace, hills, fartlek, recovery, sharpener, over_unders, cross_train
+  plannedData   Json?  // { mileage, duration, paceRange, targetPace, hrZone, hrRange, segments, label, description, coachNotes }
+  
+  // ACTUAL WORKOUT (from Garmin)
+  actualData    Json?  // { completed, mileage, duration, pace, avgHR, maxHR, hrZoneDistribution, cadence, elevationGain, calories, sessionId, garminActivityId, completedAt, syncedAt }
+  
+  // ANALYSIS & COMPARISON
+  analysis      Json?  // { workoutCompleted, hitTargetMileage, hitTargetPace, stayedInHRZone, mileageVariance, paceVariance, qualityScore, performanceNotes }
+  
+  // USER FEEDBACK
+  feedback      Json?  // { mood, effort, injuryFlag, notes, submittedAt }
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  athlete       Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  race          TrainingRace   @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  trainingPlan  TrainingPlan   @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  sessions      TrainingSession[]
+  
+  @@unique([athleteId, date]) // One workout per athlete per day
+  @@map("training_days")
+}
+
+model TrainingSession {
+  id            String @id @default(cuid())
+  athleteId     String
+  trainingDayId String?
+  
+  // Garmin identifiers
+  garminActivityId String? @unique
+  garminUserId     String?
+  
+  // Activity basics
+  activityType  String @default("running")
+  activityDate  DateTime
+  startTime     DateTime?
+  
+  // Summary metrics
+  distance      Float?  // miles
+  duration      Int?    // seconds
+  movingTime    Int?    // seconds
+  elapsedTime   Int?    // seconds
+  
+  // Pace
+  avgPace       String? // "8:45"
+  avgPaceSeconds Int?   // seconds per mile
+  
+  // Heart Rate
+  avgHR         Int?
+  maxHR         Int?
+  minHR         Int?
+  hrZoneDistribution Json? // { z1Minutes, z2Minutes, z3Minutes, z4Minutes, z5Minutes }
+  
+  // Cadence
+  avgCadence    Int?
+  maxCadence    Int?
+  
+  // Elevation
+  elevationGain   Float? // feet
+  elevationLoss   Float? // feet
+  
+  // Power (if available)
+  avgPower        Float?
+  normalizedPower Float?
+  
+  // Calories
+  calories        Int?
+  
+  // Weather (if available)
+  temperature     Float?
+  humidity        Float?
+  
+  // Splits (lap data)
+  splits          Json? // [{ lapNumber, distance, duration, pace, avgHR, elevationGain }]
+  
+  // Advanced metrics
+  metrics         Json? // { aerobicEffect, anaerobicEffect, vo2max, lactateThreshold, recoveryTime, performanceCondition, groundContactTime, verticalOscillation, strideLength }
+  
+  // GPS data (optional - can be large)
+  gpsData         Json? // { points: [{ lat, lng, elevation, timestamp, hr, pace }], enabled }
+  
+  // Raw Garmin payload
+  rawData         Json? // For debugging/future use
+  
+  // Sync tracking
+  syncedAt        DateTime @default(now())
+  source          String   @default("garmin_webhook")
+  
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  athlete         Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  trainingDay     TrainingDay? @relation(fields: [trainingDayId], references: [id], onDelete: SetNull)
+  
+  @@map("training_sessions")
 }
 

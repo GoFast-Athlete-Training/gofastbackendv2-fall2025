@@ -22,6 +22,13 @@ import stravaUrlRoute from './routes/stravaUrlRoute.js';
 import stravaCallbackRoute from './routes/stravaCallbackRoute.js';
 import stravaTokenRoute from './routes/stravaTokenRoute.js';
 import stravaAthleteRoute from './routes/stravaAthleteRoute.js';
+// RunCrew routes
+import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
+import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
+// Training routes
+import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
+import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
+import trainingDayRouter from './routes/Training/trainingDayRoute.js';
 
 dotenv.config();
 
@@ -59,6 +66,13 @@ app.use('/api/strava', stravaUrlRoute); // /auth
 app.use('/api/strava', stravaCallbackRoute); // /callback
 app.use('/api/strava', stravaTokenRoute); // /token
 app.use('/api/strava', stravaAthleteRoute); // /activities
+// RunCrew routes
+app.use('/api/runcrew', runCrewCreateRouter); // /create
+app.use('/api/runcrew', runCrewJoinRouter); // /join
+// Training routes
+app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
+app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
+app.use('/api/training/day', trainingDayRouter); // /today, /date/:date, /week/:weekIndex, /:trainingDayId/feedback
 
 // Health check
 app.get('/api/health', (req, res) => {
