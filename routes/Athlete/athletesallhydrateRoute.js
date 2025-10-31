@@ -31,6 +31,14 @@ router.get('/athletesallhydrate', async (req, res) => {
     // Redirect to new admin route
     console.log('⚠️ LEGACY ROUTE: /athletesallhydrate - Redirecting to /api/admin/athletes/hydrate');
     return res.redirect(307, '/api/admin/athletes/hydrate');
+  } catch (error) {
+    console.error('❌ Error in /athletesallhydrate:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to hydrate athletes',
+      message: error.message 
+    });
+  }
 });
     
 // Legacy route - kept for backward compatibility but redirects
