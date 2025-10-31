@@ -18,9 +18,9 @@ router.get('/crm', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const { pipeline, status } = req.query;
 
-    // Find founder by firebaseId
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {
@@ -67,9 +67,9 @@ router.get('/crm/pipelines', verifyFirebaseToken, async (req, res) => {
     const prisma = getPrismaClient();
     const firebaseId = req.user?.uid;
 
-    // Find founder by firebaseId
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {
@@ -133,9 +133,9 @@ router.post('/crm', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Find founder by firebaseId
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {

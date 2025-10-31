@@ -18,9 +18,9 @@ router.get('/tasks', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const { status = 'all' } = req.query;
 
-    // Find founder by firebaseId
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {
@@ -73,9 +73,9 @@ router.post('/tasks', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Find founder by firebaseId
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {
@@ -121,9 +121,9 @@ router.put('/tasks/:taskId', verifyFirebaseToken, async (req, res) => {
     const { taskId } = req.params;
     const { title, description, dueDate, priority, status } = req.body;
 
-    // Find founder
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {
@@ -184,9 +184,9 @@ router.delete('/tasks/:taskId', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const { taskId } = req.params;
 
-    // Find founder
-    const founder = await prisma.founder.findUnique({
-      where: { firebaseId }
+    // Find founder via athlete relation
+    const founder = await prisma.founder.findFirst({
+      where: { athlete: { firebaseId } }
     });
 
     if (!founder) {

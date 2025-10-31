@@ -35,6 +35,7 @@ import trainingDayRouter from './routes/Training/trainingDayRoute.js';
 import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
 import founderCrmRouter from './routes/Founder/founderCrmRoute.js';
 import founderProductRouter from './routes/Founder/founderProductRoute.js';
+import founderUpsertRouter from './routes/Founder/founderUpsertRoute.js';
 // Admin routes
 import adminHydrateRouter from './routes/Admin/adminHydrateRoute.js';
 import adminUpsertRouter from './routes/Admin/adminUpsertRoute.js';
@@ -87,6 +88,7 @@ app.use('/api/training/day', trainingDayRouter); // /today, /date/:date, /week/:
 app.use('/api/founder', founderTaskRouter); // /tasks, /tasks/:taskId
 app.use('/api/founder', founderCrmRouter); // /crm, /crm/pipelines, /crm/:contactId
 app.use('/api/founder', founderProductRouter); // /product, /gtm, /personal, /roadmap, /roadmap/:itemId
+app.use('/api/founder', founderUpsertRouter); // /upsert
 // Admin routes
 app.use('/api/admin', adminHydrateRouter); // /athletes/hydrate, /athletes/:id/hydrate, /athletes/hydrate/summary
 app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/founder
