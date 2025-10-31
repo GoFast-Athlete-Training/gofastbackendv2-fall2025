@@ -14,7 +14,7 @@ export const ATHLETE_COLUMN_CONFIG = {
       // Universal Profile (MVP1 Required)
       firstName: { upsertable: true, type: 'string', required: false, displayName: 'First Name', description: 'Athlete first name' },
       lastName: { upsertable: true, type: 'string', required: false, displayName: 'Last Name', description: 'Athlete last name' },
-      email: { upsertable: true, type: 'string', required: true, displayName: 'Email', description: 'Athlete email address' },
+      email: { upsertable: false, type: 'string', required: true, displayName: 'Email', description: 'Athlete email address - Users must change their own email (not admin)' },
       phoneNumber: { upsertable: true, type: 'string', required: false, displayName: 'Phone Number', description: 'Optional phone number' },
       gofastHandle: { upsertable: true, type: 'string', required: false, displayName: 'GoFast Handle', description: 'Unique username' },
       birthday: { upsertable: true, type: 'datetime', required: false, displayName: 'Birthday', description: 'Date of birth' },

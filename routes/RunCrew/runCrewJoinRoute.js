@@ -96,18 +96,19 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
     
     console.log('✅ RUNCREW JOIN: RunCrew found:', runCrew.name, runCrew.id);
     
-    // Check if athlete is already a member
+    // Check if athlete is already a member (check junction table)
     console.log('🔍 RUNCREW JOIN: Checking for existing membership...');
-    const existingMembership = await prisma.runCrewMembership.findFirst({
+    const existingMembership = await prisma.runCrewMembership.findUnique({
       where: {
-        runCrewId: runCrew.id,
-        athleteId: athleteId,
-        status: 'active' // Only check active memberships
+        runCrewId_athleteId: {
+          runCrewId: runCrew.id,
+          athleteId: athleteId
+        }
       }
     });
     
     if (existingMembership) {
-      console.log('⚠️ RUNCREW JOIN: Athlete already a member');
+      console.log('⚠️ RUNCREW JOIN: Athlete already a member of this crew');
       return res.status(409).json({
         success: false,
         error: 'Already a member',
@@ -115,80 +116,19 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
       });
     }
     
-    // Check if athlete has left this crew before (check for any membership record)
-    const anyMembership = await prisma.runCrewMembership.findFirst({
-      where: {
-        runCrewId: runCrew.id,
-        athleteId: athleteId
-      }
-    });
-    
-    if (anyMembership) {
-      // If they left before, reactivate the membership
-      console.log('🔄 RUNCREW JOIN: Reactivating previous membership...');
-      const reactivated = await prisma.runCrewMembership.update({
-        where: { id: anyMembership.id },
-        data: {
-          status: 'active',
-          joinedAt: new Date(),
-          leftAt: null
-        }
-      });
-      
-      console.log('✅ RUNCREW JOIN: Membership reactivated:', reactivated.id);
-      
-      // Return RunCrew with membership info
-      const runCrewWithMembers = await prisma.runCrew.findUnique({
-        where: { id: runCrew.id },
-        include: {
-          admin: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              photoURL: true
-            }
-          },
-          memberships: {
-            where: { status: 'active' },
-            include: {
-              athlete: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  email: true,
-                  photoURL: true
-                }
-              }
-            }
-          }
-        }
-      });
-      
-      return res.json({
-        success: true,
-        message: 'Rejoined RunCrew successfully',
-        membership: reactivated,
-        runCrew: runCrewWithMembers
-      });
-    }
-    
-    // Create new membership
-    console.log('📝 RUNCREW JOIN: Creating new membership...');
+    // Add athlete to crew via junction table (athlete can be in multiple crews)
+    console.log('📝 RUNCREW JOIN: Creating membership via junction table...');
     const membership = await prisma.runCrewMembership.create({
       data: {
         runCrewId: runCrew.id,
-        athleteId: athleteId,
-        status: 'active'
+        athleteId: athleteId
       }
     });
     
     console.log('✅ RUNCREW JOIN: Membership created:', membership.id);
     console.log('✅ RUNCREW JOIN: ===== JOINED RUNCREW SUCCESSFULLY =====');
     
-    // Return RunCrew with membership info
+    // Return RunCrew with members
     const runCrewWithMembers = await prisma.runCrew.findUnique({
       where: { id: runCrew.id },
       include: {
@@ -202,7 +142,6 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
           }
         },
         memberships: {
-          where: { status: 'active' },
           include: {
             athlete: {
               select: {
@@ -221,7 +160,6 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Joined RunCrew successfully',
-      membership: membership,
       runCrew: runCrewWithMembers
     });
     

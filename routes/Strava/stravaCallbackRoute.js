@@ -1,7 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { getPrismaClient } from '../config/database.js';
-import { resolveAthleteId } from '../services/athleteService.js';
+import { getPrismaClient } from '../../config/database.js';
+import { resolveAthleteId } from '../../services/athleteService.js';
 
 dotenv.config();
 
@@ -63,5 +63,4 @@ router.get('/callback', async (req, res) => {
 });
 
 export default router;
-
 

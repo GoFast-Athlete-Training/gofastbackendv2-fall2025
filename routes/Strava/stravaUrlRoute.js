@@ -1,6 +1,6 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import { resolveAthleteId } from '../services/athleteService.js';
+import { resolveAthleteId } from '../../services/athleteService.js';
 
 dotenv.config();
 
@@ -29,5 +29,4 @@ router.get('/auth', async (req, res) => {
 });
 
 export default router;
-
 

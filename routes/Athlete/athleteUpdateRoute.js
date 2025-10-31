@@ -2,8 +2,8 @@
 // API endpoints for updating athlete records
 
 import express from "express";
-import AthleteUpdateService from "../services/AthleteUpdateService.js";
-import { ATHLETE_COLUMN_CONFIG } from "../config/athleteColumnConfig.js";
+import AthleteUpdateService from "../../services/AthleteUpdateService.js";
+import { ATHLETE_COLUMN_CONFIG } from "../../config/athleteColumnConfig.js";
 
 const router = express.Router();
 
@@ -154,3 +154,4 @@ router.post("/bulk-update/:athleteId", async (req, res) => {
 });
 
 export default router;
+
