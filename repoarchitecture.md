@@ -74,9 +74,10 @@ const athletes = await prisma.athlete.findMany();
 
 **Deployment Process:**
 1. Render runs `npm install`
-2. Triggers `postinstall` script: `npx prisma generate && npx prisma db push --accept-data-loss`
-3. Creates database tables from `prisma/schema.prisma`
-4. Starts server with database connection ready
+2. Triggers `postinstall` script: `npx prisma generate`
+3. Build command runs: `npx prisma db push --accept-data-loss`
+4. Creates database tables from `prisma/schema.prisma`
+5. Starts server with database connection ready
 
 ---
 
@@ -95,7 +96,7 @@ This project uses a **cloud-first database workflow** that auto-syncs schema fro
 
 **Build Command** (in `package.json`):
 ```json
-"build": "npm install && npx prisma generate && npx prisma db push"
+"build": "npm install && npx prisma generate && npx prisma db push --accept-data-loss"
 ```
 
 **Deployment Flow**:
@@ -122,7 +123,7 @@ npx prisma studio
 **Production Deployment**:
 ```bash
 # This happens automatically on Render
-npm run build  # Runs: npm install && npx prisma generate && npx prisma db push
+npm run build  # Runs: npm install && npx prisma generate && npx prisma db push --accept-data-loss
 ```
 
 ### Schema Changes Workflow
@@ -133,13 +134,13 @@ npm run build  # Runs: npm install && npx prisma generate && npx prisma db push
 4. **Database Updates**: Schema syncs to PostgreSQL
 5. **Done**: New fields available in production
 
-### Why `db push` (No Flags)?
+### Why `db push --accept-data-loss`?
 
-- **Clean approach**: No confusing flags or warnings
+- **Auto-sync**: Ensures schema always matches code without prompts
 - **Cloud-first**: Database is managed, not a dev sandbox
-- **Auto-sync**: Ensures schema always matches code
 - **No conflicts**: Avoids migration versioning issues
-- **Simple**: Just push schema changes directly
+- **No interruptions**: Build process won't hang waiting for confirmation
+- **Safe for additive changes**: Adding new fields/tables won't lose data
 
 ### ⚠️ PRODUCTION DATA PROTECTION RULE
 
@@ -261,7 +262,7 @@ await prisma.athlete.update({
 
 **Build Command**:
 ```json
-"build": "npm install && npx prisma generate && npx prisma db push"
+"build": "npm install && npx prisma generate && npx prisma db push --accept-data-loss"
 ```
 
 ### **What Happened**

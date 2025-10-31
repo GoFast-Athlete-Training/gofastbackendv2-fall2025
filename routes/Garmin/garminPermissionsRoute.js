@@ -214,11 +214,18 @@ router.put("/permissions", async (req, res) => {
     const { userId } = payload;
     console.log(`📩 Garmin permissions change for ${userId}`);
 
-    // 2️⃣ Find the athlete using the service
-    const athlete = await findAthleteByGarminUserId(userId);
+    // 2️⃣ Find the athlete using the service (with retry for timing issues)
+    let athlete = await findAthleteByGarminUserId(userId);
+    
+    // If not found immediately, retry after a short delay (webhook might fire before DB commit)
+    if (!athlete) {
+      console.log(`⏳ Athlete not found immediately for ${userId}, retrying in 1 second...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      athlete = await findAthleteByGarminUserId(userId);
+    }
     
     if (!athlete?.garmin_access_token) {
-      console.log(`⚠️ No access token for ${userId}`);
+      console.log(`⚠️ No athlete found for garmin_user_id: ${userId}`);
       return;
     }
 
@@ -272,11 +279,18 @@ router.post("/permissions", async (req, res) => {
     const { userId } = payload;
     console.log(`📩 Garmin permissions change for ${userId}`);
 
-    // 2️⃣ Find the athlete using the service
-    const athlete = await findAthleteByGarminUserId(userId);
+    // 2️⃣ Find the athlete using the service (with retry for timing issues)
+    let athlete = await findAthleteByGarminUserId(userId);
+    
+    // If not found immediately, retry after a short delay (webhook might fire before DB commit)
+    if (!athlete) {
+      console.log(`⏳ Athlete not found immediately for ${userId}, retrying in 1 second...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      athlete = await findAthleteByGarminUserId(userId);
+    }
     
     if (!athlete?.garmin_access_token) {
-      console.log(`⚠️ No access token for ${userId}`);
+      console.log(`⚠️ No athlete found for garmin_user_id: ${userId}`);
       return;
     }
 
