@@ -27,23 +27,15 @@ router.get('/admin/hydrate', async (req, res) => {
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     const prisma = getPrismaClient();
-    console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma) - EXCLUDING FAKE DATA...');
+    console.log('🔄 ATHLETE HYDRATE: Loading all athletes for admin (SQL/Prisma)...');
     
-    // SQL equivalent of MongoDB find() with sort - EXCLUDE FAKE/TEST DATA
+    // SQL equivalent of MongoDB find() with sort
     const athletes = await prisma.athlete.findMany({
-      where: {
-        // Filter out test/fake emails (@example.com)
-        email: {
-          not: {
-            endsWith: '@example.com'
-          }
-        }
-      },
       orderBy: { createdAt: 'desc' }
       // No include needed yet - single table for now
     });
     
-    console.log('✅ ATHLETE HYDRATE: Found', athletes.length, 'athletes (fake/test data filtered out)');
+    console.log('✅ ATHLETE HYDRATE: Found', athletes.length, 'athletes');
     
     // Format for frontend consumption
     const hydratedAthletes = athletes.map(athlete => ({
