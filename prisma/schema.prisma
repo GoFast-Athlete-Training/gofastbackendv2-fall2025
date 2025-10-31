@@ -93,7 +93,7 @@ model Athlete {
   // Founder Relations
   founder Founder?
 
-  @@map("athlete")
+  @@map("athletes")
 }
 
 model AthleteActivity {
