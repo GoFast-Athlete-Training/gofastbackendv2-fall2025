@@ -2,182 +2,105 @@
 
 ## Premise
 
-This document outlines the product features that need to be built and the order in which they should be prioritized. This is the **strategic roadmap** for the GoFast product - what we're building, when, and why.
+This roadmap outlines product features to build over the next 6 months. Simple format: Feature → What it does → APIs needed → Timeline.
 
-**Key Questions to Answer:**
-1. What features do we need to build?
-2. In what order should we build them?
-3. Why are we building them in this order?
-4. What dependencies exist between features?
+**Key Questions:**
+1. What feature are we building?
+2. What does it do for users?
+3. What APIs/backend routes are needed?
+4. When will it ship?
 
 ---
 
 ## Current Status
 
-**Last Updated**: [Date]
+**Last Updated**: January 2025
 
-**Product Phase**: [Discovery / MVP / Growth / Scale]
+**Product Phase**: MVP / Growth
 
 ---
 
-## Roadmap Overview
+## 6-Month Timeline Overview
 
-### Stage 1: Foundation & Core Features (Q1 2025)
-- User authentication & onboarding
-- Basic athlete profiles
-- Run activity tracking (Strava/Garmin integration)
-- RunCrew functionality
-
-### Stage 2: Training & Social (Q2 2025)
-- Training plan builder
-- Race goal setting
-- Enhanced RunCrew features (leaderboards, posts)
-- Activity analytics
-
-### Stage 3: Community & Monetization (Q3 2025)
-- Matching system (athlete-to-athlete)
-- Premium features
-- Points/rewards system
-- Merch store integration
-
-### Stage 4: Scale & Advanced Features (Q4 2025)
-- Advanced analytics
-- Coach marketplace
-- Team management
-- Enterprise features
+```
+Q1 2025 (Jan-Mar)                    Q2 2025 (Apr-Jun)
+─────────────────                    ─────────────────
+Month 1  |  Month 2  |  Month 3      Month 4  |  Month 5  |  Month 6
+```
 
 ---
 
 ## Product Roadmap Items
 
-### Roadmap Categories
-- **Product** - Core product features for users
-- **GTM** - Go-to-market features (marketing, growth, distribution)
-- **Operations** - Internal operations and infrastructure
+### [Month 1]
+
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed (e.g., `/api/feature/create`, `/api/feature/list`)
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-## Detailed Roadmap Items
+### [Month 2]
 
-### Product Features
-
-#### [Feature Name]
-- **Priority**: High / Medium / Low
-- **Status**: Not Started / In Progress / Completed / On Hold
-- **Description**: Brief description of the feature
-- **Why**: Business/strategic rationale
-- **Dependencies**: What needs to be built first
-- **Success Metrics**: How we measure success
-- **Target Quarter**: Q1/Q2/Q3/Q4 2025
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-### GTM Features
+### [Month 3]
 
-#### [GTM Initiative]
-- **Priority**: High / Medium / Low
-- **Status**: Not Started / In Progress / Completed / On Hold
-- **Description**: Brief description
-- **Why**: Business/strategic rationale
-- **Dependencies**: What needs to be built first
-- **Success Metrics**: How we measure success
-- **Target Quarter**: Q1/Q2/Q3/Q4 2025
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-### Operations Features
+### [Month 4]
 
-#### [Operations Initiative]
-- **Priority**: High / Medium / Low
-- **Status**: Not Started / In Progress / Completed / On Hold
-- **Description**: Brief description
-- **Why**: Business/strategic rationale
-- **Dependencies**: What needs to be built first
-- **Success Metrics**: How we measure success
-- **Target Quarter**: Q1/Q2/Q3/Q4 2025
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-## Priority Framework
+### [Month 5]
 
-### Must Have (P0 - Critical)
-- Features that are essential for product viability
-- Blocking dependencies for other features
-- Critical user needs
-
-### Should Have (P1 - Important)
-- Features that significantly enhance user experience
-- Competitive parity
-- Growth drivers
-
-### Nice to Have (P2 - Enhancement)
-- Features that add polish or additional value
-- Can be deferred without major impact
-- Nice-to-have enhancements
-
-### Won't Have (P3 - Backlog)
-- Features that are out of scope for current roadmap
-- Future consideration
-- Low priority
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-## Key Decisions & Rationale
+### [Month 6]
 
-### Strategic Decisions
-- **Why we're building in this order**: [Rationale]
-- **What we're NOT building**: [Rationale]
-- **Key trade-offs**: [Trade-offs and decisions]
-
----
-
-## Success Metrics
-
-### User Metrics
-- Active users (DAU/MAU)
-- Retention rates
-- Feature adoption
-- User engagement
-
-### Business Metrics
-- Revenue (if applicable)
-- Conversion rates
-- Cost per acquisition
-- Customer lifetime value
-
-### Technical Metrics
-- Performance benchmarks
-- Uptime/Reliability
-- Code quality metrics
+#### Feature Name
+- **What it does**: Brief description of what users can do with this feature
+- **API/Backend**: Routes needed
+- **Status**: Not Started / In Progress / Done
 
 ---
 
-## Dependencies & Blockers
+## Priority Legend
 
-### Technical Dependencies
-- **Feature A** depends on **Feature B**
-- **Infrastructure** needed for **Feature C**
-
-### External Dependencies
-- **Third-party integrations** (e.g., Strava, Garmin)
-- **Regulatory/compliance** requirements
-- **Partnership** agreements
-
-### Resource Dependencies
-- **Design** bandwidth
-- **Engineering** capacity
-- **Data/analytics** support
+- **P0** - Must have (critical, blocking)
+- **P1** - Should have (important, growth driver)
+- **P2** - Nice to have (enhancement, polish)
 
 ---
 
-## Notes & Updates
+## Update Log
 
-### [Date] - Update Title
-- Update details
-- Decisions made
-- Changes to roadmap
+### [Date] - Update
+- Moved **[Feature]** from Month X to Month Y
+- Added **[Feature]** to Month Z
+- Completed **[Feature]** - Shipped!
 
 ---
 
-**This is a living document** - update as the roadmap evolves based on user feedback, business priorities, and technical constraints.
-
+**This is a living document** - move features around as priorities shift, timelines change, or new requirements emerge.
