@@ -40,6 +40,8 @@ import founderHydrateRouter from './routes/Founder/founderHydrateRoute.js';
 // Admin routes
 import adminHydrateRouter from './routes/Admin/adminHydrateRoute.js';
 import adminUpsertRouter from './routes/Admin/adminUpsertRoute.js';
+// Company routes
+import companyRoadmapRouter from './routes/Company/companyRoadmapRoute.js';
 
 dotenv.config();
 
@@ -96,6 +98,8 @@ app.use('/api/admin', adminHydrateRouter); // /athletes/hydrate, /athletes/:id/h
 app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/founder
 // Legacy admin route compatibility - /api/athlete/admin/hydrate
 app.use('/api/athlete/admin', adminHydrateRouter); // /hydrate (redirects to /api/admin/athletes/hydrate)
+// Company routes
+app.use('/api/company', companyRoadmapRouter); // /:companyId/roadmap, /roadmap/:itemId
 
 // Health check
 app.get('/api/health', (req, res) => {

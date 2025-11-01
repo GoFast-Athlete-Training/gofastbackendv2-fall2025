@@ -589,13 +589,40 @@ model CompanyRoadmapItem {
   id          String @id @default(cuid())
   companyId   String // Links to Company, not Founder
   
-  roadmapType String // "product", "gtm", "operations"
-  quarter     String? // "Q4 2025"
+  // Item Classification
+  itemType         String @default("Feature") // "Feature" or "Milestone"
+  parentArchitecture String? // Group related features (e.g., "RunCrew", "Profile")
+  roadmapType      String // "Product", "GTM", "Operations", "Infrastructure", "UX/Design"
+  category         String @default("Frontend Demo") // "Frontend Demo", "API Integration", "Backend Scaffolding", "User Testing", "Release"
+  
+  // Core Details
   title       String
-  description String?
-  status      String @default("pending") // pending, in_progress, completed, cancelled
-  dueDate     DateTime?
-  completedAt DateTime?
+  whatItDoes  String? // User value proposition
+  howItHelps  String? // How it helps overall build
+  
+  // Data & Integration
+  fieldsData     String? // What fields/data needed
+  howToGet       String? // APIs, routes, data sources
+  prerequisites  String? // Setup, research, account creation, auth
+  
+  // Visual & Planning
+  visual       String @default("List") // "List", "Timeline", "Kanban"
+  orderNumber  Int? // Order in sequence (1, 2, 3...)
+  
+  // Time Tracking
+  hoursEstimated Int? // Initial estimate
+  hoursSpent     Int? // Actual time spent
+  
+  // Dates & Status
+  targetDate    DateTime?
+  dueDate       DateTime?
+  status        String @default("Not Started") // Not Started, In Progress, Done
+  priority      String @default("P1") // P0, P1, P2
+  completedAt   DateTime?
+  
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
   company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
