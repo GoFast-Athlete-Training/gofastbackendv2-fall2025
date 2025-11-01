@@ -32,57 +32,27 @@ Month 1  |  Month 2  |  Month 3      Month 4  |  Month 5  |  Month 6
 
 ## Product Roadmap Items
 
-### [Month 1]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed (e.g., `/api/feature/create`, `/api/feature/list`)
-- **Status**: Not Started / In Progress / Done
+### Month 1
 
 ---
 
-### [Month 2]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed
-- **Status**: Not Started / In Progress / Done
+### Month 2
 
 ---
 
-### [Month 3]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed
-- **Status**: Not Started / In Progress / Done
+### Month 3
 
 ---
 
-### [Month 4]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed
-- **Status**: Not Started / In Progress / Done
+### Month 4
 
 ---
 
-### [Month 5]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed
-- **Status**: Not Started / In Progress / Done
+### Month 5
 
 ---
 
-### [Month 6]
-
-#### Feature Name
-- **What it does**: Brief description of what users can do with this feature
-- **API/Backend**: Routes needed
-- **Status**: Not Started / In Progress / Done
+### Month 6
 
 ---
 
