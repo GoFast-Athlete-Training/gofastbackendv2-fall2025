@@ -758,3 +758,19 @@ model Task {
   
   @@map("tasks")
 }
+
+// =====================================================
+// MESSAGE MODEL - Group Wall Messaging
+// =====================================================
+
+model Message {
+  id        String   @id @default(cuid())
+  groupId   String   // RunCrew ID
+  authorId  String   // Athlete ID
+  author    String   // Author name (denormalized for quick display)
+  content   String   // Message content
+  createdAt DateTime @default(now())
+
+  @@index([groupId, createdAt]) // Efficient queries by group and time
+  @@map("messages")
+}

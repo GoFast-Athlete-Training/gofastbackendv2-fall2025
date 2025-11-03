@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import { connectDatabase, getPrismaClient } from './config/database.js';
 import { API_ROUTES } from './config/apiConfig.js';
+import { initializeSocket } from './src/socket.js';
+import messagesRouter from './src/routes/messagesRoute.js';
 
 // Import Athlete routes
 import athleteCreateRouter from './routes/Athlete/athleteCreateRoute.js';
@@ -100,6 +103,8 @@ app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/foun
 app.use('/api/athlete/admin', adminHydrateRouter); // /hydrate (redirects to /api/admin/athletes/hydrate)
 // Company routes
 app.use('/api/company', companyRoadmapRouter); // /:companyId/roadmap, /roadmap/:itemId
+// Messages routes (Group Wall Messaging)
+app.use('/api/messages', messagesRouter); // /:groupId (GET), / (POST)
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -132,10 +137,20 @@ app.get('/', (req, res) => {
   });
 });
 
+// Create HTTP server (required for Socket.io)
+const httpServer = createServer(app);
+
+// Initialize Socket.io
+const io = initializeSocket(httpServer);
+console.log('✅ Socket.io initialized');
+
 // Start server
-app.listen(PORT, async () => {
+httpServer.listen(PORT, async () => {
   console.log(`🚀 GoFast Backend V2 running on port ${PORT}`);
+  console.log(`📡 Socket.io server ready for WebSocket connections`);
   await connectDatabase();
 });
 
+// Export for potential use elsewhere
+export { io };
 export default app;
