@@ -47,6 +47,18 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
       console.log('✅ ATHLETE: Existing Athlete found:', athlete.id);
       console.log('✅ ATHLETE: Athlete email:', athlete.email);
       console.log('✅ ATHLETE: Athlete status:', athlete.status);
+      
+      // Sync photoURL from Firebase if available and different
+      const firebasePhotoURL = req.user?.picture || photoURL;
+      if (firebasePhotoURL && firebasePhotoURL !== athlete.photoURL) {
+        console.log('🔄 ATHLETE: Updating photoURL from Firebase');
+        athlete = await prisma.athlete.update({
+          where: { id: athlete.id },
+          data: { photoURL: firebasePhotoURL }
+        });
+        console.log('✅ ATHLETE: photoURL updated from Firebase');
+      }
+      
       return res.json({
         success: true,
         message: 'Existing athlete found',
@@ -80,12 +92,16 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     if (athlete) {
       console.log('✅ ATHLETE: Athlete found by email - linking firebaseId:', athlete.id);
       console.log('✅ ATHLETE: Linking firebaseId to existing athlete');
-      // Link firebaseId to existing Athlete
+      
+      // Use Firebase picture from token if photoURL not provided in body
+      const finalPhotoURL = photoURL || req.user?.picture || undefined;
+      
+      // Link firebaseId to existing Athlete and update photoURL
       athlete = await prisma.athlete.update({
         where: { id: athlete.id },
         data: { 
           firebaseId,
-          photoURL: photoURL || undefined
+          ...(finalPhotoURL && { photoURL: finalPhotoURL })
         }
       });
       
@@ -119,13 +135,16 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     console.log('📝 ATHLETE: Creating new Athlete for email:', email);
     console.log('📝 ATHLETE: Firebase ID:', firebaseId);
     
+    // Use Firebase picture from token if photoURL not provided in body
+    const finalPhotoURL = photoURL || req.user?.picture || null;
+    
     athlete = await prisma.athlete.create({
       data: {
         firebaseId,
         email,
         firstName: firstName || null,
         lastName: lastName || null,
-        photoURL: photoURL || null
+        photoURL: finalPhotoURL
         // Removed hardcoded status: 'active' - we'll track real activity later
       }
     });

@@ -128,6 +128,18 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
     
     console.log('✅ ATHLETE PERSON HYDRATE: Found athlete:', athlete.id, athlete.email);
     
+    // Sync photoURL from Firebase if available and different
+    const firebasePhotoURL = req.user?.picture;
+    if (firebasePhotoURL && firebasePhotoURL !== athlete.photoURL) {
+      console.log('🔄 ATHLETE PERSON HYDRATE: Updating photoURL from Firebase');
+      const prisma = getPrismaClient();
+      athlete = await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: { photoURL: firebasePhotoURL }
+      });
+      console.log('✅ ATHLETE PERSON HYDRATE: photoURL updated from Firebase');
+    }
+    
     // Format athlete data for frontend consumption
     const hydratedAthlete = {
       athleteId: athlete.id,
