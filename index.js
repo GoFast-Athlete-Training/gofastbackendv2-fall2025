@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
 import { connectDatabase, getPrismaClient } from './config/database.js';
 import { API_ROUTES } from './config/apiConfig.js';
 import { initializeSocket } from './src/socket.js';
@@ -30,6 +33,7 @@ import stravaAthleteRoute from './routes/Strava/stravaAthleteRoute.js';
 // RunCrew routes
 import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
 import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
+import runCrewHydrateRouter from './routes/RunCrew/runCrewHydrateRoute.js';
 // Training routes
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
@@ -51,6 +55,21 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// --- Profile Picture Upload Setup ---
+// Make sure the persistent upload directory exists
+const uploadDir = '/data/uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure Multer for storing files on Render's persistent disk
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+});
+const upload = multer({ storage });
+// --- End Upload Setup ---
+
 // CORS - Allow all origins for debugging
 app.use(cors({
   origin: true, // Allow all origins - more explicit than '*'
@@ -61,6 +80,8 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity details
+// Serve uploaded files statically
+app.use('/uploads', express.static(uploadDir));                                                                        
 
 // Athlete routes - ORDER MATTERS!
 app.use('/api/athlete', athletepersonhydrateRouter); // /athletepersonhydrate (FIRST - most specific)
@@ -86,6 +107,7 @@ app.use('/api/strava', stravaAthleteRoute); // /activities
 // RunCrew routes
 app.use('/api/runcrew', runCrewCreateRouter); // /create
 app.use('/api/runcrew', runCrewJoinRouter); // /join
+app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id (more specific /mine must come before /:id)
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
@@ -109,6 +131,15 @@ app.use('/api/messages', messagesRouter); // /:groupId (GET), / (POST)
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', version: '2.0.1' });
+});
+
+// POST /api/upload – handles profile picture upload
+app.post('/api/upload', upload.single('profilePic'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  const fileUrl = `/uploads/${req.file.filename}`;
+  res.json({ url: fileUrl });
 });
 
 // Get all athletes
