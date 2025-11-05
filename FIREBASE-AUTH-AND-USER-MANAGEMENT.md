@@ -23,7 +23,7 @@ All Firebase-related files MUST include "firebase" in their names:
 - ✅ `firebaseMiddleware.js` (NOT `authMiddleware.js`)
 - ✅ `firebaseConfig.js` (NOT `firebase.js` or `auth.js`)
 - ✅ `verifyFirebaseToken` (NOT `verifyToken`)
-- ✅ `FIREBASE_SERVICE_ACCOUNT_KEY` (environment variable)
+- ✅ `FIREBASE_SERVICE_ACCOUNT` (environment variable - matches Render)
 
 ---
 
@@ -643,7 +643,7 @@ router.get('/protected', verifyFirebaseToken, async (req, res) => {
 **Production:** Render environment variables
 ```env
 # Firebase Admin SDK (Service Account)
-FIREBASE_SERVICE_ACCOUNT_KEY="{\"type\":\"service_account\",\"project_id\":\"...\",...}"
+FIREBASE_SERVICE_ACCOUNT="{\"type\":\"service_account\",\"project_id\":\"...\",...}"
 
 # Database
 DATABASE_URL="postgresql://..."
@@ -686,7 +686,7 @@ VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 - [x] `routes/User/userCreateRoute.js` exists (Pattern A)
 - [x] `routes/User/userHydrateRoute.js` exists (Pattern B)
 - [x] Routes mounted at `/api/user`
-- [x] Environment variable: `FIREBASE_SERVICE_ACCOUNT_KEY` (from Render)
+- [x] Environment variable: `FIREBASE_SERVICE_ACCOUNT` (from Render - matches actual variable name)
 - [x] All protected routes use `verifyFirebaseToken` middleware
 
 ### Frontend

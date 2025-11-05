@@ -541,7 +541,7 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
 
 **Backend**:
 - `DATABASE_URL` - PostgreSQL connection string
-- `FIREBASE_SERVICE_ACCOUNT` - Firebase admin SDK JSON
+- `FIREBASE_SERVICE_ACCOUNT` - Firebase admin SDK JSON (set in Render environment variables)
 - `PORT` - Server port (default: 3001)
 
 **Deployment** (Render.com):

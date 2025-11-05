@@ -436,7 +436,7 @@ cp env.example .env
 
 # Set up environment variables
 # DATABASE_URL="postgresql://..."
-# FIREBASE_SERVICE_ACCOUNT="{\"type\":\"service_account\",...}"
+# FIREBASE_SERVICE_ACCOUNT="{\"type\":\"service_account\",...}" (matches Render env var name)
 
 # Generate Prisma client
 npx prisma generate
