@@ -12,7 +12,7 @@ import { getPrismaClient } from '../config/database.js';
  *   - leave:group → leave room for groupId
  */
 
-export function initializeSocket(server: HTTPServer): SocketIOServer {
+export function initializeSocket(server) {
   const io = new SocketIOServer(server, {
     cors: {
       origin: true, // Allow all origins (matches Express CORS)
@@ -25,7 +25,7 @@ export function initializeSocket(server: HTTPServer): SocketIOServer {
     console.log(`✅ Socket client connected: ${socket.id}`);
 
     // Join a group room
-    socket.on('join:group', async (data: { groupId: string }) => {
+    socket.on('join:group', async (data) => {
       const { groupId } = data;
       if (!groupId) {
         socket.emit('error', { message: 'groupId is required' });
@@ -39,7 +39,7 @@ export function initializeSocket(server: HTTPServer): SocketIOServer {
     });
 
     // Leave a group room
-    socket.on('leave:group', (data: { groupId: string }) => {
+    socket.on('leave:group', (data) => {
       const { groupId } = data;
       if (!groupId) return;
 
@@ -49,7 +49,7 @@ export function initializeSocket(server: HTTPServer): SocketIOServer {
     });
 
     // Send a new message
-    socket.on('message:send', async (data: { groupId: string; authorId: string; author: string; content: string }) => {
+    socket.on('message:send', async (data) => {
       const { groupId, authorId, author, content } = data;
 
       // Validate input
@@ -86,7 +86,7 @@ export function initializeSocket(server: HTTPServer): SocketIOServer {
 
         // Confirm to sender
         socket.emit('message:sent', { id: message.id });
-      } catch (error: any) {
+      } catch (error) {
         console.error('❌ Error creating message:', error);
         socket.emit('error', { message: error.message || 'Failed to create message' });
       }

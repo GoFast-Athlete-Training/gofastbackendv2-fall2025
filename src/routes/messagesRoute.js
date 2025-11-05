@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/:groupId', async (req, res) => {
   try {
     const { groupId } = req.params;
-    const limit = parseInt(req.query.limit as string) || 50; // Default 50, max 200
+    const limit = parseInt(req.query.limit) || 50; // Default 50, max 200
     const limitValue = Math.min(limit, 200);
 
     if (!groupId) {
@@ -37,7 +37,7 @@ router.get('/:groupId', async (req, res) => {
       groupId,
       messages: sortedMessages
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Error fetching messages:', error);
     res.status(500).json({
       success: false,
@@ -77,7 +77,7 @@ router.post('/', async (req, res) => {
       success: true,
       message
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Error creating message:', error);
     res.status(500).json({
       success: false,

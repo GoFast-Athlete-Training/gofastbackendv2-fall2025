@@ -72,12 +72,20 @@ const upload = multer({ storage });
 
 // CORS - Allow all origins for debugging
 app.use(cors({
-  origin: true, // Allow all origins - more explicit than '*'
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    // Allow all origins for MVP
+    callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: false,
   optionsSuccessStatus: 200 // Some legacy browsers choke on 204
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity details
 // Serve uploaded files statically
