@@ -114,7 +114,7 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
     console.log('🚀 ATHLETE PERSON HYDRATE: Finding athlete by Firebase ID:', firebaseId);
     
     // Use service to find athlete (separation of concerns)
-    const athlete = await findAthleteByFirebaseId(firebaseId);
+    let athlete = await findAthleteByFirebaseId(firebaseId);
     
     if (!athlete) {
       console.log('❌ ATHLETE PERSON HYDRATE: No athlete found for Firebase ID:', firebaseId);
