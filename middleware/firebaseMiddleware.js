@@ -9,11 +9,12 @@ let firebaseAdmin = null;
 const initializeFirebase = () => {
   if (!firebaseAdmin) {
     try {
-      // Get Firebase service account from environment
-      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+      // Get Firebase service account from environment (.env for dev, Render for production)
+      const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
       
       if (!serviceAccount) {
-        console.error('❌ FIREBASE: FIREBASE_SERVICE_ACCOUNT environment variable not set');
+        console.error('❌ FIREBASE: FIREBASE_SERVICE_ACCOUNT_KEY environment variable not set');
+        console.error('❌ FIREBASE: Set this in Render environment variables');
         throw new Error('Firebase service account not configured');
       }
 

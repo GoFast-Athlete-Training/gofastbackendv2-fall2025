@@ -78,7 +78,7 @@ model Athlete {
   activities AthleteActivity[]
 
   // RunCrew Relations
-  adminRunCrews       RunCrew[]            @relation("RunCrewAdmin") // Crews this athlete admins
+  createdRunCrews     RunCrew[]            @relation("RunCrewCreator") // Crews this athlete created/admin
   runCrewMemberships  RunCrewMembership[] // Crew memberships (junction table - athlete can be in multiple crews)
   runCrewPosts        RunCrewPost[] // Posts authored by this athlete
   runCrewPostComments RunCrewPostComment[] // Comments authored by this athlete
@@ -154,7 +154,8 @@ model RunCrew {
   description    String? // Optional crew description/motto
   joinCode       String  @unique // Unique invite code for joining
   logo           String? // Optional logo/image URL
-  runcrewAdminId String // Athlete ID of the admin/creator
+  icon           String? // Optional emoji/icon (alternative to logo)
+  creatorAdminId String  // Athlete ID of the creator/admin (proper relationship)
 
   // Status & Archive
   isArchived Boolean   @default(false) // Soft delete - archive crew instead of deleting
@@ -165,7 +166,7 @@ model RunCrew {
   updatedAt DateTime @updatedAt
 
   // Relations
-  admin              Athlete              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  creatorAdmin       Athlete              @relation("RunCrewCreator", fields: [creatorAdminId], references: [id])
   memberships        RunCrewMembership[] // Junction table for members
   posts              RunCrewPost[] // Forum posts/banter
   leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats

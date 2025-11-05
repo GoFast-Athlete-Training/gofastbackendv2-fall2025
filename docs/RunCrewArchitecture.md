@@ -1,5 +1,39 @@
 # RunCrew Architecture
 
+**Last Updated**: January 2025  
+**Schema Status**: ✅ Complete (RunCrew, RunCrewMembership, RunCrewPost, RunCrewPostComment, RunCrewLeaderboard)  
+**Route Status**: 4/10+ routes implemented (create, join, hydrate/:id, hydrate/mine)  
+**Pattern**: Following `BACKEND_SCAFFOLDING_PATTERN.md`  
+**Architecture**: Athlete-first schema - all RunCrew features link back to Athlete model
+
+## Quick Status
+
+### ✅ Implemented
+- **Schema**: All core models in `prisma/schema.prisma`
+- **Routes**: 
+  - `POST /api/runcrew/create` → `routes/RunCrew/runCrewCreateRoute.js` ✅
+  - `POST /api/runcrew/join` → `routes/RunCrew/runCrewJoinRoute.js` ✅
+  - `GET /api/runcrew/:id` → `routes/RunCrew/runCrewHydrateRoute.js` ✅ (Fully implemented)
+  - `GET /api/runcrew/mine` → `routes/RunCrew/runCrewHydrateRoute.js` ✅ (Fully implemented)
+
+**Upsert Pattern**: 
+- ✅ Create route uses `upsert` for membership (prevents duplicates)
+- ✅ Join route checks for existing membership before creating
+- ✅ Both routes return hydrated crew with admin and members
+
+### 🚧 Next Priority (Phase 2)
+- `DELETE /api/runcrew/:id/leave` - Leave a crew
+- `DELETE /api/runcrew/:id/members/:athleteId` - Remove member (admin only)
+- **File**: `routes/RunCrew/runCrewMemberRoute.js`
+
+### 📋 Planned
+- Member management (leave, remove)
+- Admin operations (update, delegate, broadcast)
+- Events & RSVP (requires schema addition)
+- Leaderboard calculation service
+
+---
+
 ## Conceptual Analysis
 
 ### Premise & Vision
@@ -66,13 +100,13 @@ RunCrew is a feature that allows athletes to create and join small running group
 
 ### Derived Data
 - **Member Count**: Query `memberships.count` (real-time from junction table)
-- **Admin**: Single creator admin + delegated admins (via `RunCrewAdmin` junction table)
+- **Admin**: Direct foreign key relationship - `creatorAdminId` references `athletes.id` (the athlete who created the crew)
 
 ### Related Data (Relations)
 - **Memberships**: Junction table entries (many-to-many)
 - **Posts**: Forum/banter posts
 - **Leaderboards**: Aggregated stats for competition
-- **Admins**: Multiple admins via delegation (planned)
+- **Creator Admin**: Direct relationship via `creatorAdminId` → `athletes.id` (proper relationship, no junction table)
 
 ---
 
@@ -89,7 +123,7 @@ model RunCrew {
   joinCode        String   @unique // Unique invite code for joining
   logo            String?  // Optional logo/image URL
   icon            String?  // Optional emoji/icon (alternative to logo)
-  runcrewAdminId  String   // Athlete ID of the creator/admin
+  creatorAdminId String   // Athlete ID of the creator/admin (proper relationship)
   
   // Status & Archive
   isArchived      Boolean  @default(false) // Soft delete - archive crew instead of deleting
@@ -100,11 +134,12 @@ model RunCrew {
   updatedAt DateTime @updatedAt
   
   // Relations
-  admin     Athlete  @relation("RunCrewAdmin") // Creator admin
-  memberships RunCrewMembership[] // Junction table for members
-  posts     RunCrewPost[] // Forum posts/banter
+  creatorAdmin       Athlete              @relation("RunCrewCreator", fields: [creatorAdminId], references: [id])
+  memberships        RunCrewMembership[] // Junction table for members
+  posts              RunCrewPost[] // Forum posts/banter
   leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats
-  // Future: delegatedAdmins RunCrewAdmin[] // Multi-admin support
+  
+  @@map("run_crews")
 }
 ```
 
@@ -115,9 +150,15 @@ model RunCrew {
 - `joinCode`: Unique invite code (user-created, validated for uniqueness)
 - `logo`: Optional logo/image URL for crew branding
 - `icon`: Optional emoji/icon string (simpler alternative to logo upload)
-- `runcrewAdminId`: Foreign key to Athlete who created the crew (creator admin)
+- `creatorAdminId`: **Direct foreign key** to `athletes.id` - the athlete who created the crew (proper relationship, no junction table)
 - `isArchived`: Soft delete flag (archive instead of hard delete)
 - `archivedAt`: Timestamp when crew was archived
+
+**Admin Relationship Design:**
+- **Current Implementation**: Direct foreign key relationship (`creatorAdminId` → `athletes.id`)
+- The `creatorAdminId` field stores the athlete's ID directly - when Adam Cole creates a crew, it stores his `athleteId`
+- This is a proper, simple relationship - no junction table needed for the creator/admin
+- **Future Multi-Admin**: Add `managerId` field (optional) for delegated managers - simple, direct relationship (not `adminId`, use `managerId`!)
 
 ### RunCrewMembership Model (Junction Table)
 **Table**: `run_crew_memberships`
@@ -147,29 +188,80 @@ model RunCrewMembership {
 - **Athlete is source of truth**: Query `runCrewMemberships` via `athleteId` to get all crews
 - **Timestamps**: Track when athlete joined each crew
 
-### Future: RunCrewAdmin Model (Multi-Admin Support)
-**Table**: `run_crew_admins` (planned)
+### Future: Multi-Admin Support via `managerId`
+**Field**: `managerId` on `RunCrew` model (planned - not yet in schema)
+
+**Note**: Currently, the creator/admin relationship is handled via a direct foreign key (`creatorAdminId` on `RunCrew`). For multi-admin support, we'll add a `managerId` field (not `adminId`!) - simple, direct relationship.
 
 ```prisma
-model RunCrewAdmin {
-  id        String   @id @default(cuid())
-  runCrewId String
-  athleteId String
-  isCreator Boolean  @default(false) // True for original creator
-  delegatedAt DateTime? // When admin was delegated (null for creator)
+model RunCrew {
+  // ... existing fields ...
+  creatorAdminId String  // Athlete ID of the creator/admin
+  managerId      String? // Optional: Athlete ID of delegated manager (not adminId!)
   
   // Relations
-  runCrew   RunCrew  @relation(...)
-  athlete   Athlete  @relation(...)
-  
-  @@unique([runCrewId, athleteId]) // Prevent duplicate admin entries
+  creatorAdmin Athlete @relation("RunCrewCreator", ...)
+  manager      Athlete? @relation("RunCrewManager", fields: [managerId], references: [id])
 }
 ```
 
-**Purpose**: Enable multi-admin management
-- Creator automatically gets admin entry with `isCreator: true`
-- Creator can delegate admin privileges to other members
-- All admins have same permissions (manage crew, broadcast, remove members)
+**Purpose**: Enable multi-admin management (future enhancement)
+- Current: Single admin via `creatorAdminId` (direct foreign key) ✅
+- Future: Add optional `managerId` field for delegated managers
+- **Naming**: Use `managerId` (not `adminId`!) - clear distinction from creator
+- Both creator and manager have same permissions (manage crew, broadcast, remove members)
+- **Status**: 🚧 Planned - simple schema addition (just add `managerId` field)
+
+### Future: RunCrewEvent Model (Events & RSVP)
+**Table**: `run_crew_events` (planned - not yet in schema)
+
+```prisma
+model RunCrewEvent {
+  id           String   @id @default(cuid())
+  runCrewId    String
+  organizerId  String   // Athlete ID
+  
+  title        String
+  date         DateTime
+  time         String   // "6:00 AM"
+  location     String
+  address      String?
+  distance     String?  // "5-8 miles"
+  pace         String?  // "8:00-9:00 min/mile"
+  description  String?
+  stravaRouteId Int?    // Strava activity ID (for route linking)
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id])
+  organizer    Athlete  @relation(fields: [organizerId], references: [id])
+  rsvps        RunCrewEventRSVP[]
+  
+  @@map("run_crew_events")
+}
+
+model RunCrewEventRSVP {
+  id        String   @id @default(cuid())
+  eventId   String
+  athleteId String
+  status    String   // "going", "maybe", "not-going"
+  
+  createdAt DateTime @default(now())
+  
+  event      RunCrewEvent @relation(fields: [eventId], references: [id])
+  athlete    Athlete      @relation(fields: [athleteId], references: [id])
+  
+  @@unique([eventId, athleteId])
+  @@map("run_crew_event_rsvps")
+}
+```
+
+**Purpose**: Coordinate group runs and events
+- Admin/members can create run events
+- RSVP system for attendance tracking
+- Strava route integration for route sharing
+- **Status**: 🚧 Planned - schema addition needed
 
 ### RunCrewPost Model (Forum/Banter)
 **Table**: `run_crew_posts`
@@ -266,12 +358,12 @@ model Athlete {
   // ... existing fields ...
   
   // RunCrew Relations
-  adminRunCrews RunCrew[] @relation("RunCrewAdmin") // Crews this athlete created/admin
+  createdRunCrews RunCrew[] @relation("RunCrewCreator") // Crews this athlete created/admin
   runCrewMemberships RunCrewMembership[] // All crew memberships (junction table)
   runCrewPosts RunCrewPost[] // Posts authored by this athlete
   runCrewPostComments RunCrewPostComment[] // Comments authored by this athlete
   runCrewLeaderboards RunCrewLeaderboard[] // Leaderboard entries for this athlete
-  // Future: runCrewAdmins RunCrewAdmin[] // Admin roles (when delegated)
+  // Future: managedRunCrews RunCrew[] @relation("RunCrewManager") // Crews this athlete manages (when delegated)
 }
 ```
 
@@ -282,13 +374,14 @@ model Athlete {
 ### One-to-Many: RunCrew → Creator Admin (Athlete)
 - Each RunCrew has **one** creator admin (who created it)
 - An Athlete can be creator of **multiple** RunCrews
-- Relationship: `RunCrew.runcrewAdminId → Athlete.id`
+- Relationship: `RunCrew.creatorAdminId → Athlete.id` (direct foreign key, proper relationship)
 
-### Future: Many-to-Many: RunCrew ↔ Admin (Athlete) via RunCrewAdmin
-- Each RunCrew can have **multiple** admins (via delegation)
-- Each Athlete can be admin of **multiple** RunCrews
-- Junction table: `RunCrewAdmin`
-- Relationship: `RunCrewAdmin.runCrewId → RunCrew.id` and `RunCrewAdmin.athleteId → Athlete.id`
+### Future: Multi-Admin: RunCrew ↔ Manager (Athlete) via `managerId`
+- Each RunCrew can have **creator** (`creatorAdminId`) + **manager** (`managerId` - optional)
+- Each Athlete can be creator of **multiple** RunCrews
+- Each Athlete can be manager of **multiple** RunCrews (via `managerId` field)
+- **Simple direct relationship**: `RunCrew.managerId → Athlete.id` (not a junction table, just add `managerId` field!)
+- **Naming**: Use `managerId` (not `adminId`!) - keeps it clear and simple
 
 ### Many-to-Many: RunCrew ↔ Athlete (via RunCrewMembership)
 - Each RunCrew can have **many** members
@@ -457,10 +550,9 @@ model Athlete {
    - Description: "5am grind, every day" (optional)
    - Logo: Upload image (optional) OR Icon: Choose from 10 emoji options
 5. Submit form → `POST /api/runcrew/create`
-   - Backend creates `RunCrew` record
+   - Backend creates `RunCrew` record with `creatorAdminId` set to athlete's ID
    - Backend creates `RunCrewMembership` for creator (creator is member)
-   - Backend creates `RunCrewAdmin` entry for creator (with `isCreator: true`)
-   - Returns hydrated crew with members
+   - Returns hydrated crew with members and creator admin
 6. Navigate to `/run-crew-success`
 7. User sees success message and join code
 8. User can:
@@ -592,64 +684,164 @@ Frontend renders Run Crew Central with tabs
 
 ---
 
-## API Endpoints
+## API Endpoints & Route Structure
 
-### Implemented
+**Route Organization**: Following `BACKEND_SCAFFOLDING_PATTERN.md`
+- **Folder**: `routes/RunCrew/` (PascalCase)
+- **Files**: camelCase + "Route.js" (e.g., `runCrewCreateRoute.js`)
+- **Registration**: All routes registered with `app.use('/api/runcrew', router)` in `index.js`
 
-**Create RunCrew** ✅
-- `POST /api/runcrew/create`
-- Body: `{ name: string, joinCode: string, description?: string, logo?: string, icon?: string, athleteId: string }`
-- Auth: Firebase token required
-- Returns: `{ success: true, runCrew: RunCrew }`
-- **Implementation**: `routes/RunCrew/runCrewCreateRoute.js`
+### Implemented ✅
 
-**Join RunCrew** ✅
-- `POST /api/runcrew/join`
-- Body: `{ joinCode: string, athleteId: string }`
-- Auth: Firebase token required
-- Returns: `{ success: true, runCrew: RunCrew }`
-- **Implementation**: `routes/RunCrew/runCrewJoinRoute.js`
+**Create RunCrew**
+- **Route**: `POST /api/runcrew/create`
+- **File**: `routes/RunCrew/runCrewCreateRoute.js`
+- **Auth**: `verifyFirebaseToken` middleware
+- **Body**: `{ name: string, joinCode: string, description?: string, logo?: string, icon?: string, athleteId: string }`
+- **Returns**: `{ success: true, runCrew: RunCrew }` (hydrated with admin and memberships)
+- **Status**: ✅ Fully implemented
+  - Validates joinCode uniqueness
+  - Creates RunCrew record
+  - **Uses `upsert` for membership** - Prevents duplicates, handles rejoin
+  - Returns hydrated crew with relations
 
-### Planned
+**Join RunCrew**
+- **Route**: `POST /api/runcrew/join`
+- **File**: `routes/RunCrew/runCrewJoinRoute.js`
+- **Auth**: `verifyFirebaseToken` middleware
+- **Body**: `{ joinCode: string, athleteId: string }`
+- **Returns**: `{ success: true, runCrew: RunCrew }` (hydrated with members)
+- **Status**: ✅ Fully implemented
+  - Normalizes joinCode (uppercase)
+  - **Checks for existing membership** before creating (prevents duplicates)
+  - Creates RunCrewMembership via junction table
+  - Returns hydrated crew with relations
 
-**Get RunCrew Details**
-- `GET /api/runcrew/:id`
-- Auth: Firebase token
-- Returns: `{ runCrew: RunCrew, members: Athlete[], admin: Athlete, posts: RunCrewPost[], leaderboard: RunCrewLeaderboard[] }`
+**Hydrate RunCrew** ✅ NEW
+- **Route**: `GET /api/runcrew/:id`
+- **File**: `routes/RunCrew/runCrewHydrateRoute.js`
+- **Auth**: `verifyFirebaseToken` middleware
+- **Returns**: `{ success: true, runCrew: RunCrew }` (fully hydrated with admin, members, posts, leaderboard)
+- **Status**: ✅ Fully implemented
+  - Includes admin, memberships with athlete details
+  - Includes posts with comments (limited to 20 most recent)
+  - Includes leaderboard entries with athlete details
+  - **Security**: Verifies athlete is member or admin before returning data
+  - Returns `memberCount` and `isAdmin` flags
 
-**Get My RunCrews**
-- `GET /api/runcrew/mine`
-- Auth: Firebase token
-- Returns: `{ runCrews: RunCrew[] }`
-- Implementation: Query `RunCrewMembership` where `athleteId = athleteId` and include `runCrew`
+**Get My RunCrews** ✅ NEW
+- **Route**: `GET /api/runcrew/mine`
+- **File**: `routes/RunCrew/runCrewHydrateRoute.js`
+- **Auth**: `verifyFirebaseToken` middleware
+- **Returns**: `{ success: true, runCrews: RunCrew[], count: number }`
+- **Status**: ✅ Fully implemented
+  - Queries `RunCrewMembership` where `athleteId = athleteId`
+  - Returns all crews user belongs to with admin and member count
+  - Includes `joinedAt`, `postCount`, `leaderboardCount` metadata
+  - Ordered by `joinedAt` (most recent first)
 
-**Leave RunCrew**
-- `DELETE /api/runcrew/:id/leave` or `PUT /api/runcrew/leave`
-- Auth: Firebase token
-- Body: `{ athleteId: string }`
-- Deletes: `RunCrewMembership` record
+**Group Wall Messaging** (via Message model)
+- **Route**: `GET /api/messages/:groupId`, `POST /api/messages`
+- **Schema**: `Message` model exists (groupId, authorId, author, content)
+- **Real-time**: Socket.io rooms (`group-{groupId}`)
+- **Status**: ⚠️ Model exists, routes need implementation in separate route file
 
-**Remove Member** (Admin only)
-- `DELETE /api/runcrew/:id/members/:athleteId`
-- Auth: Firebase token (must be admin)
-- Deletes: `RunCrewMembership` record
+### To Implement 🚧
 
-**Delegate Admin** (Creator/Admin only)
-- `POST /api/runcrew/:id/delegate-admin`
-- Auth: Firebase token (must be creator or admin)
-- Body: `{ athleteId: string }`
-- Creates: `RunCrewAdmin` entry (or updates existing)
+**Core Crew Management** (Next Priority)
+- `DELETE /api/runcrew/:id/leave` - Leave a crew
+  - **File**: `routes/RunCrew/runCrewMemberRoute.js`
+  - Deletes: `RunCrewMembership` record via junction table
+  - Auth: Must verify athlete is member
 
-**Broadcast Message** (Admin only)
-- `POST /api/runcrew/:id/broadcast`
-- Auth: Firebase token (must be admin)
-- Body: `{ message: string }`
-- Sends: Notification/message to all crew members
+- `DELETE /api/runcrew/:id/members/:athleteId` - Remove member (admin only)
+  - **File**: `routes/RunCrew/runCrewMemberRoute.js` (member management)
+  - Auth: Must verify admin status (`creatorAdminId === athlete.id`)
+  - Deletes: `RunCrewMembership` record
 
-**Regenerate Join Code** (Admin only)
-- `PUT /api/runcrew/:id/regenerate-code`
-- Auth: Firebase token (must be admin)
-- Updates: `joinCode` with new unique code
+- `DELETE /api/runcrew/:id/leave` - Leave a crew
+  - **File**: `routes/RunCrew/runCrewLeaveRoute.js`
+  - Deletes: `RunCrewMembership` record via junction table
+
+- `DELETE /api/runcrew/:id/members/:athleteId` - Remove member (admin only)
+  - **File**: `routes/RunCrew/runCrewMemberRoute.js` (member management)
+  - Auth: Must verify admin status
+  - Deletes: `RunCrewMembership` record
+
+**Admin Management** (After Core Routes)
+- `PUT /api/runcrew/:id` - Update crew (name, description, logo, icon)
+  - **File**: `routes/RunCrew/runCrewUpdateRoute.js`
+  - Auth: Admin only
+
+- `POST /api/runcrew/:id/delegate-manager` - Delegate manager privileges
+  - **File**: `routes/RunCrew/runCrewManagerRoute.js` (manager management)
+  - **Note**: Sets `managerId` field on `RunCrew` (simple field update, no junction table needed)
+
+- `PUT /api/runcrew/:id/regenerate-code` - Regenerate join code
+  - **File**: Same admin route file
+  - Updates: `joinCode` with new unique value
+
+- `POST /api/runcrew/:id/broadcast` - Broadcast message to all members
+  - **File**: Same admin route file or separate `runCrewBroadcastRoute.js`
+  - Sends: Notification/message to all crew members
+
+**Events & RSVP** (Future - Schema Addition Required)
+- `POST /api/runcrew/:crewId/events` - Create run event
+- `GET /api/runcrew/:crewId/events` - List upcoming events
+- `GET /api/runcrew/events/:eventId` - Get event details
+- `POST /api/runcrew/events/:eventId/rsvp` - RSVP to event
+- `GET /api/runcrew/events/:eventId/rsvps` - Get RSVP list
+- **File**: `routes/RunCrew/runCrewEventRoute.js` (event management)
+- **Schema**: Requires `RunCrewEvent` and `RunCrewEventRSVP` models (see schema section)
+
+**Leaderboard Calculation** (Service Layer)
+- Aggregate from `AthleteActivity` by crew membership
+- Calculate periods: week, month, allTime
+- Update `RunCrewLeaderboard` entries
+- **File**: `services/runCrewLeaderboardService.js` (business logic)
+- **Note**: `RunCrewLeaderboard` model exists in schema, needs calculation service + route to trigger/query
+
+---
+
+## Route Implementation Plan
+
+Following `BACKEND_SCAFFOLDING_PATTERN.md` principles:
+
+### Phase 1: Core Hydration ✅ COMPLETE
+1. **Schema Check**: ✅ All models exist (RunCrew, RunCrewMembership, RunCrewPost, RunCrewLeaderboard)
+2. **Route File**: ✅ `routes/RunCrew/runCrewHydrateRoute.js` created and implemented
+   - ✅ `GET /api/runcrew/:id` - Hydrate single crew with all relations
+   - ✅ `GET /api/runcrew/mine` - Get all crews for authenticated athlete
+3. **Register**: ✅ Added to `index.js` (registered before `/:id` route)
+
+### Phase 2: Member Management
+1. **Route File**: Create `routes/RunCrew/runCrewMemberRoute.js`
+   - `DELETE /api/runcrew/:id/leave` - Self-leave
+   - `DELETE /api/runcrew/:id/members/:athleteId` - Admin remove member
+2. **Auth**: Admin verification middleware (check `creatorAdminId === athlete.id`)
+
+### Phase 3: Manager/Admin Management
+1. **Schema Addition**: Add `managerId` field to `RunCrew` model (optional, direct foreign key - not junction table!)
+2. **Route File**: Create `routes/RunCrew/runCrewManagerRoute.js`
+   - `PUT /api/runcrew/:id` - Update crew settings
+   - `POST /api/runcrew/:id/delegate-manager` - Delegate manager (sets `managerId` field)
+   - `PUT /api/runcrew/:id/regenerate-code` - Regenerate code
+   - `POST /api/runcrew/:id/broadcast` - Broadcast message
+
+### Phase 4: Events & RSVP
+1. **Schema Addition**: Add `RunCrewEvent` and `RunCrewEventRSVP` models
+2. **Route File**: Create `routes/RunCrew/runCrewEventRoute.js`
+   - All event endpoints (see API section)
+3. **Run Migration**: `npx prisma migrate dev`
+
+### Route File Naming Convention
+- ✅ `runCrewCreateRoute.js` - Create crew
+- ✅ `runCrewJoinRoute.js` - Join crew
+- 🚧 `runCrewHydrateRoute.js` - Get crew details (hydrate)
+- 🚧 `runCrewMemberRoute.js` - Member management
+- 🚧 `runCrewManagerRoute.js` - Manager operations (delegate manager, update crew)
+- 🚧 `runCrewEventRoute.js` - Event management
+- 🚧 `runCrewLeaderboardRoute.js` - Leaderboard queries
 
 ---
 
@@ -666,17 +858,18 @@ Frontend renders Run Crew Central with tabs
 - **Multiple crews per athlete**: Athlete can be in multiple RunCrews (via junction table)
 - Athlete cannot join same RunCrew twice (enforced by `@@unique([runCrewId, athleteId])`)
 - Creator is automatically added as a member (create `RunCrewMembership` on crew creation)
-- Creator is automatically an admin (create `RunCrewAdmin` entry with `isCreator: true`)
+- Creator is automatically an admin (`creatorAdminId` is set to creator's athlete ID on crew creation)
 - When athlete leaves, delete `RunCrewMembership` record
 - When admin removes member, delete `RunCrewMembership` record
 - **Athlete is source of truth**: Query `athlete.runCrewMemberships` to get all crews
 
 ### Admin Rules
-- **Creator**: Original creator has full admin privileges
-- **Delegation**: Creator can delegate admin privileges to other members
-- **Multi-Admin**: Multiple admins can manage a crew (via `RunCrewAdmin` junction table)
-- **Permissions**: All admins have same permissions (manage crew, broadcast, remove members)
-- **Delegation**: Only creator/admins can delegate admin privileges
+- **Creator**: Original creator has full admin privileges (stored via `creatorAdminId` foreign key)
+- **Current**: Single admin per crew (`creatorAdminId` - direct foreign key relationship)
+- **Future**: Multi-admin support via `managerId` field (optional, direct foreign key - not junction table!)
+- **Naming**: Use `managerId` (not `adminId`!) - clear distinction from creator
+- **Permissions**: Creator admin and manager both have full permissions (manage crew, broadcast, remove members)
+- **Delegation**: Future feature - creator can delegate manager privileges by setting `managerId` field
 
 ### Access Control
 - **View RunCrew**: Must be a member or admin
@@ -763,7 +956,7 @@ Frontend renders Run Crew Central with tabs
 ## Decisions & Questions Resolved
 
 1. **Admin as Member**: Creator is automatically a member (upsert membership on create)
-2. **Multiple Admins**: Multi-admin support via `RunCrewAdmin` junction table (planned)
+2. **Admin Relationship**: Current implementation uses direct foreign key (`creatorAdminId` → `athletes.id`) - proper, simple relationship. Multi-admin support via `managerId` field (not `adminId`!) is planned for future - simple field addition, no junction table needed.
 3. **Join Code Format**: Alphanumeric, 4-12 chars, case-insensitive, unique constraint
 4. **Member Limit**: No limit for MVP, add later if needed
 5. **Deleted Crews**: Soft delete (archive) - `isArchived` flag preserves data

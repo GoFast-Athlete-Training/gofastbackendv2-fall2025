@@ -6,6 +6,13 @@ import { saveGarminTokens } from './garminTokenSaveRoute.js';
 
 const router = express.Router();
 
+// Helper function to validate state (simple check - state should match athleteId)
+const validateState = (state, athleteId) => {
+  // For now, we use athleteId as state, so they should match
+  // In production, you might want to use a more secure state token
+  return state === athleteId;
+};
+
 // GET /api/garmin/callback?code=XYZ&state=123
 router.get('/callback', async (req, res) => {
   try {

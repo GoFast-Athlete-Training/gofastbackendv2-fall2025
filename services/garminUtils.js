@@ -25,14 +25,25 @@ export const generatePKCE = () => {
   };
 };
 
-// Build Garmin authorization URL
+// Build Garmin authorization URL with proper scopes for testing
 export const buildAuthUrl = (codeChallenge, state) => {
+  // Garmin scopes for testing - request both read and write permissions
+  // These scopes allow reading activities and writing training plans
+  const scopes = [
+    'CONNECT_READ',      // Read activities, health data
+    'CONNECT_WRITE',     // Write training plans, activities
+    'PARTNER_READ',     // Partner-level read access
+    'PARTNER_WRITE'     // Partner-level write access
+  ].join(' ');
+  
   const params = new URLSearchParams({
     client_id: GARMIN_CONFIG.CLIENT_ID,
     response_type: 'code',
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
-    state: state
+    state: state,
+    scope: scopes,
+    redirect_uri: `${GARMIN_CONFIG.BACKEND_URL}/api/garmin/callback`
   });
   
   return `${GARMIN_CONFIG.AUTHORIZE_URL}?${params.toString()}`;

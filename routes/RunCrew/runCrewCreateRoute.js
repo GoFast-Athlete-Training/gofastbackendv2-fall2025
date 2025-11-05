@@ -59,18 +59,21 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
   }
   
   try {
-    // Create RunCrew and upsert admin membership in a transaction
+    // Create RunCrew and upsert membership in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create RunCrew
+      // Create RunCrew with creatorAdminId (proper relationship)
       const runCrew = await tx.runCrew.create({
         data: {
           name: name.trim(),
           joinCode: normalizedJoinCode,
-          runcrewAdminId: athleteId
+          description: req.body.description?.trim(),
+          logo: req.body.logo,
+          icon: req.body.icon,
+          creatorAdminId: athleteId // Proper relationship - creator is admin
         }
       });
       
-      // Upsert admin membership (create if doesn't exist, update if it does)
+      // Upsert membership (creator is also a member)
       const membership = await tx.runCrewMembership.upsert({
         where: {
           runCrewId_athleteId: {
@@ -87,11 +90,11 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         }
       });
       
-      // Return hydrated RunCrew with admin and members
+      // Return hydrated RunCrew with creator admin and members
       const hydratedCrew = await tx.runCrew.findUnique({
         where: { id: runCrew.id },
         include: {
-          admin: {
+          creatorAdmin: {
             select: {
               id: true,
               firstName: true,

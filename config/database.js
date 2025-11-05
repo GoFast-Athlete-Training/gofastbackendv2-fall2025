@@ -3,14 +3,15 @@ import { PrismaClient } from '@prisma/client';
 /**
  * Database Configuration for GoFast Backend V2
  * 
- * RENDER ENVIRONMENT VARIABLE NAME: DATABASE_URL
+ * LOCAL DEVELOPMENT:
+ * - Create .env file with DATABASE_URL (required for Prisma Studio, testing, etc.)
+ * - Format: DATABASE_URL = postgresql://user:pass@host:port/gofast_db
+ * 
+ * PRODUCTION (Render):
+ * - Set DATABASE_URL in Render environment variables
+ * - Uses same format as local development
+ * 
  * ACTUAL POSTGRES DATABASE: gofast_db
- * 
- * On Render, set:
- * DATABASE_URL = postgresql://user:pass@host:port/gofast_db
- * 
- * Local development:
- * Create .env file with DATABASE_URL
  */
 
 let prisma;

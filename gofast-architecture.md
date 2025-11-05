@@ -672,5 +672,41 @@ export function getPrismaClient()      // Get shared Prisma instance
 
 ---
 
-*Last updated: $(date)*
+## Architecture Documentation Status
+
+### Active Documentation Files
+
+1. **`GOFAST_ARCHITECTURE.md`** (Main Architecture Doc)
+   - **Purpose**: Comprehensive architecture, design patterns, schema design
+   - **Scope**: Design principles, modular patterns, athlete-first schema
+   - **Status**: ✅ **ACTIVE** - Main architecture reference
+
+2. **`docs/GoFastDevOverview.md`** (Development Guide)
+   - **Purpose**: Complete development guide, stack overview, getting started
+   - **Scope**: Stack setup, API endpoints, development patterns
+   - **Status**: ✅ **ACTIVE** - Primary dev guide
+
+3. **`gofast-architecture.md`** (This File - Operational Guide)
+   - **Purpose**: Repository structure, deployment, database workflow, operational details
+   - **Scope**: Deployment patterns, database sync, frontend app connections
+   - **Status**: ✅ **ACTIVE** - Operational/deployment reference
+
+### Documentation Consolidation Notes
+
+**All three files are ACTIVE** - they serve different purposes:
+- `GOFAST_ARCHITECTURE.md` = Design & architecture patterns
+- `docs/GoFastDevOverview.md` = Development guide & getting started
+- `gofast-architecture.md` = Operational & deployment (this file)
+
+**No deprecation needed** - Each serves a distinct purpose. Cross-references added between files.
+
+### Related Documentation
+
+- **`GOFAST_ARCHITECTURE.md`** - Design patterns and architecture
+- **`docs/GoFastDevOverview.md`** - Development guide
+- **`gofastfrontend-mvp1/profile_ux_architecture.md`** - Profile setup UX architecture
+
+---
+
+*Last updated: January 2025*
 *Author: AI Assistant*

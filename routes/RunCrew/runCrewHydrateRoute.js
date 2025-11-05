@@ -46,7 +46,7 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
     const runCrew = await prisma.runCrew.findUnique({
       where: { id },
       include: {
-        admin: {
+        creatorAdmin: {
           select: {
             id: true,
             firstName: true,
@@ -135,7 +135,10 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
       membership => membership.athleteId === athlete.id
     );
     
-    if (!isMember && runCrew.runcrewAdminId !== athlete.id) {
+    // Check if athlete is the creator admin (proper relationship)
+    const isAdmin = runCrew.creatorAdminId === athlete.id;
+    
+    if (!isMember && !isAdmin) {
       console.log('❌ RUNCREW HYDRATE: Athlete is not a member or admin');
       return res.status(403).json({
         success: false,
@@ -151,7 +154,7 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
       runCrew: {
         ...runCrew,
         memberCount: runCrew.memberships.length,
-        isAdmin: runCrew.runcrewAdminId === athlete.id
+        isAdmin: isAdmin
       }
     });
     
@@ -209,7 +212,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
       include: {
         runCrew: {
           include: {
-            admin: {
+            creatorAdmin: {
               select: {
                 id: true,
                 firstName: true,
@@ -241,7 +244,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
     const runCrews = memberships.map(membership => ({
       ...membership.runCrew,
       memberCount: membership.runCrew.memberships.length,
-      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
+      isAdmin: membership.runCrew.creatorAdminId === athlete.id,
       joinedAt: membership.joinedAt,
       postCount: membership.runCrew._count.posts,
       leaderboardCount: membership.runCrew._count.leaderboardEntries
@@ -269,5 +272,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
 });
 
 export default router;
+
+
 
 

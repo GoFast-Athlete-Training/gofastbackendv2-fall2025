@@ -34,6 +34,7 @@ model Company {
   // Relations
   founders          CompanyFounder[]
   employees         CompanyEmployee[]
+  invites           CompanyInvite[]     // Invitation-based access
   roadmapItems      CompanyRoadmapItem[]
   tasks             Task[]              // Company tasks (companyId set, founderId null)
   crmContacts       CompanyCrmContact[]
@@ -86,6 +87,42 @@ model CompanyEmployee {
   @@map("company_employees")
 }
 ```
+
+### CompanyInvite (Invitation-Based Access)
+```prisma
+model CompanyInvite {
+  id        String @id @default(cuid())
+  companyId String
+  
+  // Invitation Details
+  email     String      // Invitee email
+  token     String @unique // Unique invitation token (for URL)
+  role      String? // "founder", "admin", "manager", "employee"
+  department String?
+  
+  // Invitation Status
+  status    String @default("pending") // pending, accepted, expired, revoked
+  invitedBy String? // Email of person who sent invite
+  acceptedAt DateTime?
+  expiresAt  DateTime?
+  
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, email, token]) // One active invite per email per company
+  @@map("company_invites")
+}
+```
+
+**Key Architecture Point**: Invitation-based access control
+- **Users must be invited** - No open signup
+- **Token-based** - Unique token in invitation URL
+- **Email + Token** - Verifies both email and valid invitation
+- **Role/Department** - Set at invitation time
+- **Expiration** - Invites can expire for security
 
 ### CompanyRoadmapItem
 ```prisma
@@ -354,9 +391,26 @@ PUT    /api/company/employees/:employeeId                // Update employee
 DELETE /api/company/employees/:employeeId                // Remove employee
 ```
 
+### Invite Routes (Invitation-Based Auth)
+```
+POST   /api/company/:companyId/invites                  // Create invitation
+GET    /api/company/:companyId/invites                   // List invitations
+PUT    /api/company/invites/:inviteId                    // Update invite (revoke, extend)
+DELETE /api/company/invites/:inviteId                    // Delete invitation
+
+POST   /api/company/invite/verify                        // Verify invitation token
+POST   /api/company/invite/accept                        // Accept invitation (create employee + auth)
+```
+
 ---
 
 ## Frontend Pages (Follow from Models = Pages)
+
+### Auth Pages
+- `Splash.jsx` (/splash) - Welcome/invitation check page
+  - Checks for invite token in URL or localStorage
+  - Shows "invitation required" if no token
+  - Shows login form if valid token found
 
 ### Main Hub
 - `CompanyAdminNav.jsx` (/) - Main hub with navigation cards
@@ -414,6 +468,12 @@ DELETE /api/company/employees/:employeeId                // Remove employee
    - Schema defines models FIRST
    - Backend routes follow from schema
    - Frontend pages follow from models (Models = Pages)
+
+6. **Invitation-Based Access**
+   - `CompanyInvite` model for access control
+   - Users must be invited (no open signup)
+   - Token-based invitation URLs
+   - Role/department set at invitation time
 
 ---
 

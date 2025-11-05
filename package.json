@@ -13,6 +13,7 @@
     "db:generate": "npx prisma generate",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
+    "db:query": "node query-table.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
