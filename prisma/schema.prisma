@@ -155,7 +155,7 @@ model RunCrew {
   joinCode       String  @unique // Unique invite code for joining
   logo           String? // Optional logo/image URL
   icon           String? // Optional emoji/icon (alternative to logo)
-  runcrewAdminId String  // Athlete ID of the creator/admin (proper relationship)
+  runcrewAdminId String? // Athlete ID of the creator/admin (nullable temporarily for migration)
 
   // Status & Archive
   isArchived Boolean   @default(false) // Soft delete - archive crew instead of deleting
@@ -166,7 +166,7 @@ model RunCrew {
   updatedAt DateTime @updatedAt
 
   // Relations
-  admin       Athlete              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  admin       Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
   memberships        RunCrewMembership[] // Junction table for members
   posts              RunCrewPost[] // Forum posts/banter
   leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats
