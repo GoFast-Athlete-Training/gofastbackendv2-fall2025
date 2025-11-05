@@ -81,10 +81,11 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   credentials: false,
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+  preflightContinue: false // Let CORS handle preflight
 }));
 
-// Handle preflight requests explicitly
+// Handle preflight requests explicitly BEFORE routes
 app.options('*', cors());
 
 app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity details

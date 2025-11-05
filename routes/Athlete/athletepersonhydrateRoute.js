@@ -96,9 +96,19 @@ router.get('/by-id', async (req, res) => {
   }
 });
 
+// Handle preflight OPTIONS requests for CORS
+router.options('/athletepersonhydrate', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(200);
+});
+
 // ATHLETE PERSON HYDRATE - Find athlete by Firebase ID (from verified token) and return full data
 // Uses Firebase middleware to verify token and get firebaseId from req.user.uid
 router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
+  // Set CORS headers explicitly
+  res.header('Access-Control-Allow-Origin', '*');
   try {
     // Get firebaseId from verified token (set by middleware)
     const firebaseId = req.user?.uid;
@@ -178,6 +188,11 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
     };
     
     console.log('🎯 ATHLETE PERSON HYDRATE: Returning hydrated athlete data');
+    
+    // Ensure CORS headers are set before sending response
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     
     res.json({
       success: true,
