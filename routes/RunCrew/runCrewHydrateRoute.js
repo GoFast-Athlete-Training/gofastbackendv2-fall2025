@@ -9,6 +9,106 @@ import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 const router = express.Router();
 
 /**
+ * Get My RunCrews
+ * GET /api/runcrew/mine
+ * Returns: All crews the authenticated athlete belongs to
+ * 
+ * Flow:
+ * 1. Verify Firebase token
+ * 2. Find athlete by Firebase ID
+ * 3. Query RunCrewMembership for all crews
+ * 4. Return hydrated crews with admin and member count
+ */
+router.get('/mine', verifyFirebaseToken, async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const firebaseId = req.user?.uid;
+    
+    console.log('🔍 RUNCREW MINE: Fetching crews for athlete');
+    console.log('🔍 RUNCREW MINE: Firebase ID:', firebaseId);
+    
+    // Verify athlete exists
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+    
+    if (!athlete) {
+      console.log('❌ RUNCREW MINE: Athlete not found');
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Athlete not found'
+      });
+    }
+    
+    // Find all memberships for this athlete
+    const memberships = await prisma.runCrewMembership.findMany({
+      where: {
+        athleteId: athlete.id
+      },
+      include: {
+        runCrew: {
+          include: {
+            admin: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                photoURL: true
+              }
+            },
+            memberships: {
+              select: {
+                athleteId: true
+              }
+            },
+            _count: {
+              select: {
+                posts: true,
+                leaderboardEntries: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        joinedAt: 'desc'
+      }
+    });
+    
+    // Transform to include member count and admin status
+    const runCrews = memberships.map(membership => ({
+      ...membership.runCrew,
+      memberCount: membership.runCrew.memberships.length,
+      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
+      joinedAt: membership.joinedAt,
+      postCount: membership.runCrew._count.posts,
+      leaderboardCount: membership.runCrew._count.leaderboardEntries
+    }));
+    
+    console.log('✅ RUNCREW MINE: Found', runCrews.length, 'crews');
+    
+    res.json({
+      success: true,
+      runCrews,
+      count: runCrews.length
+    });
+    
+  } catch (error) {
+    console.error('❌ RUNCREW MINE: ===== ERROR =====');
+    console.error('❌ RUNCREW MINE: Error message:', error.message);
+    console.error('❌ RUNCREW MINE: Error stack:', error.stack);
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch RunCrews',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Get RunCrew by ID
  * GET /api/runcrew/:id
  * Returns: Fully hydrated RunCrew with admin, members, posts, leaderboard
@@ -166,106 +266,6 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to hydrate RunCrew',
-      message: error.message
-    });
-  }
-});
-
-/**
- * Get My RunCrews
- * GET /api/runcrew/mine
- * Returns: All crews the authenticated athlete belongs to
- * 
- * Flow:
- * 1. Verify Firebase token
- * 2. Find athlete by Firebase ID
- * 3. Query RunCrewMembership for all crews
- * 4. Return hydrated crews with admin and member count
- */
-router.get('/mine', verifyFirebaseToken, async (req, res) => {
-  try {
-    const prisma = getPrismaClient();
-    const firebaseId = req.user?.uid;
-    
-    console.log('🔍 RUNCREW MINE: Fetching crews for athlete');
-    console.log('🔍 RUNCREW MINE: Firebase ID:', firebaseId);
-    
-    // Verify athlete exists
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-    
-    if (!athlete) {
-      console.log('❌ RUNCREW MINE: Athlete not found');
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized',
-        message: 'Athlete not found'
-      });
-    }
-    
-    // Find all memberships for this athlete
-    const memberships = await prisma.runCrewMembership.findMany({
-      where: {
-        athleteId: athlete.id
-      },
-      include: {
-        runCrew: {
-          include: {
-            admin: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                photoURL: true
-              }
-            },
-            memberships: {
-              select: {
-                athleteId: true
-              }
-            },
-            _count: {
-              select: {
-                posts: true,
-                leaderboardEntries: true
-              }
-            }
-          }
-        }
-      },
-      orderBy: {
-        joinedAt: 'desc'
-      }
-    });
-    
-    // Transform to include member count and admin status
-    const runCrews = memberships.map(membership => ({
-      ...membership.runCrew,
-      memberCount: membership.runCrew.memberships.length,
-      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
-      joinedAt: membership.joinedAt,
-      postCount: membership.runCrew._count.posts,
-      leaderboardCount: membership.runCrew._count.leaderboardEntries
-    }));
-    
-    console.log('✅ RUNCREW MINE: Found', runCrews.length, 'crews');
-    
-    res.json({
-      success: true,
-      runCrews,
-      count: runCrews.length
-    });
-    
-  } catch (error) {
-    console.error('❌ RUNCREW MINE: ===== ERROR =====');
-    console.error('❌ RUNCREW MINE: Error message:', error.message);
-    console.error('❌ RUNCREW MINE: Error stack:', error.stack);
-    
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch RunCrews',
       message: error.message
     });
   }

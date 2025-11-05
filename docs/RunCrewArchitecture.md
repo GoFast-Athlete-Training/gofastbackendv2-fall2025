@@ -2,7 +2,8 @@
 
 **Last Updated**: January 2025  
 **Schema Status**: ✅ Complete (RunCrew, RunCrewMembership, RunCrewPost, RunCrewPostComment, RunCrewLeaderboard)  
-**Route Status**: 4/10+ routes implemented (create, join, hydrate/:id, hydrate/mine)  
+**Route Status**: 4/10+ routes implemented (create, join, hydrate/:id)
+**Hydration Pattern**: RunCrews included in universal `/api/athlete/hydrate` endpoint  
 **Pattern**: Following `BACKEND_SCAFFOLDING_PATTERN.md`  
 **Architecture**: Athlete-first schema - all RunCrew features link back to Athlete model
 
@@ -14,7 +15,7 @@
   - `POST /api/runcrew/create` → `routes/RunCrew/runCrewCreateRoute.js` ✅
   - `POST /api/runcrew/join` → `routes/RunCrew/runCrewJoinRoute.js` ✅
   - `GET /api/runcrew/:id` → `routes/RunCrew/runCrewHydrateRoute.js` ✅ (Fully implemented)
-  - `GET /api/runcrew/mine` → `routes/RunCrew/runCrewHydrateRoute.js` ✅ (Fully implemented)
+- **Universal Hydration**: RunCrews included in `/api/athlete/hydrate` ✅ (No separate `/mine` call needed)
 
 **Upsert Pattern**: 
 - ✅ Create route uses `upsert` for membership (prevents duplicates)
@@ -645,24 +646,39 @@ Frontend navigates to success page, then central
 
 **Data Flow:**
 ```
-Frontend → GET /api/runcrew/:id
+Frontend → GET /api/athlete/hydrate (on splash/athlete-home)
 ↓
-Backend queries:
-- RunCrew by ID
-- RunCrewMemberships with Athlete includes
-- RunCrewPosts (for forum)
-- RunCrewLeaderboards (for stats)
-↓
-Returns: {
-  runCrew: {...},
-  members: [{...}],
-  admin: {...},
-  posts: [...],
-  leaderboard: [...]
+Backend returns:
+{
+  athlete: {
+    athleteId: "...",
+    runCrews: [
+      {
+        id: "crew-123",
+        name: "Morning Warriors",
+        runcrewAdminId: "athlete-id", // Admin's athleteId
+        isAdmin: true,                // ✅ Already computed!
+        memberCount: 5,
+        joinedAt: "...",
+        postCount: 10,
+        leaderboardCount: 3,
+        // ... full crew data
+      }
+    ],
+    runCrewCount: 1,
+    adminRunCrews: [...], // Crews this athlete created
+    adminRunCrewCount: 1
+  }
 }
+↓
+Frontend uses athlete.runCrews array (no separate API call needed!)
+↓
+OR for specific crew details: GET /api/runcrew/:id
 ↓
 Frontend renders Run Crew Central with tabs
 ```
+
+**⚠️ Important**: Frontend should NOT call `/api/runcrew/mine` separately. Use `athlete.runCrews` from the universal hydration response.
 
 ### Flow 4: Admin Management (Creator/Delegated Admin)
 
@@ -811,8 +827,11 @@ Following `BACKEND_SCAFFOLDING_PATTERN.md` principles:
 1. **Schema Check**: ✅ All models exist (RunCrew, RunCrewMembership, RunCrewPost, RunCrewLeaderboard)
 2. **Route File**: ✅ `routes/RunCrew/runCrewHydrateRoute.js` created and implemented
    - ✅ `GET /api/runcrew/:id` - Hydrate single crew with all relations
-   - ✅ `GET /api/runcrew/mine` - Get all crews for authenticated athlete
-3. **Register**: ✅ Added to `index.js` (registered before `/:id` route)
+3. **Universal Hydration**: ✅ RunCrews included in `/api/athlete/hydrate` endpoint
+   - ✅ `athlete.runCrews` array includes all crews with `isAdmin` computed
+   - ✅ `athlete.adminRunCrews` array includes crews this athlete created
+   - ✅ Frontend should use hydration response, not separate `/mine` call
+4. **Register**: ✅ Routes registered in `index.js`
 
 ### Phase 2: Member Management
 1. **Route File**: Create `routes/RunCrew/runCrewMemberRoute.js`

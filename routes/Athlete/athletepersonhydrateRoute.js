@@ -97,16 +97,15 @@ router.get('/by-id', async (req, res) => {
 });
 
 // Handle preflight OPTIONS requests for CORS
-router.options('/athletepersonhydrate', (req, res) => {
+router.options('/hydrate', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.sendStatus(200);
 });
 
-// ATHLETE PERSON HYDRATE - Find athlete by Firebase ID (from verified token) and return full data
-// Uses Firebase middleware to verify token and get firebaseId from req.user.uid
-router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
+// Universal athlete hydration handler (shared logic)
+async function hydrateAthlete(req, res) {
   // Set CORS headers explicitly
   res.header('Access-Control-Allow-Origin', '*');
   try {
@@ -123,8 +122,56 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
     
     console.log('🚀 ATHLETE PERSON HYDRATE: Finding athlete by Firebase ID:', firebaseId);
     
-    // Use service to find athlete (separation of concerns)
-    let athlete = await findAthleteByFirebaseId(firebaseId);
+    const prisma = getPrismaClient();
+    
+    // Find athlete with RunCrew memberships included
+    let athlete = await prisma.athlete.findFirst({
+      where: { firebaseId },
+      include: {
+        runCrewMemberships: {
+          include: {
+            runCrew: {
+              include: {
+                admin: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    photoURL: true
+                  }
+                },
+                memberships: {
+                  select: {
+                    athleteId: true
+                  }
+                },
+                _count: {
+                  select: {
+                    posts: true,
+                    leaderboardEntries: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            joinedAt: 'desc'
+          }
+        },
+        adminRunCrews: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            joinCode: true,
+            logo: true,
+            icon: true,
+            createdAt: true
+          }
+        }
+      }
+    });
     
     if (!athlete) {
       console.log('❌ ATHLETE PERSON HYDRATE: No athlete found for Firebase ID:', firebaseId);
@@ -142,13 +189,66 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
     const firebasePhotoURL = req.user?.picture;
     if (firebasePhotoURL && firebasePhotoURL !== athlete.photoURL) {
       console.log('🔄 ATHLETE PERSON HYDRATE: Updating photoURL from Firebase');
-      const prisma = getPrismaClient();
       athlete = await prisma.athlete.update({
         where: { id: athlete.id },
-        data: { photoURL: firebasePhotoURL }
+        data: { photoURL: firebasePhotoURL },
+        include: {
+          runCrewMemberships: {
+            include: {
+              runCrew: {
+                include: {
+                  admin: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      photoURL: true
+                    }
+                  },
+                  memberships: {
+                    select: {
+                      athleteId: true
+                    }
+                  },
+                  _count: {
+                    select: {
+                      posts: true,
+                      leaderboardEntries: true
+                    }
+                  }
+                }
+              }
+            },
+            orderBy: {
+              joinedAt: 'desc'
+            }
+          },
+          adminRunCrews: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              joinCode: true,
+              logo: true,
+              icon: true,
+              createdAt: true
+            }
+          }
+        }
       });
       console.log('✅ ATHLETE PERSON HYDRATE: photoURL updated from Firebase');
     }
+    
+    // Transform RunCrew memberships to include hydrated crew data
+    const runCrews = athlete.runCrewMemberships.map(membership => ({
+      ...membership.runCrew,
+      memberCount: membership.runCrew.memberships.length,
+      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
+      joinedAt: membership.joinedAt,
+      postCount: membership.runCrew._count.posts,
+      leaderboardCount: membership.runCrew._count.leaderboardEntries
+    }));
     
     // Format athlete data for frontend consumption
     const hydratedAthlete = {
@@ -176,6 +276,14 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
         connectedAt: athlete.garmin_connected_at || null,
         lastSyncAt: athlete.garmin_last_sync_at || null
       },
+      
+      // RunCrew Memberships (hydrated)
+      runCrews: runCrews,
+      runCrewCount: runCrews.length,
+      
+      // Admin RunCrews (crews this athlete created)
+      adminRunCrews: athlete.adminRunCrews || [],
+      adminRunCrewCount: athlete.adminRunCrews?.length || 0,
       
       // Computed fields
       fullName: athlete.firstName && athlete.lastName 
@@ -209,6 +317,15 @@ router.get('/athletepersonhydrate', verifyFirebaseToken, async (req, res) => {
       message: error.message
     });
   }
-});
+}
+
+// UNIVERSAL ATHLETE HYDRATE - Find athlete by Firebase ID (from verified token) and return full data
+// This is the SINGLE universal endpoint - includes RunCrews, activities, everything
+// Mirror of Ignite's /api/owner/hydrate pattern
+// Uses Firebase middleware to verify token and get firebaseId from req.user.uid
+router.get('/hydrate', verifyFirebaseToken, hydrateAthlete);
+
+// Legacy route - kept for backward compatibility
+router.get('/athletepersonhydrate', verifyFirebaseToken, hydrateAthlete);
 
 export default router;

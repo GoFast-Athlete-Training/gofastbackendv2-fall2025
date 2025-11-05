@@ -668,7 +668,6 @@ gofastbackendv2-fall2025/
 - **`docs/GoFastDevOverview.md`** - Complete development guide and stack overview
 - **`docs/RunCrewArchitecture.md`** - Complete RunCrew implementation details
 - **`docs/TrainingArchitecture.md`** - Training plans architecture
-- **`gofast-architecture.md`** - Repository structure and deployment patterns (operational focus)
 - **`gofastfrontend-mvp1/profile_ux_architecture.md`** - Profile setup UX architecture, completion flow, reminder system, and profile picture upload strategy
 
 ---

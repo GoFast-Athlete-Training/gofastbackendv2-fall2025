@@ -93,7 +93,7 @@ app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity
 app.use('/uploads', express.static(uploadDir));                                                                        
 
 // Athlete routes - ORDER MATTERS!
-app.use('/api/athlete', athletepersonhydrateRouter); // /athletepersonhydrate (FIRST - most specific)
+app.use('/api/athlete', athletepersonhydrateRouter); // /hydrate (universal), /athletepersonhydrate (legacy)
 app.use('/api/athlete', athleteActivitiesRouter); // /activities, /:athleteId/activities (BEFORE /:id routes)
 app.use('/api/athlete', athletesallhydrateRouter); // /athletesallhydrate (legacy)
 app.use('/api/athlete', athleteProfileRouter); // /:id/profile
@@ -168,7 +168,8 @@ app.get('/', (req, res) => {
   res.json({ 
     message: 'GoFast Backend V2',
     endpoints: {
-      athletepersonhydrate: '/api/athlete/athletepersonhydrate',
+      hydrate: '/api/athlete/hydrate', // Universal athlete hydration (includes RunCrews, everything)
+      athletepersonhydrate: '/api/athlete/athletepersonhydrate', // Legacy - redirects to /hydrate
       athletesallhydrate: '/api/athlete/athletesallhydrate',
       createAthlete: API_ROUTES.CREATE_ATHLETE.path,
       hydrateAthletes: API_ROUTES.HYDRATE_ATHLETES.path,
