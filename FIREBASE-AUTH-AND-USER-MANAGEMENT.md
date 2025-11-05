@@ -161,7 +161,7 @@ router.get('/protected', verifyFirebaseToken, async (req, res) => {
 
 ---
 
-## 🎨 Frontend: Firebase Config
+## 🎨 Frontend: Firebase Config & API Client
 
 ### `src/config/firebaseConfig.js`
 
@@ -255,6 +255,102 @@ export async function signInWithEmail(email, password) {
 
 export { app, analytics };
 ```
+
+### `src/api/axiosConfig.js` or `src/lib/api.js`
+
+**Purpose:** Axios instance with automatic Firebase token injection - **REQUIRED PATTERN**
+
+**Why This Pattern:**
+- Firebase SDK automatically refreshes tokens when you call `getIdToken()`
+- Axios interceptor ensures every request gets a fresh token
+- No manual token management needed
+- Tokens persist automatically via Firebase SDK's internal storage
+
+**Implementation:**
+```javascript
+import axios from 'axios';
+import { getAuth } from 'firebase/auth';
+
+const api = axios.create({
+  baseURL: import.meta.env.PROD 
+    ? 'https://your-backend.onrender.com/api' 
+    : 'http://localhost:4000/api',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true
+});
+
+// Request interceptor - AUTOMATICALLY adds Firebase token to all requests
+api.interceptors.request.use(
+  async (config) => {
+    // Get Firebase auth instance
+    const firebaseAuth = getAuth();
+    const user = firebaseAuth.currentUser;
+    
+    // If user is authenticated, add token to request
+    if (user) {
+      try {
+        const token = await user.getIdToken(); // Firebase SDK gets fresh token automatically
+        config.headers.Authorization = `Bearer ${token}`; // Automatically added!
+      } catch (error) {
+        console.error('❌ Failed to get Firebase token:', error);
+      }
+    }
+    
+    // Log request
+    console.log('🔥 API Request:', config.method.toUpperCase(), config.url, config.data);
+    return config;
+  },
+  (error) => {
+    console.error('❌ API Request Error:', error);
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor - Handles errors and logging
+api.interceptors.response.use(
+  response => {
+    console.log('✅ API Response:', response.status, response.data);
+    return response;
+  },
+  error => {
+    console.error('❌ API Error:', error.response?.status, error.response?.data || error.message);
+    
+    // Handle 401 (Unauthorized) - token expired or invalid
+    if (error.response?.status === 401) {
+      console.error('🚫 Unauthorized - redirecting to signup');
+      // Clear any stored auth data
+      localStorage.clear();
+      // Redirect to signup
+      window.location.href = '/signup';
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+```
+
+**Usage in Components:**
+```javascript
+import api from '../api/axiosConfig'; // or '../lib/api'
+
+// No manual token needed - interceptor handles it!
+const response = await api.get('/athlete/hydrate');
+const { athlete } = response.data;
+
+// All requests automatically get fresh tokens
+const createResponse = await api.post('/runcrew/create', { name: 'My Crew' });
+```
+
+**Key Points:**
+- ✅ **Use axios, not fetch** - Required for automatic token management
+- ✅ **Token automatically refreshed** - Firebase SDK handles it
+- ✅ **No localStorage token storage** - Firebase SDK manages tokens internally
+- ✅ **Works with `onAuthStateChanged`** - Token refresh happens automatically
+- ✅ **All API calls use this instance** - Consistent token handling
 
 ---
 
@@ -553,26 +649,22 @@ app.use('/api/user', userHydrateRoute);
 
 ### Frontend Usage
 ```javascript
-// Get Firebase token
-const firebaseUser = getCurrentUser();
-if (!firebaseUser) {
-  // Redirect to sign-in
-  return;
+import api from '../api/axiosConfig'; // or '../lib/api'
+
+// No manual token needed - axios interceptor handles it!
+const response = await api.get('/[entity]/hydrate');
+
+// Response structure: response.data.success, response.data.[entity]
+if (response.data.success && response.data.[entity]) {
+  const [entity] = response.data.[entity];
+  // Store full entity data in state/context
 }
-
-const idToken = await firebaseUser.getIdToken();
-
-// Call hydrate route (replace [entity] with your model name)
-const response = await fetch('/api/[entity]/hydrate', {
-  method: 'GET',
-  headers: {
-    'Authorization': `Bearer ${idToken}`
-  }
-});
-
-const { [entity] } = await response.json();
-// Store full entity data in state/context
 ```
+
+**Important:** Use axios with interceptors, NOT fetch. The interceptor automatically:
+- Gets fresh Firebase token on every request
+- Handles token refresh (Firebase SDK does this automatically)
+- No manual token management needed
 
 ### Key Points
 - ✅ **Requires `verifyFirebaseToken` middleware** - Token must be verified
@@ -612,17 +704,15 @@ const { user } = await response.json();
 
 ### 3. Hydrate User Data (Pattern B)
 ```javascript
-const idToken = await firebaseUser.getIdToken();
+import api from '../api/axiosConfig';
 
-const response = await fetch('/api/user/hydrate', {
-  method: 'GET',
-  headers: {
-    'Authorization': `Bearer ${idToken}`
-  }
-});
+// Token automatically added by axios interceptor
+const response = await api.get('/user/hydrate');
 
-const { user } = await response.json();
-// Store full user data with companies, etc.
+if (response.data.success && response.data.user) {
+  const { user } = response.data;
+  // Store full user data with companies, etc.
+}
 ```
 
 ### 4. Protected Routes
@@ -693,6 +783,9 @@ VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXXXX
 - [x] `src/config/firebaseConfig.js` exists
 - [x] Exports: `auth`, `signInWithGoogle`, `signOutUser`, `getCurrentUser`
 - [x] Firebase config matches backend project
+- [x] **`src/api/axiosConfig.js` or `src/lib/api.js` exists with axios interceptors**
+- [x] **All API calls use axios instance (not fetch)**
+- [x] **Axios interceptor automatically adds Firebase tokens**
 - [x] ID tokens sent in `Authorization: Bearer <token>` header
 
 ---
