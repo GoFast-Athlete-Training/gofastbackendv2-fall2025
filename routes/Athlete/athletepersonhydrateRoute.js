@@ -96,18 +96,14 @@ router.get('/by-id', async (req, res) => {
   }
 });
 
-// Handle preflight OPTIONS requests for CORS
+// Handle preflight OPTIONS requests for CORS (handled by main CORS middleware)
 router.options('/hydrate', (req, res) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.sendStatus(200);
 });
 
 // Universal athlete hydration handler (shared logic)
 async function hydrateAthlete(req, res) {
-  // Set CORS headers explicitly
-  res.header('Access-Control-Allow-Origin', '*');
+  // CORS headers handled by main middleware
   try {
     // Get firebaseId from verified token (set by middleware)
     const firebaseId = req.user?.uid;
@@ -125,9 +121,11 @@ async function hydrateAthlete(req, res) {
     const prisma = getPrismaClient();
     
     // Find athlete with RunCrew memberships included
+    // ATHLETE-FIRST: Query athlete by firebaseId, then hydrate all relations via athleteId
     let athlete = await prisma.athlete.findFirst({
-      where: { firebaseId },
+      where: { firebaseId }, // Find by Firebase ID (auth)
       include: {
+        // ATHLETE-FIRST: RunCrew memberships relation - explicitly included
         runCrewMemberships: {
           include: {
             runCrew: {
@@ -183,14 +181,16 @@ async function hydrateAthlete(req, res) {
       });
     }
     
-    console.log('✅ ATHLETE PERSON HYDRATE: Found athlete:', athlete.id, athlete.email);
+    // Get athleteId - ATHLETE-FIRST ARCHITECTURE: Everything flows from athleteId
+    const athleteId = athlete.id;
+    console.log('✅ ATHLETE PERSON HYDRATE: Found athlete - athleteId:', athleteId, 'email:', athlete.email);
     
     // Sync photoURL from Firebase if available and different
     const firebasePhotoURL = req.user?.picture;
     if (firebasePhotoURL && firebasePhotoURL !== athlete.photoURL) {
-      console.log('🔄 ATHLETE PERSON HYDRATE: Updating photoURL from Firebase');
+      console.log('🔄 ATHLETE PERSON HYDRATE: Updating photoURL from Firebase for athleteId:', athleteId);
       athlete = await prisma.athlete.update({
-        where: { id: athlete.id },
+        where: { id: athleteId }, // ATHLETE-FIRST: Use athleteId
         data: { photoURL: firebasePhotoURL },
         include: {
           runCrewMemberships: {
@@ -241,18 +241,35 @@ async function hydrateAthlete(req, res) {
     }
     
     // Transform RunCrew memberships to include hydrated crew data
-    const runCrews = athlete.runCrewMemberships.map(membership => ({
-      ...membership.runCrew,
-      memberCount: membership.runCrew.memberships.length,
-      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
-      joinedAt: membership.joinedAt,
-      postCount: membership.runCrew._count.posts,
-      leaderboardCount: membership.runCrew._count.leaderboardEntries
-    }));
+    // ATHLETE-FIRST: All RunCrew data flows from athleteId via junction table
+    console.log('🔍 ATHLETE PERSON HYDRATE: Checking RunCrew memberships for athleteId:', athleteId);
+    console.log('🔍 ATHLETE PERSON HYDRATE: Found', athlete.runCrewMemberships?.length || 0, 'memberships');
+    
+    if (!athlete.runCrewMemberships) {
+      console.warn('⚠️ ATHLETE PERSON HYDRATE: runCrewMemberships is null/undefined - relation may not be working!');
+    }
+    
+    const runCrews = (athlete.runCrewMemberships || []).map(membership => {
+      if (!membership.runCrew) {
+        console.warn('⚠️ ATHLETE PERSON HYDRATE: Membership found but runCrew relation is null:', membership.id);
+        return null;
+      }
+      return {
+        ...membership.runCrew,
+        memberCount: membership.runCrew.memberships?.length || 0,
+        isAdmin: membership.runCrew.runcrewAdminId === athleteId, // ATHLETE-FIRST: Use athleteId
+        joinedAt: membership.joinedAt,
+        postCount: membership.runCrew._count?.posts || 0,
+        leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0
+      };
+    }).filter(Boolean); // Remove null entries
+    
+    console.log('✅ ATHLETE PERSON HYDRATE: Successfully hydrated', runCrews.length, 'RunCrews');
     
     // Format athlete data for frontend consumption
+    // ATHLETE-FIRST: athleteId is the central identifier
     const hydratedAthlete = {
-      athleteId: athlete.id,
+      athleteId: athleteId, // ATHLETE-FIRST: Central identifier
       firebaseId: athlete.firebaseId,
       email: athlete.email,
       firstName: athlete.firstName,
@@ -295,13 +312,10 @@ async function hydrateAthlete(req, res) {
       hasBio: !!athlete.bio
     };
     
-    console.log('🎯 ATHLETE PERSON HYDRATE: Returning hydrated athlete data');
+    console.log('🎯 ATHLETE PERSON HYDRATE: Returning hydrated athlete data for athleteId:', athleteId);
+    console.log('🎯 ATHLETE PERSON HYDRATE: RunCrews count:', runCrews.length, 'Admin crews:', athlete.adminRunCrews?.length || 0);
     
-    // Ensure CORS headers are set before sending response
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    
+    // CORS handled by main middleware
     res.json({
       success: true,
       message: 'Athlete hydrated successfully',

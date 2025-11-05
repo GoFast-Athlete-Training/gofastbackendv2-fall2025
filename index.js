@@ -70,19 +70,19 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 // --- End Upload Setup ---
 
-// CORS - Allow all origins for debugging
+// CORS - Simple config for Bearer token auth (no cookies)
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    // Allow all origins for MVP
+    // Allow all origins for MVP (Bearer tokens don't need strict origin matching)
     callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  credentials: false,
-  optionsSuccessStatus: 200, // Some legacy browsers choke on 204
-  preflightContinue: false // Let CORS handle preflight
+  credentials: false, // No cookies - using Bearer tokens
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
 // Handle preflight requests explicitly BEFORE routes

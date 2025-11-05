@@ -1,5 +1,6 @@
 // Firebase Middleware - Token Verification
 // Verifies Firebase ID tokens from frontend requests
+// STANDARDIZED: All Firebase auth middleware uses this naming convention
 
 import admin from 'firebase-admin';
 
@@ -22,14 +23,20 @@ const initializeFirebase = () => {
       // Parse service account JSON
       const serviceAccountKey = JSON.parse(serviceAccount);
       
-      // Initialize Firebase Admin
-      firebaseAdmin = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccountKey),
-        projectId: serviceAccountKey.project_id
-      });
-      
-      console.log('✅ FIREBASE: Admin SDK initialized successfully');
-      console.log('✅ FIREBASE: Project ID:', serviceAccountKey.project_id);
+      // Initialize Firebase Admin ONCE (check if already initialized)
+      try {
+        firebaseAdmin = admin.app();
+        console.log('✅ FIREBASE: Admin SDK already initialized');
+      } catch (e) {
+        // Not initialized yet, initialize now
+        firebaseAdmin = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccountKey),
+          projectId: serviceAccountKey.project_id
+        });
+        
+        console.log('✅ FIREBASE: Admin SDK initialized successfully');
+        console.log('✅ FIREBASE: Project ID:', serviceAccountKey.project_id);
+      }
       
     } catch (error) {
       console.error('❌ FIREBASE: Failed to initialize Admin SDK:', error.message);
@@ -77,6 +84,7 @@ export const verifyFirebaseToken = async (req, res, next) => {
     // Add user info to request object
     req.user = {
       uid: decodedToken.uid,
+      firebaseId: decodedToken.uid, // Alias for compatibility
       email: decodedToken.email,
       emailVerified: decodedToken.email_verified,
       name: decodedToken.name,
@@ -93,7 +101,9 @@ export const verifyFirebaseToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         error: 'Token expired',
-        message: 'Firebase token has expired, please re-authenticate'
+        message: 'Firebase token has expired. Frontend should refresh token automatically.',
+        code: 'TOKEN_EXPIRED',
+        shouldRefresh: true
       });
     }
     
@@ -101,7 +111,8 @@ export const verifyFirebaseToken = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         error: 'Invalid token',
-        message: 'Firebase token is invalid'
+        message: 'Firebase token is invalid',
+        code: 'INVALID_TOKEN'
       });
     }
     
@@ -109,6 +120,7 @@ export const verifyFirebaseToken = async (req, res, next) => {
       success: false,
       error: 'Authentication failed',
       message: 'Failed to verify Firebase token',
+      code: 'AUTH_FAILED',
       details: error.message
     });
   }
@@ -168,6 +180,7 @@ export const debugFirebaseToken = async (req, res, next) => {
           
           req.user = {
             uid: decodedToken.uid,
+            firebaseId: decodedToken.uid, // Alias for compatibility
             email: decodedToken.email,
             emailVerified: decodedToken.email_verified,
             name: decodedToken.name,

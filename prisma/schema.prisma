@@ -79,7 +79,7 @@ model Athlete {
 
   // RunCrew Relations
   adminRunCrews       RunCrew[]            @relation("RunCrewAdmin") // Crews this athlete created/admin
-  runCrewMemberships  RunCrewMembership[] // Crew memberships (junction table - athlete can be in multiple crews)
+  runCrewMemberships  RunCrewMembership[]  @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
   runCrewPosts        RunCrewPost[] // Posts authored by this athlete
   runCrewPostComments RunCrewPostComment[] // Comments authored by this athlete
   runCrewLeaderboards RunCrewLeaderboard[] // Leaderboard entries for this athlete
@@ -177,16 +177,16 @@ model RunCrew {
 model RunCrewMembership {
   id        String @id @default(cuid())
   runCrewId String
-  athleteId String
+  athleteId String // ATHLETE-FIRST: Foreign key to Athlete
 
   // Timestamps
   joinedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
+  // Relations - ATHLETE-FIRST: Explicitly tied to athleteId
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation("AthleteRunCrewMemberships", fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@unique([runCrewId, athleteId]) // Prevent duplicate memberships
   @@map("run_crew_memberships")
