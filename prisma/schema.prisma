@@ -886,3 +886,168 @@ model Message {
   @@index([groupId, createdAt]) // Efficient queries by group and time
   @@map("messages")
 }
+
+// =====================================================
+// GOFAST COMPANY STACK MODELS - Single-Tenant Company Operations
+// =====================================================
+
+model GoFastCompany {
+  id          String   @id @default(cuid())
+  containerId String   @unique  // Unique container identifier for GoFast operations
+  
+  // Company Details (Upserted by founder during onboarding)
+  companyName String   // "GoFast Inc"
+  address     String?  // "2604 N. George Mason Dr."
+  city        String?  // "Arlington"
+  state       String?  // "VA"
+  website     String?  // "gofastcrushgoals.com"
+  description String?  // Company description
+  
+  // System
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations - All scoped to this single company
+  staffRoles  CompanyStaffRole[]  // All staff via junction
+  contacts    Contact[]            // CRM contacts
+  pipelines   Pipeline[]           // BD Pipeline (contact-driven, config-based)
+  productPipelineItems ProductPipelineItem[]  // Product Pipeline (product module, user-driven)
+  financialSpends CompanyFinancialSpend[]
+  financialProjections CompanyFinancialProjection[]
+  roadmapItems CompanyRoadmapItem[]
+  tasks       Task[]
+  
+  @@map("gofast_company")
+}
+
+model CompanyStaff {
+  id          String   @id @default(cuid())
+  firebaseId  String   @unique  // Firebase auth ID (for authentication)
+  name        String?  // Full name (from Firebase displayName or firstName/lastName)
+  email       String?  // Email address (from Firebase)
+  photoURL    String?  // Profile photo URL (from Firebase - stored for quick access)
+  
+  // Verification Code (for onboarding/re-authentication)
+  verificationCode String?  // Unique code for employee onboarding (future: can be changed)
+  
+  // Reverse relations
+  companyRoles CompanyStaffRole[]  // Junction table with roles
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("company_staff")
+}
+
+model CompanyStaffRole {
+  id        String @id @default(cuid())
+  companyId String
+  staffId   String // Links to CompanyStaff.id (NOT Athlete.id)
+  
+  // Role-Based Access Control (role values defined in roleConfig.js)
+  role      String  // "founder", "admin", "manager", "employee" (REQUIRED - validated against roleConfig)
+  department String? // Optional department assignment
+  
+  joinedAt  DateTime @default(now())
+  
+  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  staff     CompanyStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  
+  @@unique([companyId, staffId])
+  @@map("company_staff_roles")
+}
+
+model Contact {
+  id          String @id @default(cuid())
+  companyId   String  // Links to GoFastCompany.id (containerId)
+  
+  // Core person data (aligned with Ignite pattern)
+  firstName   String?
+  lastName    String?
+  goesBy      String?  // Preferred name
+  email       String?
+  phone       String?
+  title       String?
+  
+  // Pipeline Tracking (via Pipeline model - config-based)
+  pipelineId  String?  // Links to Pipeline.id (optional - contact may not be in pipeline yet)
+  
+  // Conversion Path (Contact → Athlete)
+  athleteId   String?  // Links to Athlete.id if contact converted to athlete
+  
+  // System
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipeline    Pipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
+  
+  @@map("contacts")
+}
+
+model Pipeline {
+  id          String @id @default(cuid())
+  companyId   String  // Links to GoFastCompany.id (containerId)
+  contactId   String  // Links to Contact.id (contact-driven pipeline)
+  
+  // Pipeline Configuration (from PipelineConfig)
+  configId    String  // Links to PipelineConfig.id (which pipeline config)
+  stageId     String  // Current stage ID (from PipelineConfig.stages)
+  
+  // System
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact     Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  
+  @@unique([contactId, configId]) // One pipeline per contact per config
+  @@map("pipelines")
+}
+
+model PipelineConfig {
+  id          String @id @default(cuid())
+  companyId   String  // Links to GoFastCompany.id (containerId)
+  
+  // Pipeline Definition
+  name        String  // "BD Pipeline", "Sales Pipeline", etc.
+  description String?
+  
+  // Stages (JSON array of stage definitions)
+  stages      Json    // [{ id, name, order, color, etc. }]
+  
+  // System
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@map("pipeline_configs")
+}
+
+model ProductPipelineItem {
+  id          String @id @default(cuid())
+  companyId   String  // Links to GoFastCompany.id (containerId)
+  
+  // User-Driven Product Module Fields
+  name        String  // Product feature/module name (user input)
+  description String? // Description (user input)
+  timeItTakes String? // Time it takes (e.g., "2 weeks", "1 month") (user input)
+  
+  // Status
+  status      String @default("pending") // pending, in_progress, completed, cancelled
+  priority    String @default("medium") // low, medium, high, urgent
+  
+  // Dates
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // System
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@map("product_pipeline_items")
+}
