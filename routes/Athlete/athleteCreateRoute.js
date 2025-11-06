@@ -32,7 +32,7 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     console.log('🔐 ATHLETE CREATE: email:', email);
     console.log('🔐 ATHLETE CREATE: displayName:', displayName);
     console.log('🔐 ATHLETE CREATE: picture:', picture);
-
+    
     if (!firebaseId || !email) {
       return res.status(400).json({ 
         success: false,
@@ -43,8 +43,8 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
 
     // Call service to find or create athlete (upserts all Firebase data)
     const athlete = await AthleteFindOrCreateService.findOrCreate({
-      firebaseId,
-      email,
+        firebaseId,
+        email,
       displayName,
       picture
     });

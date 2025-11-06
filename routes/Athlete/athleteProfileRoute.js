@@ -2,19 +2,23 @@
 // Updates athlete profile with full data from AthleteCreateProfile form
 
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../../config/database.js';
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * Update Athlete Profile
  * PUT /api/athlete/:id/profile
  * Updates athlete with full profile data
+ * Requires: Firebase token authentication
  */
-router.put('/:id/profile', async (req, res) => {
+router.put('/:id/profile', verifyFirebaseToken, async (req, res) => {
   try {
+    const prisma = getPrismaClient();
     const { id } = req.params;
+    const firebaseId = req.user?.uid;
+    
     const {
       firstName,
       lastName,
@@ -26,11 +30,34 @@ router.put('/:id/profile', async (req, res) => {
       state,
       primarySport,
       bio,
-      instagram
+      instagram,
+      photoURL
     } = req.body;
 
     console.log('📝 PROFILE: Updating athlete:', id);
+    console.log('📝 PROFILE: Firebase ID:', firebaseId);
     console.log('📝 PROFILE: Data:', req.body);
+
+    // Verify athlete belongs to this Firebase user (security check)
+    const existingAthlete = await prisma.athlete.findUnique({
+      where: { id },
+      select: { firebaseId: true }
+    });
+
+    if (!existingAthlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
+    if (existingAthlete.firebaseId !== firebaseId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Forbidden',
+        message: 'You can only update your own profile'
+      });
+    }
 
     // Update athlete profile
     const athlete = await prisma.athlete.update({
@@ -46,7 +73,8 @@ router.put('/:id/profile', async (req, res) => {
         state,
         primarySport,
         bio,
-        instagram
+        instagram,
+        photoURL: photoURL || null // Handle photoURL
       }
     });
 
@@ -74,6 +102,27 @@ router.put('/:id/profile', async (req, res) => {
 
   } catch (error) {
     console.error('❌ PROFILE: Update error:', error);
+    
+    // Handle unique constraint violations (e.g., duplicate gofastHandle)
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'field';
+      return res.status(400).json({
+        success: false,
+        error: `Duplicate ${field}`,
+        message: `This ${field} is already taken. Please choose another one.`,
+        field: field
+      });
+    }
+    
+    // Handle record not found
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found',
+        message: 'The athlete record does not exist'
+      });
+    }
+    
     res.status(400).json({ 
       success: false,
       error: error.message 
