@@ -14,7 +14,7 @@
 - **Plan** product, GTM, and operations roadmaps
 - **Coordinate** team tasks and priorities
 
-**Core Value**: **Company-first operations** - Everything centers around the Company container, with separate auth (Founder model) and role-based access control via CompanyFounder junction.
+**Core Value**: **Company-first operations** - Everything centers around the Company container, with separate auth (CompanyStaff model) and role-based access control via CompanyStaffRole junction (roles defined in roleConfig.js).
 
 ---
 
@@ -22,7 +22,7 @@
 
 Company Outlook is built on a **company-first schema** where the `Company` model (CompanyHQ) is the central container entity. All other models and features link back to `Company` as the source of truth.
 
-**Key Principle**: **Separate auth from athlete identity** - The `Founder` model handles authentication (Firebase), completely separate from `Athlete` model. This enables:
+**Key Principle**: **Separate auth from athlete identity** - The `CompanyStaff` model handles authentication (Firebase), completely separate from `Athlete` model. This enables:
 - Company operations without requiring athlete signup
 - Prospect → User conversion path (contacts can become athletes later)
 - Sales channel partner management (separate from athlete users)
@@ -32,7 +32,7 @@ Company Outlook is built on a **company-first schema** where the `Company` model
 
 ```
 Company (CompanyHQ - Root Container)
-  ├── Founders (Firebase Auth - Role-based via CompanyFounder junction)
+  ├── Staff (Firebase Auth - Role-based via CompanyStaffRole junction)
   ├── Employees (Email-based, NO athleteId)
   ├── Invites (Invitation-based access with roles)
   ├── CRM Contacts (Prospects → Users/Athletes/Partners)
@@ -42,7 +42,7 @@ Company (CompanyHQ - Root Container)
   └── [Future: Products, Deals, Integrations]
 ```
 
-**Note**: `Founder` is for Company Outlook authentication - separate from `Athlete` identity. Role-based access via `CompanyFounder` junction table. See Identity Architecture section below.
+**Note**: `CompanyStaff` is for Company Outlook authentication - separate from `Athlete` identity. Role-based access via `CompanyStaffRole` junction table (roles defined in `roleConfig.js`). See Identity Architecture section below.
 
 ---
 
@@ -82,31 +82,31 @@ Company (CompanyHQ - Root Container)
 
 ### Identity Types
 
-#### 1. Founder (Company Auth)
+#### 1. CompanyStaff (Company Auth)
 - Company Outlook users (founders, admins, managers, employees)
-- Primary identity: `Founder` model (Firebase auth)
+- Primary identity: `CompanyStaff` model (Firebase auth)
 - Has access to company tools (CRM, finances, roadmaps, tasks)
-- **Role-based access** - Roles assigned via `CompanyFounder` junction (founder, admin, manager, employee)
-- **Separate from Athlete** - Founder is NOT an athlete extension
-- **May optionally** link to Athlete if founder is also a runner (future: optional link)
+- **Role-based access** - Roles assigned via `CompanyStaffRole` junction (roles defined in `roleConfig.js`)
+- **Separate from Athlete** - CompanyStaff is NOT an athlete extension
+- **May optionally** link to Athlete if staff is also a runner (future: optional link)
 
 #### 2. Athlete (Separate Concern)
 - Real users using GoFast app for fitness/training
 - Primary identity: `Athlete` model (separate system)
 - Has activities, Garmin integration, RunCrew membership
-- **Separate from Founder** - Athlete is NOT a company extension
+- **Separate from CompanyStaff** - Athlete is NOT a company extension
 - **Conversion Path**: Prospect (Contact) → Can become Athlete (if they sign up for GoFast app)
 
 ### Model Relationships
 
-**Founder (Company Identity)**:
+**CompanyStaff (Company Identity)**:
 ```
-Founder (Firebase Auth)
-  ├── CompanyFounder[] (companyFounderships - junction with roles)
+CompanyStaff (Firebase Auth)
+  ├── CompanyStaffRole[] (companyRoles - junction with roles)
   │   └── Company (via junction)
-  │   └── role: "founder" | "admin" | "manager" | "employee"
+  │   └── role: "founder" | "admin" | "manager" | "employee" (from roleConfig.js)
   └── (No athlete activities - separate concern)
-  └── May have optional athleteId link (future - if founder is also a runner)
+  └── May have optional athleteId link (future - if staff is also a runner)
 ```
 
 **Athlete (Fitness Identity)**:
@@ -175,9 +175,9 @@ model Company {
   address   String?
   website   String?
   
-  // Role-Based Access (via CompanyFounder junction)
-  // No direct ownerId/managerId - use CompanyFounder junction with roles
-  founders  CompanyFounder[]  // All founders/admins/managers/employees via junction
+  // Role-Based Access (via CompanyStaffRole junction)
+  // No direct staffId - use CompanyStaffRole junction with roles
+  staffRoles CompanyStaffRole[]  // All staff (founders/admins/managers/employees) via junction
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -198,14 +198,14 @@ model Company {
 
 **Key Architecture Point**: CompanyHQ is the root container for multi-tenancy
 - **Everything stored under CompanyHQId** - all data is nested under it
-- **Founder is NOT a Contact** - Founders are separate from Contact model
-- **Role-based access** - Access controlled via `CompanyFounder` junction with roles
+- **CompanyStaff is NOT a Contact** - Staff are separate from Contact model
+- **Role-based access** - Access controlled via `CompanyStaffRole` junction with roles (defined in `roleConfig.js`)
 - **Data isolation**: Each CompanyHQ can only access their own data
 
-### Founder Model (Company Auth - Firebase)
+### CompanyStaff Model (Company Auth - Firebase)
 
 ```prisma
-model Founder {
+model CompanyStaff {
   id          String   @id @default(cuid())
   firebaseId  String   @unique  // Firebase auth ID (for authentication)
   name        String?  // Full name (from Firebase displayName or firstName/lastName)
@@ -213,7 +213,7 @@ model Founder {
   photoURL    String?  // Profile photo URL (from Firebase - stored for quick access)
   
   // Reverse relations
-  companyFounderships CompanyFounder[]  // Junction table with roles
+  companyRoles CompanyStaffRole[]  // Junction table with roles
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -224,43 +224,44 @@ model Founder {
 - `firebaseId` = Firebase UID (universal identifier)
 - `name` = Parsed from Firebase `displayName` (format: "First Last") or set manually
 - `email` = From Firebase auth
-- `photoURL` = From Firebase `photoURL` - **Stored in Founder model for quick access** (no need to fetch from Firebase every time)
+- `photoURL` = From Firebase `photoURL` - **Stored in CompanyStaff model for quick access** (no need to fetch from Firebase every time)
 
-**Key Architecture Point**: Founder is separate from Athlete
-- **NO athleteId** - Founder is NOT an athlete extension
+**Key Architecture Point**: CompanyStaff is separate from Athlete
+- **NO athleteId** - CompanyStaff is NOT an athlete extension
 - **Separate auth system** - Uses Firebase, not athlete auth
-- **Role-based access** - Roles assigned via `CompanyFounder` junction table
-- **Multi-company support** - Founder can have different roles at different companies
+- **Role-based access** - Roles assigned via `CompanyStaffRole` junction table (roles defined in `roleConfig.js`)
+- **Multi-company support** - CompanyStaff can have different roles at different companies
 
-### CompanyFounder Junction (Role-Based Access)
+### CompanyStaffRole Junction (Role-Based Access)
 
 ```prisma
-model CompanyFounder {
+model CompanyStaffRole {
   id        String @id @default(cuid())
   companyId String
-  founderId String // Links to Founder.id (NOT Athlete.id)
+  staffId   String // Links to CompanyStaff.id (NOT Athlete.id)
   
-  // Role-Based Access Control
-  role      String  // "founder", "admin", "manager", "employee" (REQUIRED)
+  // Role-Based Access Control (role values defined in roleConfig.js)
+  role      String  // "founder", "admin", "manager", "employee" (REQUIRED - validated against roleConfig)
   department String? // Optional department assignment
   
   joinedAt  DateTime @default(now())
   
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  founder   Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+  staff     CompanyStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
   
-  @@unique([companyId, founderId])
-  @@map("company_founders")
+  @@unique([companyId, staffId])
+  @@map("company_staff_roles")
 }
 ```
 
 **Key Architecture Point**: Role-based access via junction table
-- `founderId` → `Founder.id` (company auth)
+- `staffId` → `CompanyStaff.id` (company auth)
 - **NOT** `Athlete.id` (separate system)
-- **Role required** - Every founder-company relationship has a role (founder, admin, manager, employee)
-- **Multi-company support** - Same founder can have different roles at different companies
+- **Role required** - Every staff-company relationship has a role (validated against `roleConfig.js`)
+- **Multi-company support** - Same staff member can have different roles at different companies
 - **Department assignment** - Optional department for role-based filtering
-- If founder wants to use GoFast app, they sign up separately as Athlete
+- **Role config** - Roles and permissions defined in `config/roleConfig.js`
+- If staff wants to use GoFast app, they sign up separately as Athlete
 
 ### CompanyEmployee (Email-Based, NO AthleteId)
 
@@ -479,14 +480,14 @@ model CompanyFinancialProjection {
 - **Ingested as totals** - user enters total projected expenses, total revenue, etc.
 - **Different from Spend model** - Spend = items, Projection = totals
 
-### Task (Unified - Founder OR Company)
+### Task (Unified - CompanyStaff OR Company)
 
 ```prisma
 model Task {
   id        String @id @default(cuid())
   
   // Polymorphic Link - ONE of these must be set
-  founderId String?  // For founder personal tasks (Adam's tasks)
+  staffId   String?  // For staff personal tasks (Adam's tasks)
   companyId String?  // For company-wide tasks
   
   // Task Details
@@ -499,8 +500,8 @@ model Task {
   // Department (for company tasks)
   department  String? // "Engineering", "Design", "Marketing"
   
-  // Founder Priority Flag (for company tasks)
-  isTopPriority Boolean @default(false) // Founder can mark "most important now"
+  // Staff Priority Flag (for company tasks)
+  isTopPriority Boolean @default(false) // Staff can mark "most important now"
   
   // Completion
   completedAt DateTime?
@@ -510,7 +511,7 @@ model Task {
   updatedAt DateTime @updatedAt
   
   // Relations
-  founder Founder? @relation(fields: [founderId], references: [id], onDelete: Cascade)
+  staff   CompanyStaff? @relation(fields: [staffId], references: [id], onDelete: Cascade)
   company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
   @@map("tasks")
@@ -518,8 +519,8 @@ model Task {
 ```
 
 **Key Architecture Point**: Unified task model
-- **Founder tasks** - Personal tasks for founder (founderId set, companyId null)
-- **Company tasks** - Company-wide tasks (companyId set, founderId null)
+- **Staff tasks** - Personal tasks for staff (staffId set, companyId null)
+- **Company tasks** - Company-wide tasks (companyId set, staffId null)
 - **Avoids duplicate task models** - One model handles both cases
 
 ---
@@ -527,11 +528,11 @@ model Task {
 ## Relationships Summary
 
 ### Company Relationships
-- `Company` → `CompanyFounder[]` → `Founder` (role-based access: founder, admin, manager, employee)
+- `Company` → `CompanyStaffRole[]` → `CompanyStaff` (role-based access: founder, admin, manager, employee - roles from roleConfig.js)
 - `Company` → `CompanyEmployee[]` (email-based, NO athleteId)
 - `Company` → `CompanyInvite[]` (invitation-based access with roles)
 - `Company` → `CompanyRoadmapItem[]` (product/GTM/ops roadmap)
-- `Company` → `Task[]` (companyId set, founderId null)
+- `Company` → `Task[]` (companyId set, staffId null)
 - `Company` → `CompanyCrmContact[]` (product CRM - prospects → users/partners)
 - `Company` → `CompanyFinancialSpend[]` (actual spending transactions)
 - `Company` → `CompanyFinancialProjection[]` (projected spending/budgets)
@@ -571,11 +572,11 @@ model Task {
 **Structure**:
 ```
 routes/
-├── Founder/           # Founder CRUD & hydration (Firebase auth)
-│   ├── founderCreateRoute.js
-│   ├── founderUpdateRoute.js
-│   ├── founderHydrateRoute.js
-│   └── founderProfileRoute.js
+├── Staff/           # CompanyStaff CRUD & hydration (Firebase auth)
+│   ├── staffCreateRoute.js
+│   ├── staffUpdateRoute.js
+│   ├── staffHydrateRoute.js
+│   └── staffProfileRoute.js
 ├── Company/         # Company management
 │   ├── companyCreateRoute.js
 │   ├── companyHydrateRoute.js
@@ -615,8 +616,9 @@ routes/
 **Purpose**: Business logic separated from route handlers
 
 **Services**:
-- `FounderUpsertService.js` - Universal founder upsert logic
-- `FounderUpdateService.js` - Founder update operations
+- `StaffUpsertService.js` - Universal CompanyStaff upsert logic
+- `StaffUpdateService.js` - CompanyStaff update operations
+- `RoleValidationService.js` - Role validation using roleConfig.js
 - `CrmContactService.js` - CRM contact management
 - `CrmConversionService.js` - Prospect → User/Partner conversion logic
 - `FinancialAggregationService.js` - Financial totals calculation
@@ -625,15 +627,15 @@ routes/
 ```javascript
 // Route handler (thin)
 router.post('/create', verifyFirebaseToken, async (req, res) => {
-  const result = await FounderUpsertService.upsert(req.body);
+  const result = await StaffUpsertService.upsert(req.body);
   res.json(result);
 });
 
 // Service (business logic)
-export class FounderUpsertService {
+export class StaffUpsertService {
   static async upsert(data) {
     // Business logic here
-    return await prisma.founder.upsert(...);
+    return await prisma.companyStaff.upsert(...);
   }
 }
 ```
@@ -669,7 +671,7 @@ export function getPrismaClient() {
 import { getPrismaClient } from '../../config/database.js';
 
 const prisma = getPrismaClient();
-const founders = await prisma.founder.findMany();
+const staff = await prisma.companyStaff.findMany();
 ```
 
 **Never Do This**:
@@ -688,12 +690,12 @@ const prisma = new PrismaClient(); // Wrong!
 
 ## Route Architecture
 
-### Founder Routes (Firebase Auth)
+### CompanyStaff Routes (Firebase Auth)
 
 ```
-POST   /api/founder/create              → Find or create Founder by firebaseId
-PUT    /api/founder/:id/profile         → Update Founder profile (name, email)
-GET    /api/founder/hydrate             → Hydrate Founder with full data (requires token)
+POST   /api/staff/create              → Find or create CompanyStaff by firebaseId
+PUT    /api/staff/:id/profile         → Update CompanyStaff profile (name, email)
+GET    /api/staff/hydrate             → Hydrate CompanyStaff with full data (requires token)
 ```
 
 ### Company Routes
@@ -701,7 +703,7 @@ GET    /api/founder/hydrate             → Hydrate Founder with full data (requ
 ```
 GET    /api/company/:companyId/hydrate          // Hydrate company + all relations
 GET    /api/company/:companyId                 // Get company details
-POST   /api/company/create                     // Create company record (requires founderId + role)
+POST   /api/company/create                     // Create company record (requires staffId + role from roleConfig.js)
 PUT    /api/company/:companyId                 // Update company
 ```
 
@@ -1188,17 +1190,18 @@ PORT=4000
 ## Key Architectural Decisions
 
 1. **Separate Auth from Athlete Identity**
-   - `Founder` model handles Company Outlook auth (Firebase)
+   - `CompanyStaff` model handles Company Outlook auth (Firebase)
    - `Athlete` model handles GoFast app auth (separate system)
    - **NO athleteId dependencies** in Company Outlook routes
    - **Clear separation of concerns** - Company operations don't require athlete signup
-   - **Role-based access** - Roles assigned via `CompanyFounder` junction (founder, admin, manager, employee)
+   - **Role-based access** - Roles assigned via `CompanyStaffRole` junction (roles defined in `roleConfig.js`)
 
 2. **Company-First Architecture**
    - `Company` (CompanyHQ) is root container for multi-tenancy
    - Everything stored under CompanyHQId
-   - Founder is NOT a Contact - separate model, separate concern
-   - **Role-based access** - Access controlled via `CompanyFounder` junction with roles
+   - CompanyStaff is NOT a Contact - separate model, separate concern
+   - **Role-based access** - Access controlled via `CompanyStaffRole` junction with roles (defined in `roleConfig.js`)
+   - **Role configuration** - All roles and permissions defined in `config/roleConfig.js` for centralized management
    - Data isolation: Each CompanyHQ can only access their own data
 
 3. **Prospect → User Conversion Path**
@@ -1219,7 +1222,7 @@ PORT=4000
    - If employee wants app, they sign up separately as Athlete
 
 6. **Unified Task Model**
-   - One `Task` model with `founderId` OR `companyId` (polymorphic)
+   - One `Task` model with `staffId` OR `companyId` (polymorphic)
    - Avoids duplicate task models
 
 7. **Modular Hydration**
@@ -1241,14 +1244,14 @@ PORT=4000
 
 ## Data Flow Examples
 
-### Example 1: Founder Hydration (Firebase Auth)
+### Example 1: CompanyStaff Hydration (Firebase Auth)
 
 ```javascript
-// GET /api/founder/hydrate (with Firebase token)
-const founder = await prisma.founder.findUnique({
+// GET /api/staff/hydrate (with Firebase token)
+const staff = await prisma.companyStaff.findUnique({
   where: { firebaseId },
   include: {
-    companyFounderships: {
+    companyRoles: {
       include: {
         company: {
           include: {
@@ -1265,11 +1268,11 @@ const founder = await prisma.founder.findUnique({
 });
 
 return {
-  founder,
-  companies: founder.companyFounderships.map(cf => ({
-    ...cf.company,
-    role: cf.role,  // Include role from junction
-    department: cf.department
+  staff,
+  companies: staff.companyRoles.map(cr => ({
+    ...cr.company,
+    role: cr.role,  // Include role from junction (validated against roleConfig.js)
+    department: cr.department
   }))
 };
 ```
@@ -1334,37 +1337,43 @@ const contact = await prisma.companyCrmContact.create({
 
 ### Hydration (CompanyHQId Direct)
 - **Hydrate by CompanyHQId** - direct relationship, clean and simple
-- **Founder is NOT a Contact** - Founders are separate from Contact model
-- **No filtering needed** - Contact.companyId = CompanyHQId, Founders are separate
+- **CompanyStaff is NOT a Contact** - Staff are separate from Contact model
+- **No filtering needed** - Contact.companyId = CompanyHQId, CompanyStaff are separate
 - **Can hydrate by string values** - `pipeline` and `status` string values work perfectly for filtering
 - **Always filter by CompanyHQId** in all queries for security/isolation - ensures tenants only see their own data
 - **Tenant isolation enforced**: Every query must include `companyId: companyHQId` to prevent cross-tenant data access
 
 ### Access Control Hierarchy (Role-Based)
 
+**Roles and permissions are defined in `config/roleConfig.js`**
+
 1. **founder** (Super Admin)
    - Literal founder/owner of the company
    - Full access to everything
    - Can change company settings
+   - Can delete company
+   - Can manage all roles
    - Original creator
    - **Separate from Contact model** - not a contact, never will be
 
 2. **admin** (Delegated Admin)
-   - Assigned by founder (via CompanyFounder junction)
+   - Assigned by founder (via CompanyStaffRole junction)
    - Can manage CRM stack, finances, roadmaps
    - Can manage other roles (manager, employee)
-   - Cannot change company settings
+   - Cannot change company settings or delete company
 
 3. **manager** (Delegated Manager)
-   - Assigned by founder/admin (via CompanyFounder junction)
+   - Assigned by founder/admin (via CompanyStaffRole junction)
    - Can manage CRM stack, tasks
    - Cannot change company settings or manage roles
 
 4. **employee** (Standard Employee)
-   - Assigned by founder/admin/manager (via CompanyFounder junction)
+   - Assigned by founder/admin/manager (via CompanyStaffRole junction)
    - Read access to most features
    - Can manage own tasks
    - Limited write access
+
+**Role Configuration**: See `config/roleConfig.js` for complete permission definitions
 
 ---
 
@@ -1372,7 +1381,7 @@ const contact = await prisma.companyCrmContact.create({
 
 1. ✅ **CompanyHQId = Root Container** - Everything stored under CompanyHQId (multi-tenancy). Each CompanyHQ is a tenant - actual customers using the platform. Data isolation enforced - tenants can only access their own CompanyHQId data.
 
-2. ✅ **Founder = Company Auth** - Founder model handles Firebase authentication, completely separate from Athlete identity. NO athleteId dependencies in Company Outlook routes. Role-based access via CompanyFounder junction.
+2. ✅ **CompanyStaff = Company Auth** - CompanyStaff model handles Firebase authentication, completely separate from Athlete identity. NO athleteId dependencies in Company Outlook routes. Role-based access via CompanyStaffRole junction with roles defined in `roleConfig.js`.
 
 3. ✅ **Contact → CompanyHQId Direct** - Contact has `companyId` = CompanyHQId directly, no intermediate layer needed
 
@@ -1380,9 +1389,9 @@ const contact = await prisma.companyCrmContact.create({
 
 5. ✅ **Prospect → Partner Conversion** - Contact can convert to Partner (if they become sales channel) via `partnerId` link (future model).
 
-6. ✅ **Role-Based Access** - Roles assigned via `CompanyFounder` junction: founder (super admin), admin (delegated admin), manager (delegated manager), employee (standard access)
+6. ✅ **Role-Based Access** - Roles assigned via `CompanyStaffRole` junction: founder (super admin), admin (delegated admin), manager (delegated manager), employee (standard access). All roles and permissions defined in `config/roleConfig.js`.
 
-7. ✅ **Multi-Company Support** - Same founder can have different roles at different companies via CompanyFounder junction
+7. ✅ **Multi-Company Support** - Same staff member can have different roles at different companies via CompanyStaffRole junction
 
 8. ✅ **Contacts are universal personhood** - Simple hydration, represents person across entire journey (prospect → user/partner/client)
 
@@ -1392,15 +1401,16 @@ const contact = await prisma.companyCrmContact.create({
 
 11. ✅ **String Values Work** - Can hydrate/filter contacts by `pipeline` and `status` string values perfectly
 
-12. ✅ **Separate Auth Systems** - Founder uses Firebase (Company Outlook), Athlete uses separate auth (GoFast app)
+12. ✅ **Separate Auth Systems** - CompanyStaff uses Firebase (Company Outlook), Athlete uses separate auth (GoFast app)
 
 ---
 
 **Last Updated**: January 2025  
 **Architecture Pattern**: Company-First with Separate Auth & Role-Based Access  
 **Multi-Tenancy**: Company-scoped (`companyId` = CompanyHQId)  
-**Hydration Pattern**: CompanyHQId direct (founder is separate model, no filtering needed)  
+**Hydration Pattern**: CompanyHQId direct (CompanyStaff is separate model, no filtering needed)  
 **Contact Model**: Universal personhood for prospects → users/partners conversion  
-**Auth Model**: Founder (Firebase) - separate from Athlete identity  
-**Access Control**: Role-based via `CompanyFounder` junction (founder, admin, manager, employee)  
+**Auth Model**: CompanyStaff (Firebase) - separate from Athlete identity  
+**Access Control**: Role-based via `CompanyStaffRole` junction (roles defined in `config/roleConfig.js`)  
+**Role Configuration**: Centralized in `config/roleConfig.js` (roles, permissions, hierarchy)  
 **Conversion**: Handled via `athleteId` and `partnerId` links, no separate models
