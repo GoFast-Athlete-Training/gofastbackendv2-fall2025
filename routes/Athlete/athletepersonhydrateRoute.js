@@ -279,10 +279,19 @@ async function hydrateAthlete(req, res) {
           gte: sevenDaysAgo,
           lte: now
         },
-        // MVP1: Only show running activities (case-insensitive)
-        OR: [
-          { activityType: { equals: 'running', mode: 'insensitive' } },
-          { activityType: { contains: 'run', mode: 'insensitive' } }
+        // MVP1: Only show running activities (exclude wheelchair)
+        AND: [
+          {
+            OR: [
+              { activityType: { equals: 'running', mode: 'insensitive' } },
+              { activityType: { equals: 'run', mode: 'insensitive' } }
+            ]
+          },
+          {
+            NOT: {
+              activityType: { contains: 'wheelchair', mode: 'insensitive' }
+            }
+          }
         ]
       },
       orderBy: {

@@ -65,6 +65,13 @@ router.post("/activity", async (req, res) => {
           continue;
         }
     
+        // Log device info to see what Garmin sends
+        console.log(`📱 Device fields check:`);
+        console.log(`   - deviceMetaData:`, garminActivity.deviceMetaData);
+        console.log(`   - deviceName:`, garminActivity.deviceName);
+        console.log(`   - device:`, garminActivity.device);
+        console.log(`   - All keys:`, Object.keys(garminActivity).filter(k => k.toLowerCase().includes('device')));
+        
         // Normalize webhook format to mapper expected format
         const normalizedActivity = {
           ...garminActivity,

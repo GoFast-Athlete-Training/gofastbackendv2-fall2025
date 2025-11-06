@@ -41,8 +41,13 @@ export class GarminFieldMapper {
       endLongitude: garminActivity.endLongitude || null,
       summaryPolyline: garminActivity.summaryPolyline || null,
       
-      // Device Information
-      deviceName: garminActivity.deviceMetaData?.deviceName || null,
+      // Device Information - try multiple field names
+      deviceName: garminActivity.deviceMetaData?.deviceName || 
+                  garminActivity.deviceName || 
+                  garminActivity.device?.name ||
+                  garminActivity.device?.deviceName ||
+                  garminActivity.deviceMetaData?.name ||
+                  null,
       garminUserId: garminActivity.userId || null,
       
       // Phase 1: Summary Data (JSON for additional fields)
