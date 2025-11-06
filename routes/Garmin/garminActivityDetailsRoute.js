@@ -1,6 +1,5 @@
 import express from 'express';
-import { getPrismaClient } from '../../config/database.js';
-import GarminFieldMapper from '../../services/GarminFieldMapper.js';
+import { updateActivityDetail } from '../../services/garminUpdateActivityDetailService.js';
 
 const router = express.Router();
 
@@ -19,43 +18,29 @@ router.post("/activity-details", async (req, res) => {
   try {
     console.log('📊 Garmin activity detail received');
     console.log('📊 Detail payload keys:', Object.keys(req.body));
-    console.log('📊 Detail payload sample:', JSON.stringify(req.body, null, 2).substring(0, 500));
+    console.log('📊 Detail payload sample:', JSON.stringify(req.body, null, 2).substring(0, 1000));
     
-    const prisma = getPrismaClient();
     // Try different field names for summaryId
     const summaryId = req.body?.summaryId || req.body?.activityId || req.body?.activitySummaryId || req.body?.activity?.summaryId;
     
+    console.log(`🔍 Extracted summaryId: ${summaryId} (type: ${typeof summaryId})`);
+    
     if (!summaryId) {
-      console.log('⚠️ No summaryId found in activity details payload');
-      console.log('📊 Available keys:', Object.keys(req.body));
+      console.error('❌ No summaryId found in activity details payload');
+      console.error('📊 Available keys:', Object.keys(req.body));
+      console.error('📊 Full payload:', JSON.stringify(req.body, null, 2));
       return;
     }
     
-    // Find the matching activity record using summaryId (sourceActivityId is unique)
-    const activity = await prisma.athleteActivity.findUnique({
-      where: { sourceActivityId: summaryId.toString() },
-    });
+    // Use service to update activity detail
+    const updated = await updateActivityDetail(summaryId, req.body);
     
-    if (!activity) {
-      console.log(`⚠️ No matching activity found for summaryId ${summaryId}`);
+    if (!updated) {
+      console.error(`❌ Failed to update activity detail for summaryId ${summaryId}`);
       return;
     }
     
-    // Map detail data using GarminFieldMapper
-    const mappedDetailData = GarminFieldMapper.mapActivityDetails(req.body);
-    
-    // Update the activity with mapped detail data
-    await prisma.athleteActivity.update({
-      where: { sourceActivityId: summaryId.toString() },
-      data: {
-        detailData: mappedDetailData.detailData, // Only the mapped detail data
-        hydratedAt: mappedDetailData.hydratedAt,
-        lastUpdatedAt: mappedDetailData.lastUpdatedAt,
-      },
-    });
-    
-    console.log(`✅ Activity detail linked for summaryId ${summaryId}`);
-    console.log(`✅ Detail data keys:`, mappedDetailData.detailData ? Object.keys(mappedDetailData.detailData) : 'null');
+    console.log(`✅ Activity detail updated successfully for summaryId ${summaryId}`);
     
   } catch (err) {
     console.error('❌ Error saving Garmin detail data:', err);

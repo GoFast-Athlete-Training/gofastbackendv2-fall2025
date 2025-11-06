@@ -129,11 +129,13 @@ export class GarminFieldMapper {
     // Lap summaries
     if (garminDetails.lapSummaries) {
       detailData.lapSummaries = garminDetails.lapSummaries;
+      console.log(`📊 Mapped lapSummaries: ${Array.isArray(garminDetails.lapSummaries) ? garminDetails.lapSummaries.length : 'not array'} items`);
     }
     
     // Split summaries
     if (garminDetails.splitSummaries) {
       detailData.splitSummaries = garminDetails.splitSummaries;
+      console.log(`📊 Mapped splitSummaries: ${Array.isArray(garminDetails.splitSummaries) ? garminDetails.splitSummaries.length : 'not array'} items`);
     }
     
     // Cadence data
@@ -166,10 +168,22 @@ export class GarminFieldMapper {
       detailData.heartRateZones = garminDetails.timeInHeartRateZones;
     }
     
-    // Raw samples (optional streams)
+    // Raw samples (optional streams) - THIS CAN BE A MASSIVE ARRAY
     if (garminDetails.samples) {
+      const samplesArray = Array.isArray(garminDetails.samples) ? garminDetails.samples : [];
+      const samplesSize = JSON.stringify(garminDetails.samples).length;
+      console.log(`📊 Mapped samples: ${samplesArray.length} items, ~${Math.round(samplesSize / 1024)}KB`);
+      
+      if (samplesArray.length > 10000) {
+        console.warn(`⚠️ Large samples array detected: ${samplesArray.length} items - this will be stored in detailData JSON`);
+      }
+      
       detailData.samples = garminDetails.samples;
     }
+    
+    // Log total detailData size
+    const totalSize = JSON.stringify(detailData).length;
+    console.log(`📊 Total detailData size: ~${Math.round(totalSize / 1024)}KB`);
     
     // Return null if no detail data
     return Object.keys(detailData).length > 0 ? detailData : null;
