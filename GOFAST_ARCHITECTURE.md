@@ -94,6 +94,8 @@ Athlete (Central Identity)
 
 **Pattern**: Features organized by domain, not by HTTP method
 
+**Key Concept**: Routes are organized by **feature domain**, not by HTTP method. Each feature domain gets a folder with one or more route files.
+
 **Structure**:
 ```
 routes/
@@ -126,19 +128,92 @@ routes/
 - **Folder**: PascalCase (`RunCrew/`, `Athlete/`)
 - **File**: camelCase + "Route.js" (`runCrewCreateRoute.js`, `athleteHydrateRoute.js`)
 
+**Why This Pattern**:
+- ✅ **Grouped by feature** - All related endpoints in one place
+- ✅ **Clear naming** - File name describes functionality
+- ✅ **Scalable** - Easy to add new route files per feature
+- ✅ **No filename conflicts** - PascalCase folder + camelCase file
+
 **Route Registration** (in `index.js`):
 ```javascript
-// RunCrew routes
+// index.js
+
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { connectDatabase } from './config/database.js';
+
+// Import route files
 import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
 import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
 import runCrewHydrateRouter from './routes/RunCrew/runCrewHydrateRoute.js';
 
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// CORS configuration
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: false,
+  optionsSuccessStatus: 200
+}));
+
+app.use(express.json({ limit: '10mb' }));
+
+// Feature routes - ORDER MATTERS!
+// RunCrew routes
 app.use('/api/runcrew', runCrewCreateRouter); // /create
 app.use('/api/runcrew', runCrewJoinRouter); // /join
-app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id
+app.use('/api/runcrew', runCrewHydrateRouter); // /:id (single crew hydration)
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', version: '2.0.2' });
+});
+
+// Start server
+app.listen(PORT, async () => {
+  console.log(`🚀 GoFast Backend V2 running on port ${PORT}`);
+  await connectDatabase();
+});
+
+export default app;
 ```
 
-**Order Matters**: More specific routes must be registered before catch-all routes (`/mine` before `/:id`)
+**Key Points for Registration**:
+- Import each router at the top
+- Register routes with `app.use('/api/[prefix]', router)`
+- **ORDER MATTERS** - More specific routes must come before catch-all routes
+- Add comments explaining each route block
+- **Note**: No `/mine` endpoint - use universal `/api/athlete/hydrate` instead
+
+**Route Organization Principles**:
+
+**Standard Pattern**: One file per feature (start here)
+- **Structure**: All CRUD operations for a feature in a single file
+- **Example**: `Founder/founderTaskRoute.js` contains:
+  - `GET /tasks` - List all tasks
+  - `GET /tasks/:id` - Get single task
+  - `POST /tasks` - Create task
+  - `PUT /tasks/:id` - Update task
+  - `DELETE /tasks/:id` - Delete task
+- **When to use**: Default for all new features
+- **Benefits**: Easy to find all endpoints for a feature, less file navigation
+
+**Extended Pattern**: Split by action (develop as needed)
+- **Structure**: Separate files for different action types
+- **Example**: Split `founderTaskRoute.js` into:
+  - `Founder/founderTaskCreateRoute.js` - Create tasks (POST)
+  - `Founder/founderTaskUpdateRoute.js` - Update/delete tasks (PUT, DELETE)
+  - `Founder/founderTaskReadRoute.js` - Read tasks (GET)
+- **When to evolve**: If file grows > 500 lines, becomes hard to navigate, or has complex logic that benefits from separation
+- **Benefits**: Better organization for large features, easier to maintain complex logic
+
+**Guideline**: Always start with Standard Pattern. Evolve to Extended Pattern only when the file becomes unwieldy or complex.
 
 ---
 
@@ -266,7 +341,7 @@ const prisma = new PrismaClient(); // Wrong!
 **Documentation**: See `docs/RunCrewArchitecture.md` for complete details
 
 **Quick Status**:
-- ✅ **Schema**: Complete (RunCrew, RunCrewMembership, RunCrewPost, RunCrewLeaderboard)
+- ✅ **Schema**: Complete (RunCrew, RunCrewMembership, RunCrewChatter, RunCrewLeaderboard)
 - ✅ **Routes**: Create, Join, Hydrate implemented
 - ✅ **Upsert Pattern**: Uses Prisma `upsert` for membership management
 
@@ -415,7 +490,8 @@ Founder/Company
 
 **RunCrew Integration Status**:
 - **Documented**: `dashboardmanagement.md` mentions RunCrew as TODO
-- **Routes Available**: Backend has `/api/runcrew/mine` and `/api/runcrew/:id`
+- **Routes Available**: Backend has `/api/runcrew/:id` (single crew hydration)
+- **Universal Hydrate**: `/api/athlete/hydrate` returns RunCrew object in response
 - **Frontend**: No RunCrew card in `DashboardNavOptions.jsx`
 - **Next Step**: Add RunCrew management option to dashboard navigation
 
@@ -462,30 +538,221 @@ Founder/Company
 
 ## Route Implementation Patterns
 
-### Hydration Pattern
+### Standard Route File Template
 
-**Purpose**: Fetch complete data with all relations
-
-**Example**: `GET /api/runcrew/:id`
+**Template for new route files**:
 ```javascript
-const runCrew = await prisma.runCrew.findUnique({
-  where: { id },
-  include: {
-    admin: { select: { id: true, firstName: true, ... } },
-    memberships: {
-      include: { athlete: { select: {...} } }
-    },
-    posts: { include: { athlete: {...}, comments: {...} } },
-    leaderboardEntries: { include: { athlete: {...} } }
+// [Feature] [Action] Route
+// Description of what this route file does
+
+import express from 'express';
+import { getPrismaClient } from '../../config/database.js';
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js'; // If auth needed
+
+const router = express.Router();
+
+/**
+ * GET /api/[feature]/[endpoint]
+ * Description of endpoint
+ * Query params: ?param1=value1&param2=value2
+ */
+router.get('/[endpoint]', verifyFirebaseToken, async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const firebaseId = req.user?.uid; // If using Firebase auth
+    
+    // Your business logic here
+    
+    res.json({
+      success: true,
+      message: 'Success message',
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ ERROR PREFIX:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
 });
+
+/**
+ * POST /api/[feature]/[endpoint]
+ * Create new record
+ * Body: { field1: value1, field2: value2 }
+ */
+router.post('/[endpoint]', verifyFirebaseToken, async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { field1, field2 } = req.body;
+    
+    // Validation
+    if (!field1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Field1 is required'
+      });
+    }
+    
+    // Create record
+    const result = await prisma.modelName.create({
+      data: { field1, field2 }
+    });
+    
+    res.status(201).json({
+      success: true,
+      message: 'Created successfully',
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ ERROR PREFIX:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+export default router;
 ```
 
-### Upsert Pattern
+### Common Route Patterns
 
-**Purpose**: Create or update based on unique constraint
+#### 1. CRUD Routes
 
-**Example**: RunCrew membership
+**Standard CRUD Pattern**:
+```javascript
+GET    /api/feature          → List all
+GET    /api/feature/:id      → Get one
+POST   /api/feature          → Create
+PUT    /api/feature/:id      → Update full
+PATCH  /api/feature/:id      → Update partial
+DELETE /api/feature/:id      → Delete
+```
+
+#### 2. Universal Hydration Pattern (Local-First Architecture)
+
+**Core Principle**: **Hydrate once, save to localStorage, use everywhere**
+
+**Universal Hydration Route**:
+```javascript
+GET /api/athlete/hydrate
+→ Returns complete athlete profile with all relations
+→ Frontend saves to localStorage
+→ Downstream components read from localStorage (no API calls)
+```
+
+**What Gets Stored in localStorage**:
+```javascript
+{
+  athlete: {
+    id: "athlete123",
+    firstName: "John",
+    lastName: "Doe",
+    email: "john@example.com",
+    photoURL: "...",
+    // ... all athlete fields
+  },
+  runCrew: {  // MVP1: Single RunCrew (limit to 1)
+    id: "runcrew456",
+    name: "Morning Warriors",
+    runCrewId: "runcrew456",  // ← Use this directly, no API calls!
+    isAdmin: true,
+    memberships: [...],
+    chatter: [...],
+    runs: [...],
+    leaderboardEntries: [...]
+  },
+  // Future: runCrews: [...] (array for multiple crews)
+}
+```
+
+**Local-First Flow**:
+1. **App Load** → `GET /api/athlete/hydrate` (with Firebase token)
+2. **Save to localStorage** → `localStorage.setItem('athleteData', JSON.stringify(data))`
+3. **Downstream Components** → Read from `localStorage.getItem('athleteData')`
+4. **No API Calls Needed** → `runCrewId` is already in localStorage, use it directly!
+
+**Example Usage**:
+```javascript
+// ❌ DON'T DO THIS (unnecessary API call)
+const response = await fetch('/api/runcrew/mine');
+const crews = await response.json();
+
+// ✅ DO THIS (read from localStorage)
+const athleteData = JSON.parse(localStorage.getItem('athleteData'));
+const runCrewId = athleteData.runCrew.id;  // Already there!
+const runCrew = athleteData.runCrew;  // Full object already hydrated!
+```
+
+**MVP1 RunCrew Limit**:
+- **Single RunCrew**: MVP1 limits to 1 RunCrew per athlete
+- **Future**: `RunCrewSelection.jsx` component for multiple crews
+- **Hydration**: Universal hydrate returns `runCrew` object (not array for MVP1)
+
+**Hydration Pattern Example**: `GET /api/athlete/hydrate`
+```javascript
+const athlete = await prisma.athlete.findUnique({
+  where: { firebaseId },
+  include: {
+    runCrewMemberships: {
+      include: {
+        runCrew: {
+          include: {
+            admin: { select: { id: true, firstName: true, ... } },
+            memberships: {
+              include: { athlete: { select: {...} } }
+            },
+            chatter: { include: { athlete: {...}, comments: {...} } },
+            runs: { include: { organizer: {...}, rsvps: {...} } },
+            leaderboardEntries: { include: { athlete: {...} } }
+          }
+        }
+      },
+      take: 1  // MVP1: Limit to 1 crew
+    }
+  }
+});
+
+// Transform to single runCrew object (MVP1)
+const runCrew = athlete.runCrewMemberships[0]?.runCrew || null;
+
+return {
+  athlete: { ...athlete, runCrewMemberships: undefined },
+  runCrew  // Single object, not array
+};
+```
+
+**Admin Hydration** (Separate Pattern):
+```javascript
+GET /api/admin/hydrate?entity=athletes|founders|activities
+→ Dispatches to entity-specific handler
+```
+
+**Direct Admin Hydration**:
+```javascript
+GET /api/admin/athletes/hydrate        → All athletes
+GET /api/admin/founders/hydrate        → All founders
+GET /api/admin/athletes/:id/hydrate    → Single athlete
+```
+
+#### 3. Upsert Routes (Admin)
+
+**Universal Upsert**:
+```javascript
+POST /api/admin/upsert?model=founder
+Body: { athleteId: 'xxx' }
+→ Dispatches to model-specific handler
+```
+
+**Direct Upsert**:
+```javascript
+POST /api/admin/upsert/founder
+Body: { athleteId: 'xxx' }
+```
+
+**Upsert Pattern Example**: RunCrew membership
 ```javascript
 const membership = await prisma.runCrewMembership.upsert({
   where: {
@@ -494,6 +761,17 @@ const membership = await prisma.runCrewMembership.upsert({
   update: { joinedAt: new Date() },
   create: { runCrewId, athleteId }
 });
+```
+
+#### 4. OAuth Routes
+
+**Garmin OAuth Flow**:
+```javascript
+GET  /api/garmin/auth-url        → Generate OAuth URL
+GET  /api/garmin/callback        → OAuth callback
+GET  /api/garmin/user            → Get user profile
+GET  /api/garmin/activities      → Sync activities
+POST /api/garmin/webhook         → Webhook handler
 ```
 
 ### Transaction Pattern
@@ -507,6 +785,76 @@ const result = await prisma.$transaction(async (tx) => {
   const membership = await tx.runCrewMembership.upsert({...});
   return { runCrew, membership };
 });
+```
+
+### Prisma Query Patterns
+
+**Standard Prisma Queries**:
+```javascript
+const prisma = getPrismaClient();
+
+// Find many
+const records = await prisma.modelName.findMany({
+  where: { field: value },
+  orderBy: { createdAt: 'desc' }
+});
+
+// Find one
+const record = await prisma.modelName.findUnique({
+  where: { id }
+});
+
+// Create
+const record = await prisma.modelName.create({
+  data: { field1: value1, field2: value2 }
+});
+
+// Update
+const record = await prisma.modelName.update({
+  where: { id },
+  data: { field1: newValue }
+});
+
+// Delete
+await prisma.modelName.delete({
+  where: { id }
+});
+```
+
+### Error Handling Pattern
+
+**Standard Error Response**:
+```javascript
+try {
+  // Business logic
+  res.json({ success: true, data: result });
+} catch (error) {
+  console.error('❌ ERROR PREFIX:', error);
+  res.status(500).json({
+    success: false,
+    error: error.message
+  });
+}
+```
+
+**Validation Errors** (400 Bad Request):
+```javascript
+if (!requiredField) {
+  return res.status(400).json({
+    success: false,
+    error: 'Required field is missing'
+  });
+}
+```
+
+**Not Found Errors** (404):
+```javascript
+if (!record) {
+  return res.status(404).json({
+    success: false,
+    error: 'Record not found'
+  });
+}
 ```
 
 ---
@@ -533,6 +881,21 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
 3. Extracts `firebaseId` and attaches to `req.user`
 4. Route handler verifies `athleteId` matches `firebaseId`
 
+**For User-Facing Routes**:
+```javascript
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+
+router.get('/protected-route', verifyFirebaseToken, async (req, res) => {
+  const firebaseId = req.user?.uid; // Extracted by middleware
+  // Use firebaseId to find user
+});
+```
+
+**For Admin Routes**:
+- Admin routes typically **don't use Firebase** - they're internal/dashboard only
+- Use CORS to restrict access
+- Add admin verification if needed (future enhancement)
+
 ---
 
 ## Environment Configuration
@@ -553,46 +916,168 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
 
 ## File Structure
 
+**Core Backend Structure**:
 ```
 gofastbackendv2-fall2025/
-├── index.js                    # Main entry - route registration
-├── package.json                # Dependencies & scripts
+├── index.js                       # Main entry point - imports and registers all routes
+├── package.json                   # Dependencies & scripts
+├── .env                           # Environment variables
+├── render.yaml                    # Render.com deployment config
 ├── prisma/
-│   └── schema.prisma          # Database schema (source of truth)
+│   └── schema.prisma              # Database schema (source of truth for models)
 ├── config/
-│   ├── database.js            # Prisma client management
-│   ├── modelConfig.js         # Universal upsert config
-│   └── apiConfig.js           # API route constants
+│   ├── database.js                # Prisma client initialization
+│   ├── athleteColumnConfig.js     # Athlete field metadata
+│   ├── modelConfig.js             # Universal upsert config
+│   └── apiConfig.js               # API route constants
 ├── middleware/
-│   └── firebaseMiddleware.js  # Firebase auth verification
-├── services/
+│   └── firebaseMiddleware.js      # Firebase auth verification
+├── services/                      # Business logic
 │   ├── AthleteUpsertService.js
 │   ├── GarminIntegrationService.js
 │   └── ...
-├── routes/
-│   ├── Athlete/              # Athlete CRUD
-│   ├── RunCrew/              # RunCrew management
-│   ├── Garmin/               # Garmin integration
-│   ├── Founder/              # Founder stack
-│   ├── Admin/                # Admin operations
-│   └── Training/             # Training plans
+├── routes/                        # All API routes organized by feature
+│   ├── Admin/                     # Admin-only routes
+│   ├── Athlete/                   # Athlete CRUD
+│   ├── Founder/                   # Founder stack routes
+│   ├── Garmin/                    # Garmin OAuth & webhooks
+│   ├── Strava/                    # Strava OAuth
+│   ├── RunCrew/                   # RunCrew management
+│   └── Training/                  # Training plans
+├── utils/                         # Helper functions
 └── docs/
     ├── RunCrewArchitecture.md
     ├── TrainingArchitecture.md
     └── ...
 ```
 
+**Note**: This is a **single backend** serving all frontend applications. Architecture docs are **source of truth**, not proposals. See `architecturebuildprocess.md` for how architecture docs guide the build process.
+
+---
+
+## Schema-First Development
+
+**CRITICAL**: Always define schema FIRST, then routes follow
+
+**Process**:
+1. Define Prisma models in `schema.prisma`
+2. Run `npx prisma generate` to create Prisma Client
+3. Create route files using Prisma models
+4. Test routes
+
+**See**: `architecturebuildprocess.md` for full schema-first process
+
+---
+
+## Adding a New Feature
+
+### Step 1: Define Schema
+```prisma
+// prisma/schema.prisma
+model NewFeature {
+  id        String @id @default(cuid())
+  name      String
+  // ... fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+### Step 2: Generate Prisma Client
+```bash
+npx prisma generate
+```
+
+### Step 3: Create Route File
+```bash
+# Create folder (if new feature domain)
+mkdir routes/NewFeature
+
+# Create route file
+touch routes/NewFeature/newFeatureRoute.js
+```
+
+### Step 4: Implement Routes
+- Copy template from "Route Implementation Patterns" section
+- Implement CRUD endpoints
+- Add authentication if needed
+
+### Step 5: Register in index.js
+```javascript
+// Import
+import newFeatureRouter from './routes/NewFeature/newFeatureRoute.js';
+
+// Register
+app.use('/api/newfeature', newFeatureRouter);
+```
+
+**Key Points for Registration**:
+- Import each router at the top
+- Register routes with `app.use('/api/[prefix]', router)`
+- **ORDER MATTERS** - More specific routes must come before catch-all routes (e.g., `/:id`)
+- Add comments explaining each route block
+
+### Step 6: Test
+```bash
+npm run dev
+# Test endpoints
+```
+
+### Checklist for New Routes
+- [ ] Created Prisma model in `schema.prisma`
+- [ ] Ran `npx prisma generate`
+- [ ] Created route file following naming convention
+- [ ] Implemented CRUD endpoints
+- [ ] Added authentication (Firebase) if needed
+- [ ] Added error handling
+- [ ] Added validation
+- [ ] Registered route in `index.js`
+- [ ] Tested endpoints
+
+---
+
+## File Naming Quick Reference
+
+| What | Pattern | Example |
+|------|---------|---------|
+| Route folder | PascalCase | `Admin/`, `Founder/` |
+| Route file | camelCase + "Route.js" | `adminHydrateRoute.js` |
+| Service file | camelCase + "Service.js" | `garminSyncService.js` |
+| Config file | camelCase + "Config.js" | `athleteColumnConfig.js` |
+| Middleware | camelCase + "Middleware.js" | `firebaseMiddleware.js` |
+| Utils | camelCase + ".js" | `redis.js`, `helpers.js` |
+
+### Working Examples
+
+**Simple Feature** (Founder tasks):
+- Folder: `routes/Founder/`
+- File: `founderTaskRoute.js`
+- Routes: GET /tasks, POST /tasks, PUT /tasks/:id, DELETE /tasks/:id
+
+**Complex Feature** (Admin hydration):
+- Folder: `routes/Admin/`
+- File: `adminHydrateRoute.js`
+- Routes: Universal `/hydrate?entity=X` + direct routes per entity
+
+**OAuth Feature** (Garmin):
+- Folder: `routes/Garmin/`
+- Files: Multiple route files (one per OAuth step)
+- Routes: /auth-url, /callback, /user, /activities, /webhook
+
 ---
 
 ## Key Design Principles
 
 1. **Athlete-First**: All models link back to Athlete as central identity
-2. **Modular Extensions**: Additional roles (Founder, Coach) are optional one-to-one relations
-3. **Junction Tables**: Many-to-many relationships use junction tables
-4. **Cloud-First**: Schema sync via `db push`, no local migrations
-5. **Centralized Services**: Business logic in services, routes are thin
-6. **Universal Upsert**: Consistent pattern for modular model creation
-7. **Database Connection**: Single Prisma client instance, shared across routes
+2. **Local-First Architecture**: Hydrate once via `/api/athlete/hydrate` (or `/api/admin/athletes/hydrate` for admin), save to localStorage, use everywhere
+3. **NO UNNECESSARY API CALLS**: ⚠️ **CRITICAL** - If data is in localStorage, use it directly. NO `/mine` endpoints, NO per-component API calls, NO redundant fetches. Read from localStorage first, only call API if data missing.
+4. **Modular Extensions**: Additional roles (Founder, Coach) are optional one-to-one relations
+5. **Junction Tables**: Many-to-many relationships use junction tables
+6. **Cloud-First**: Schema sync via `db push`, no local migrations
+7. **Centralized Services**: Business logic in services, routes are thin
+8. **Universal Upsert**: Consistent pattern for modular model creation
+9. **Database Connection**: Single Prisma client instance, shared across routes
+10. **MVP1 RunCrew Limit**: Single RunCrew per athlete (future: `RunCrewSelection.jsx` for multiple)
 
 ---
 

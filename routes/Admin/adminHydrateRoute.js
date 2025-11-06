@@ -1,6 +1,11 @@
 // Admin Hydration Routes
-// Universal admin hydration system - hydrates any entity type
-// Pattern: Universal entry point → dispatches to entity-specific handlers
+// Universal admin hydration system - hydrates all entities in a single call
+// 
+// PRIMARY ROUTE: GET /api/admin/hydrate?entity=athletes,runcrews
+// - Returns all athletes and all RunCrews in one response
+// - Frontend stores in localStorage and uses for all display (ZERO API calls)
+// 
+// Architecture: Hydrate once → localStorage → use everywhere
 
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
@@ -19,6 +24,49 @@ router.options('/hydrate', (req, res) => {
  * Entity-specific hydration handlers
  * These can be called directly or via universal route
  */
+
+// Helper function to format athlete for hydration (reusable)
+function formatAthleteForHydration(athlete) {
+  return {
+    athleteId: athlete.id,
+    firebaseId: athlete.firebaseId,
+    email: athlete.email,
+    firstName: athlete.firstName,
+    lastName: athlete.lastName,
+    gofastHandle: athlete.gofastHandle,
+    birthday: athlete.birthday,
+    gender: athlete.gender,
+    city: athlete.city,
+    state: athlete.state,
+    primarySport: athlete.primarySport,
+    photoURL: athlete.photoURL,
+    bio: athlete.bio,
+    instagram: athlete.instagram,
+    status: athlete.status,
+    createdAt: athlete.createdAt,
+    updatedAt: athlete.updatedAt,
+    
+    // Garmin Integration Status (safe data only - no tokens)
+    garmin: {
+      connected: athlete.garmin_is_connected || false,
+      userId: athlete.garmin_user_id || null,
+      connectedAt: athlete.garmin_connected_at || null,
+      lastSyncAt: athlete.garmin_last_sync_at || null,
+      scope: athlete.garmin_scope || null,
+      hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
+      tokenStatus: athlete.garmin_access_token ? 'active' : 'none'
+    },
+    
+    // Computed fields for admin display
+    fullName: athlete.firstName && athlete.lastName 
+      ? `${athlete.firstName} ${athlete.lastName}` 
+      : 'No Name Set',
+    profileComplete: !!(athlete.firstName && athlete.lastName && athlete.city),
+    daysSinceCreation: athlete.createdAt 
+      ? Math.ceil((new Date() - new Date(athlete.createdAt)) / (1000 * 60 * 60 * 24))
+      : 0
+  };
+}
 
 // Athletes hydration handler
 async function hydrateAthletes(req, res) {
@@ -39,42 +87,8 @@ async function hydrateAthletes(req, res) {
     
     console.log('✅ ADMIN HYDRATE: Found', athletes.length, 'athletes');
     
-    // Format for frontend consumption
-    const hydratedAthletes = athletes.map(athlete => ({
-      athleteId: athlete.id,
-      firebaseId: athlete.firebaseId,
-      email: athlete.email,
-      firstName: athlete.firstName,
-      lastName: athlete.lastName,
-      gofastHandle: athlete.gofastHandle,
-      birthday: athlete.birthday,
-      gender: athlete.gender,
-      city: athlete.city,
-      state: athlete.state,
-      primarySport: athlete.primarySport,
-      photoURL: athlete.photoURL,
-      bio: athlete.bio,
-      instagram: athlete.instagram,
-      status: athlete.status,
-      createdAt: athlete.createdAt,
-      updatedAt: athlete.updatedAt,
-      
-      // Garmin Integration Status (safe data only - no tokens)
-      garmin: {
-        connected: athlete.garmin_is_connected || false,
-        connectedAt: athlete.garmin_connected_at || null,
-        lastSyncAt: athlete.garmin_last_sync_at || null
-      },
-      
-      // Computed fields for admin display
-      fullName: athlete.firstName && athlete.lastName 
-        ? `${athlete.firstName} ${athlete.lastName}` 
-        : 'No Name Set',
-      profileComplete: !!(athlete.firstName && athlete.lastName && athlete.city),
-      daysSinceCreation: athlete.createdAt 
-        ? Math.ceil((new Date() - new Date(athlete.createdAt)) / (1000 * 60 * 60 * 24))
-        : 0
-    }));
+    // Format for frontend consumption (using helper function)
+    const hydratedAthletes = athletes.map(athlete => formatAthleteForHydration(athlete));
     
     res.json({
       success: true,
@@ -97,8 +111,12 @@ async function hydrateAthletes(req, res) {
 /**
  * UNIVERSAL HYDRATE ROUTE
  * GET /api/admin/hydrate?entity=athletes|activities|runcrews|founders
+ * GET /api/admin/hydrate?entity=athletes,runcrews (multiple entities - comma-separated)
  * GET /api/athlete/admin/hydrate (legacy - defaults to athletes)
  * Universal entry point - dispatches to entity-specific handlers
+ * 
+ * MULTIPLE ENTITIES: If multiple entities requested (comma-separated), returns combined response
+ * Example: ?entity=athletes,runcrews → { athletes: [...], runCrews: [...], count: {...} }
  */
 router.get('/hydrate', async (req, res) => {
   let { entity } = req.query;
@@ -113,14 +131,129 @@ router.get('/hydrate', async (req, res) => {
     return res.status(400).json({
       success: false,
       error: 'Entity parameter required',
-      message: 'Specify entity: ?entity=athletes|activities|runcrews|founders',
+      message: 'Specify entity: ?entity=athletes|activities|runcrews|founders or ?entity=athletes,runcrews (multiple)',
       availableEntities: ['athletes', 'activities', 'runcrews', 'founders']
     });
   }
 
-  console.log(`🔄 UNIVERSAL HYDRATE: Requested entity: ${entity}`);
+  // Check if multiple entities requested (comma-separated)
+  const entities = entity.split(',').map(e => e.trim());
+  
+  if (entities.length > 1) {
+    // MULTIPLE ENTITIES: Hydrate all requested entities and return combined response
+    console.log(`🔄 UNIVERSAL HYDRATE: Multiple entities requested: ${entities.join(', ')}`);
+    
+    try {
+      const prisma = getPrismaClient();
+      const result = {
+        success: true,
+        count: {},
+        timestamp: new Date().toISOString()
+      };
+      
+      // Hydrate each entity
+      for (const entityType of entities) {
+        switch (entityType) {
+          case 'athletes':
+            const athletes = await prisma.athlete.findMany({
+              orderBy: { createdAt: 'desc' }
+            });
+            result.athletes = athletes.map(athlete => formatAthleteForHydration(athlete));
+            result.count.athletes = athletes.length;
+            break;
+            
+          case 'runcrews':
+            const runCrews = await prisma.runCrew.findMany({
+              include: {
+                admin: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true
+                  }
+                },
+                memberships: {
+                  include: {
+                    athlete: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true
+                      }
+                    }
+                  }
+                },
+                messages: true,
+                leaderboardEntries: true,
+                runs: true,
+                events: true
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+            result.runCrews = runCrews;
+            result.count.runCrews = runCrews.length;
+            break;
+            
+          case 'activities':
+            const activities = await prisma.athleteActivity.findMany({
+              include: {
+                athlete: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 100 // Limit for performance
+            });
+            result.activities = activities;
+            result.count.activities = activities.length;
+            break;
+            
+          case 'founders':
+            const founders = await prisma.founder.findMany({
+              include: {
+                athlete: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true
+                  }
+                }
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+            result.founders = founders;
+            result.count.founders = founders.length;
+            break;
+            
+          default:
+            console.warn(`⚠️ Unknown entity type: ${entityType}`);
+        }
+      }
+      
+      console.log(`✅ UNIVERSAL HYDRATE: Hydrated ${entities.length} entity types`);
+      return res.json(result);
+      
+    } catch (error) {
+      console.error('❌ UNIVERSAL HYDRATE: Error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to hydrate entities',
+        message: error.message
+      });
+    }
+  }
+  
+  // SINGLE ENTITY: Dispatch to entity-specific handler (existing behavior)
+  console.log(`🔄 UNIVERSAL HYDRATE: Single entity requested: ${entity}`);
 
-  // Dispatch to entity-specific handler
   switch (entity) {
     case 'athletes':
       return hydrateAthletes(req, res);
@@ -141,11 +274,12 @@ router.get('/hydrate', async (req, res) => {
 });
 
 /**
- * ENTITY-SPECIFIC ROUTES (for direct access)
- * These can be called directly without going through universal route
+ * ENTITY-SPECIFIC ROUTES (for backward compatibility)
+ * NOTE: Use universal route `/hydrate?entity=athletes,runcrews` instead
+ * These routes are kept for legacy support but should not be used for new code
  */
 
-// Athletes
+// Athletes (legacy - use universal route instead)
 router.get('/athletes/hydrate', hydrateAthletes);
 
 // Activities hydration handler
@@ -304,102 +438,19 @@ async function hydrateFounders(req, res) {
 router.get('/founders/hydrate', hydrateFounders);
 
 /**
- * GET /api/admin/athletes/:id/hydrate
- * Hydrate frontend with single athlete details (admin view)
- * Used by: Admin athlete details page
- * Pattern: Individual athlete hydration (SQL/Prisma version)
+ * REMOVED: GET /api/admin/athletes/:id/hydrate
+ * 
+ * This route is NOT NEEDED - frontend should read from localStorage instead.
+ * 
+ * Why removed:
+ * - All athlete data is already in localStorage from universal hydration
+ * - Frontend can find athlete by ID: athletesData.find(a => a.athleteId === id)
+ * - No API call needed for display
+ * - Reduces confusion and unnecessary API calls
+ * 
+ * If tokens are needed in detail view, they should be included in the list hydration
+ * (which they are - see formatAthleteForHydration function)
  */
-router.get('/athletes/:id/hydrate', async (req, res) => {
-  try {
-    const prisma = getPrismaClient();
-    const { id } = req.params;
-    
-    console.log('🔄 ADMIN HYDRATE: Loading athlete details for ID:', id, '(SQL/Prisma)');
-    
-    // SQL equivalent of MongoDB findOne()
-    const athlete = await prisma.athlete.findUnique({
-      where: { id }
-      // No include needed yet - single table for now
-    });
-    
-    if (!athlete) {
-      console.log('❌ ADMIN HYDRATE: Athlete not found:', id);
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found',
-        message: `No athlete found with ID: ${id}`
-      });
-    }
-    
-    console.log('✅ ADMIN HYDRATE: Athlete found:', athlete.email);
-    
-    // Format for frontend consumption with detailed info
-    const hydratedAthlete = {
-      athleteId: athlete.id,
-      firebaseId: athlete.firebaseId,
-      email: athlete.email,
-      firstName: athlete.firstName,
-      lastName: athlete.lastName,
-      gofastHandle: athlete.gofastHandle,
-      birthday: athlete.birthday,
-      gender: athlete.gender,
-      city: athlete.city,
-      state: athlete.state,
-      primarySport: athlete.primarySport,
-      photoURL: athlete.photoURL,
-      bio: athlete.bio,
-      instagram: athlete.instagram,
-      status: athlete.status,
-      createdAt: athlete.createdAt,
-      updatedAt: athlete.updatedAt,
-      
-      // Garmin Integration Status (admin can see tokens)
-      garmin: {
-        connected: athlete.garmin_is_connected || false,
-        userId: athlete.garmin_user_id || null,
-        connectedAt: athlete.garmin_connected_at || null,
-        lastSyncAt: athlete.garmin_last_sync_at || null,
-        scope: athlete.garmin_scope || null,
-        hasTokens: !!(athlete.garmin_access_token && athlete.garmin_refresh_token),
-        tokenStatus: athlete.garmin_access_token ? 'active' : 'none',
-        // Include actual tokens for localStorage (admin only)
-        accessToken: athlete.garmin_access_token || null,
-        refreshToken: athlete.garmin_refresh_token || null,
-        expiresIn: athlete.garmin_expires_in || null
-      },
-      
-      // Computed fields for detailed view
-      fullName: athlete.firstName && athlete.lastName 
-        ? `${athlete.firstName} ${athlete.lastName}` 
-        : 'No Name Set',
-      profileComplete: !!(athlete.firstName && athlete.lastName && athlete.city),
-      daysSinceCreation: athlete.createdAt 
-        ? Math.ceil((new Date() - new Date(athlete.createdAt)) / (1000 * 60 * 60 * 24))
-        : 0,
-      age: athlete.birthday 
-        ? Math.floor((new Date() - new Date(athlete.birthday)) / (1000 * 60 * 60 * 24 * 365))
-        : null,
-      location: athlete.city && athlete.state 
-        ? `${athlete.city}, ${athlete.state}`
-        : 'Location not set'
-    };
-    
-    res.json({
-      success: true,
-      message: 'Athlete hydrated successfully',
-      athlete: hydratedAthlete,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ ADMIN HYDRATE: Error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to hydrate athlete',
-      message: error.message
-    });
-  }
-});
 
 /**
  * GET /api/admin/athletes/hydrate/summary
