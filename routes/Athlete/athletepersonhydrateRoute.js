@@ -266,6 +266,44 @@ async function hydrateAthlete(req, res) {
     
     console.log('✅ ATHLETE PERSON HYDRATE: Successfully hydrated', runCrews.length, 'RunCrews');
     
+    // Fetch weekly activities (last 7 days) for this athlete
+    console.log('🔍 ATHLETE PERSON HYDRATE: Fetching weekly activities for athleteId:', athleteId);
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    const weeklyActivities = await prisma.athleteActivity.findMany({
+      where: {
+        athleteId: athleteId,
+        startTime: {
+          gte: sevenDaysAgo,
+          lte: now
+        }
+      },
+      orderBy: {
+        startTime: 'desc'
+      }
+    });
+    
+    // Calculate weekly totals
+    const weeklyTotals = {
+      totalDistance: 0,
+      totalDuration: 0,
+      totalCalories: 0,
+      activityCount: weeklyActivities.length
+    };
+    
+    weeklyActivities.forEach(activity => {
+      if (activity.distance) weeklyTotals.totalDistance += activity.distance;
+      if (activity.duration) weeklyTotals.totalDuration += activity.duration;
+      if (activity.calories) weeklyTotals.totalCalories += activity.calories;
+    });
+    
+    // Convert distance from meters to miles
+    weeklyTotals.totalDistanceMiles = (weeklyTotals.totalDistance / 1609.34).toFixed(2);
+    
+    console.log(`✅ ATHLETE PERSON HYDRATE: Found ${weeklyActivities.length} weekly activities`);
+    console.log(`📊 Weekly totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
+    
     // Format athlete data for frontend consumption
     // ATHLETE-FIRST: athleteId is the central identifier
     const hydratedAthlete = {
@@ -301,6 +339,11 @@ async function hydrateAthlete(req, res) {
       // Admin RunCrews (crews this athlete created)
       adminRunCrews: athlete.adminRunCrews || [],
       adminRunCrewCount: athlete.adminRunCrews?.length || 0,
+      
+      // Weekly Activities (last 7 days)
+      weeklyActivities: weeklyActivities || [],
+      weeklyActivityCount: weeklyActivities.length,
+      weeklyTotals: weeklyTotals,
       
       // Computed fields
       fullName: athlete.firstName && athlete.lastName 
