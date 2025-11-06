@@ -40,34 +40,45 @@ router.post("/activity-details", async (req, res) => {
         console.log(`   - activityId (top-level): ${activityDetail.activityId}`);
         console.log(`   - summary.activityId: ${activityDetail.summary?.activityId}`);
         
-        // ChatGPT analysis: summary.activityId is the TRUE Garmin activity ID that matches summary webhook
-        // Priority: summary.activityId > activityId > summaryId (without suffix)
-        const realActivityId = activityDetail.summary?.activityId || activityDetail.activityId || activityDetail.summaryId?.replace('-detail', '');
-        
-        console.log(`🔍 Selected realActivityId: ${realActivityId} (matches sourceActivityId from summary webhook)`);
-        console.log(`📊 Activity detail keys:`, Object.keys(activityDetail));
-        
-        if (!realActivityId) {
+        // Summary webhook saves: sourceActivityId = activityId (top-level from summary webhook)
+        // Details webhook has: activityId (top-level) and summary.activityId (nested)
+        // CRITICAL: Try top-level activityId FIRST (this is what summary webhook saved!)
+        if (!activityDetail.activityId && !activityDetail.summary?.activityId) {
           console.error('❌ No activityId found in activity detail');
           console.error('📊 Activity detail:', JSON.stringify(activityDetail, null, 2).substring(0, 500));
           continue;
         }
         
-        // Verify: We should NOT match on detail.activityId alone if summary.activityId exists
-        if (activityDetail.summary?.activityId && activityDetail.activityId && activityDetail.summary.activityId !== activityDetail.activityId) {
-          console.warn(`⚠️ ID MISMATCH: summary.activityId (${activityDetail.summary.activityId}) != activityId (${activityDetail.activityId})`);
-          console.warn(`⚠️ Using summary.activityId (${activityDetail.summary.activityId}) as the true match`);
+        // Try top-level activityId FIRST (matches what summary webhook saved)
+        let updated = null;
+        let matchedActivityId = null;
+        
+        if (activityDetail.activityId) {
+          console.log(`🔍 Attempting match with top-level activityId: ${activityDetail.activityId} (what summary webhook saved)`);
+          updated = await updateActivityDetail(activityDetail.activityId.toString(), activityDetail);
+          if (updated) {
+            matchedActivityId = activityDetail.activityId;
+            console.log(`✅ Match successful with top-level activityId: ${matchedActivityId}`);
+          }
         }
         
-        // Use service to update activity detail (pass the realActivityId)
-        const updated = await updateActivityDetail(realActivityId.toString(), activityDetail);
+        // If that fails, try summary.activityId as fallback
+        if (!updated && activityDetail.summary?.activityId) {
+          console.warn(`⚠️ Top-level activityId (${activityDetail.activityId}) didn't match, trying summary.activityId: ${activityDetail.summary.activityId}`);
+          updated = await updateActivityDetail(activityDetail.summary.activityId.toString(), activityDetail);
+          if (updated) {
+            matchedActivityId = activityDetail.summary.activityId;
+            console.log(`✅ Fallback match successful with summary.activityId: ${matchedActivityId}`);
+          }
+        }
         
         if (!updated) {
-          console.error(`❌ Failed to update activity detail for realActivityId ${realActivityId}`);
+          console.error(`❌ Failed to match with both activityId (${activityDetail.activityId}) and summary.activityId (${activityDetail.summary?.activityId})`);
+          console.error(`💡 Summary webhook may not have been received for these activities yet`);
           continue;
         }
         
-        console.log(`✅ Activity detail updated successfully for realActivityId ${realActivityId}`);
+        console.log(`✅ Activity detail updated successfully for activityId ${matchedActivityId}`);
         
       } catch (detailError) {
         console.error('❌ Error processing individual activity detail:', detailError);
