@@ -28,12 +28,19 @@ router.post("/activity", async (req, res) => {
     
     const activities = payload.activities;
     console.log(`📩 Garmin webhook received (${activities.length} activities)`);
+    console.log(`📊 Webhook payload root keys:`, Object.keys(payload));
+    
+    // Check if userId is at root level
+    if (payload.userId) {
+      console.log(`🔍 Found userId at ROOT level: ${payload.userId}`);
+    }
     
     // Process each activity
     for (const garminActivity of activities) {
       try {
         // Extract userId and activityId - try multiple field name variations
-        const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId;
+        // Also check payload root level (userId might be at root, not in each activity)
+        const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId || payload.userId;
         const activityId = garminActivity.activityId || garminActivity.summaryId || garminActivity.activitySummaryId;
         
         if (!userId) {
@@ -47,13 +54,24 @@ router.post("/activity", async (req, res) => {
           continue;
         }
     
-        console.log(`🔍 Looking up athlete for Garmin userId: ${userId}`);
+        console.log(`🔍 Looking up athlete for Garmin userId: ${userId} (type: ${typeof userId})`);
+        
+        // DEBUG: Check what's actually in the database
+        const allAthletesWithGarmin = await prisma.athlete.findMany({
+          where: { garmin_user_id: { not: null } },
+          select: { id: true, email: true, garmin_user_id: true }
+        });
+        console.log(`📊 DEBUG: All athletes with garmin_user_id in database:`, allAthletesWithGarmin.map(a => ({ id: a.id, email: a.email, garmin_user_id: a.garmin_user_id })));
+        console.log(`📊 DEBUG: Webhook userId value: "${userId}"`);
+        
         // Lookup athlete using the service
         const athlete = await findAthleteByGarminUserId(userId);
         
         if (!athlete) {
-          console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
-          console.warn(`💡 Check if garmin_user_id is saved correctly during OAuth connection`);
+          console.error(`❌ No athlete found for Garmin user ID: ${userId}`);
+          console.error(`❌ Webhook userId type: ${typeof userId}, value: "${userId}"`);
+          console.error(`❌ Available garmin_user_ids in DB:`, allAthletesWithGarmin.map(a => `"${a.garmin_user_id}"`));
+          console.error(`💡 Check if garmin_user_id format matches (UUID string vs number, whitespace, etc.)`);
           continue;
         }
     

@@ -105,10 +105,26 @@ export const saveGarminTokens = async (athleteId, tokens) => {
       }
     }
     
+    // Final check - verify what was actually saved
+    const finalCheck = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        garmin_user_id: true
+      }
+    });
+    
+    const finalGarminUserId = finalCheck?.garmin_user_id || null;
+    
+    if (!finalGarminUserId) {
+      console.error(`❌ CRITICAL: garmin_user_id was NOT saved! Webhooks will fail!`);
+    } else {
+      console.log(`✅ FINAL SAVE VERIFICATION - garmin_user_id confirmed in database: ${finalGarminUserId}`);
+    }
+    
     return {
       success: true,
       athleteId: athleteId,
-      garminUserId: userInfoResult.success ? userInfoResult.userData.userId : null,
+      garminUserId: finalGarminUserId, // Return what was actually saved, not what we tried to save
       message: 'Tokens and user info saved successfully'
     };
     

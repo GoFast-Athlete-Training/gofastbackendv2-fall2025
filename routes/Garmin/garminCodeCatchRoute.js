@@ -59,7 +59,7 @@ router.get('/callback', async (req, res) => {
     
     console.log(`✅ Tokens received for athleteId: ${athleteId}`);
     
-    // Step 4: Save tokens to database
+    // Step 4: Save tokens to database (THIS IS WHERE garmin_user_id GETS SAVED)
     const saveResult = await saveGarminTokens(athleteId, tokenResult.tokens);
     
     if (!saveResult.success) {
@@ -70,7 +70,14 @@ router.get('/callback', async (req, res) => {
     // Step 5: Clean up Redis
     await deleteCodeVerifier(athleteId);
     
+    // Step 6: Final verification - confirm garmin_user_id was saved
     console.log(`✅ OAuth flow completed successfully for athleteId: ${athleteId}`);
+    console.log(`✅ FINAL VERIFICATION - garminUserId from saveResult: ${saveResult.garminUserId || 'NULL'}`);
+    
+    if (!saveResult.garminUserId) {
+      console.warn(`⚠️ WARNING: garmin_user_id was NOT saved during OAuth flow!`);
+      console.warn(`⚠️ This means webhooks will NOT be able to find this athlete!`);
+    }
     
     // Step 6: Redirect to frontend success page
     return res.redirect(`${GARMIN_CONFIG.FRONTEND_URL}/garmin/success?athleteId=${athleteId}`);
@@ -123,7 +130,7 @@ router.get('/exchange', async (req, res) => {
     
     console.log(`✅ Tokens received for athleteId: ${athleteId}`);
     
-    // Step 3: Save tokens to database
+    // Step 3: Save tokens to database (THIS IS WHERE garmin_user_id GETS SAVED)
     const saveResult = await saveGarminTokens(athleteId, tokenResult.tokens);
     
     if (!saveResult.success) {
@@ -138,7 +145,14 @@ router.get('/exchange', async (req, res) => {
     // Step 4: Clean up Redis
     await deleteCodeVerifier(athleteId);
     
+    // Step 5: Final verification - confirm garmin_user_id was saved
     console.log(`✅ OAuth exchange completed successfully for athleteId: ${athleteId}`);
+    console.log(`✅ FINAL VERIFICATION - garminUserId from saveResult: ${saveResult.garminUserId || 'NULL'}`);
+    
+    if (!saveResult.garminUserId) {
+      console.warn(`⚠️ WARNING: garmin_user_id was NOT saved during OAuth flow!`);
+      console.warn(`⚠️ This means webhooks will NOT be able to find this athlete!`);
+    }
     
     res.json({
       success: true,

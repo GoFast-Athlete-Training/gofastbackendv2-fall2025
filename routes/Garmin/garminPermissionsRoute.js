@@ -26,6 +26,8 @@ router.get("/status", async (req, res) => {
     const athlete = await prisma.athlete.findUnique({
       where: { id: athleteId },
       select: {
+        id: true,
+        email: true,
         garmin_user_id: true,
         garmin_access_token: true,
         garmin_refresh_token: true,
@@ -43,6 +45,18 @@ router.get("/status", async (req, res) => {
       return res.status(404).json({ error: "Athlete not found" });
     }
     
+    // Log Garmin status for debugging
+    console.log(`🔍 GARMIN STATUS CHECK - athleteId: ${athlete.id}, email: ${athlete.email}`);
+    console.log(`📊 Garmin Status:`, {
+      garmin_user_id: athlete.garmin_user_id || 'NULL',
+      garmin_is_connected: athlete.garmin_is_connected,
+      has_access_token: !!athlete.garmin_access_token,
+      has_refresh_token: !!athlete.garmin_refresh_token,
+      garmin_scope: athlete.garmin_scope || 'NULL',
+      connected_at: athlete.garmin_connected_at,
+      disconnected_at: athlete.garmin_disconnected_at
+    });
+    
     // Parse scopes from Garmin scope string
     const garminScopes = athlete.garmin_scope ? athlete.garmin_scope.split(' ') : [];
     const scopes = {
@@ -53,7 +67,7 @@ router.get("/status", async (req, res) => {
     // Parse permissions from JSON
     const permissions = athlete.garmin_permissions || {};
     
-    res.json({
+    const statusResponse = {
       connected: athlete.garmin_is_connected && !!athlete.garmin_access_token,
       scopes: scopes,
       permissions: permissions,
@@ -61,7 +75,15 @@ router.get("/status", async (req, res) => {
       connectedAt: athlete.garmin_connected_at,
       disconnectedAt: athlete.garmin_disconnected_at,
       garminUserId: athlete.garmin_user_id
+    };
+    
+    console.log(`✅ GARMIN STATUS RESPONSE:`, {
+      connected: statusResponse.connected,
+      garminUserId: statusResponse.garminUserId || 'NULL',
+      hasScopes: Object.keys(scopes).length > 0
     });
+    
+    res.json(statusResponse);
     
   } catch (error) {
     console.error('❌ Garmin status fetch error:', error);
