@@ -32,25 +32,28 @@ router.post("/activity", async (req, res) => {
     // Process each activity
     for (const garminActivity of activities) {
       try {
-        // Extract userId and activityId
+        // Extract userId and activityId - try multiple field name variations
         const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId;
-        const activityId = garminActivity.activityId || garminActivity.summaryId;
+        const activityId = garminActivity.activityId || garminActivity.summaryId || garminActivity.activitySummaryId;
         
         if (!userId) {
-          console.warn('⚠️ No userId found in activity:', garminActivity);
+          console.warn('⚠️ No userId found in activity:', Object.keys(garminActivity));
+          console.warn('📊 Activity sample:', JSON.stringify(garminActivity, null, 2).substring(0, 300));
           continue;
     }
     
         if (!activityId) {
-          console.warn('⚠️ No activityId found in activity:', garminActivity);
+          console.warn('⚠️ No activityId found in activity:', Object.keys(garminActivity));
           continue;
         }
     
+        console.log(`🔍 Looking up athlete for Garmin userId: ${userId}`);
         // Lookup athlete using the service
         const athlete = await findAthleteByGarminUserId(userId);
         
         if (!athlete) {
           console.warn(`⚠️ No athlete found for Garmin user ID: ${userId}`);
+          console.warn(`💡 Check if garmin_user_id is saved correctly during OAuth connection`);
           continue;
         }
     
