@@ -128,7 +128,25 @@ router.patch("/scopes", async (req, res) => {
   }
 });
 
-// POST /api/garmin/disconnect - Disconnect Garmin integration
+// POST /api/garmin/disconnect - Disconnect Garmin integration (LOCAL DISCONNECT ONLY)
+// 
+// ⚠️ IMPORTANT: This route does NOT deregister with Garmin - it only clears local data.
+// 
+// What it does:
+// 1. Revokes tokens with Garmin (optional - tokens will expire anyway)
+// 2. Clears all Garmin data from local database
+// 3. Sets disconnected status
+// 
+// What it does NOT do:
+// - ❌ Does NOT call Garmin deregistration API (Garmin doesn't provide one for partners)
+// - ❌ Does NOT remove webhook subscription (webhooks will still arrive but won't match any athlete)
+// 
+// Garmin Deregistration:
+// - Garmin sends deregistration webhooks TO us when user disconnects from their side
+// - Our /api/garmin/deregistration endpoint handles those webhooks
+// - We cannot proactively deregister - only Garmin can initiate deregistration
+// 
+// Result: Local disconnect clears data, but Garmin may still send webhooks (they'll be ignored since garmin_user_id is null)
 router.post("/disconnect", async (req, res) => {
   try {
     const { athleteId } = req.body;
@@ -152,26 +170,36 @@ router.post("/disconnect", async (req, res) => {
       return res.status(400).json({ error: "No Garmin connection found" });
     }
     
-    // Revoke tokens with Garmin (optional - they'll expire anyway)
+    // Step 1: Deregister user from Garmin (programmatic disconnect)
+    // DELETE https://apis.garmin.com/wellness-api/rest/user/registration
+    // This removes the user from our program and stops all webhooks
     try {
-      await fetch('https://connectapi.garmin.com/oauth-service/oauth/revoke', {
-        method: 'POST',
+      const deregisterResponse = await fetch('https://apis.garmin.com/wellness-api/rest/user/registration', {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${athlete.garmin_access_token}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: 'token=' + encodeURIComponent(athlete.garmin_access_token)
+          'Content-Type': 'application/json'
+        }
       });
-      console.log('✅ Garmin tokens revoked for athlete:', athleteId);
-    } catch (revokeError) {
-      console.log('⚠️ Could not revoke Garmin tokens (they will expire anyway):', revokeError.message);
+      
+      if (deregisterResponse.ok || deregisterResponse.status === 204) {
+        console.log('✅ Garmin user deregistered successfully for athlete:', athleteId);
+      } else {
+        const errorText = await deregisterResponse.text();
+        console.log('⚠️ Deregistration returned status:', deregisterResponse.status, errorText);
+        // Continue with local disconnect even if Garmin deregistration fails
+      }
+    } catch (deregisterError) {
+      console.log('⚠️ Could not deregister with Garmin API:', deregisterError.message);
+      // Continue with local disconnect even if API call fails
     }
     
-    // Clear Garmin data from database
+    // Step 2: Clear ALL Garmin data from database (LOCAL DISCONNECT)
+    // This includes garmin_user_id which means webhooks won't match any athlete
     await prisma.athlete.update({
       where: { id: athleteId },
       data: {
-        garmin_user_id: null,
+        garmin_user_id: null,              // ⚠️ This prevents webhook matching
         garmin_access_token: null,
         garmin_refresh_token: null,
         garmin_expires_in: null,
@@ -180,15 +208,18 @@ router.post("/disconnect", async (req, res) => {
         garmin_last_sync_at: null,
         garmin_is_connected: false,
         garmin_permissions: null,
+        garmin_user_profile: null,          // Clear profile data
+        garmin_user_sleep: null,            // Clear sleep data
+        garmin_user_preferences: null,      // Clear preferences
         garmin_disconnected_at: new Date()
       }
     });
     
-    console.log('✅ Garmin disconnected for athlete:', athleteId);
+    console.log('✅ Garmin disconnected and deregistered for athlete:', athleteId);
     
     res.json({
       success: true,
-      message: 'Garmin disconnected successfully'
+      message: 'Garmin disconnected and deregistered successfully. You can now connect a different Garmin account or reconnect later.'
     });
     
   } catch (error) {

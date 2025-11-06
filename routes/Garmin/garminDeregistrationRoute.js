@@ -36,15 +36,20 @@ router.put("/deregistration", async (req, res) => {
       return;
     }
     
-    // 4️⃣ Wipe all Garmin data and set disconnected status
+    // 4️⃣ Wipe ALL Garmin data and set disconnected status
+    // NOTE: We clear garmin_user_id to prevent webhook matching
     const result = await prisma.athlete.updateMany({
       where: { garmin_user_id: userId },
       data: {
+        garmin_user_id: null,              // Clear user ID to prevent webhook matching
         garmin_access_token: null,
         garmin_refresh_token: null,
         garmin_expires_in: null,
         garmin_scope: null,
         garmin_permissions: null,
+        garmin_user_profile: null,          // Clear profile data
+        garmin_user_sleep: null,            // Clear sleep data
+        garmin_user_preferences: null,      // Clear preferences
         garmin_is_connected: false,
         garmin_disconnected_at: new Date()
       }
@@ -85,15 +90,20 @@ router.post("/deregistration", async (req, res) => {
       return;
     }
     
-    // 4️⃣ Wipe all Garmin data and set disconnected status
+    // 4️⃣ Wipe ALL Garmin data and set disconnected status
+    // NOTE: We clear garmin_user_id to prevent webhook matching
     const result = await prisma.athlete.updateMany({
       where: { garmin_user_id: userId },
       data: {
+        garmin_user_id: null,              // Clear user ID to prevent webhook matching
         garmin_access_token: null,
         garmin_refresh_token: null,
         garmin_expires_in: null,
         garmin_scope: null,
         garmin_permissions: null,
+        garmin_user_profile: null,          // Clear profile data
+        garmin_user_sleep: null,            // Clear sleep data
+        garmin_user_preferences: null,      // Clear preferences
         garmin_is_connected: false,
         garmin_disconnected_at: new Date()
       }
