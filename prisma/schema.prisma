@@ -78,16 +78,16 @@ model Athlete {
   activities AthleteActivity[]
 
   // RunCrew Relations
-  adminRunCrews       RunCrew[]            @relation("RunCrewAdmin") // Crews this athlete created/admin
-  runCrewMemberships  RunCrewMembership[]  @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
-  runCrewMessages       RunCrewMessage[] @relation // Messages authored by this athlete
-  runCrewAnnouncements  RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
-  runCrewLeaderboards RunCrewLeaderboard[] // Leaderboard entries for this athlete
-  runCrewRuns         RunCrewRun[] @relation("RunCrewRunCreator") // Runs created by this athlete
-  runCrewRunRSVPs     RunCrewRunRSVP[] @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
-  runCrewEvents       RunCrewEvent[] @relation("RunCrewEventOrganizer") // Events organized by this athlete
-  runCrewEventRSVPs   RunCrewEventRSVP[] @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
-  runCrewManagers     RunCrewManager[] @relation("RunCrewManager") // RunCrews this athlete manages (future)
+  adminRunCrews        RunCrew[]             @relation("RunCrewAdmin") // Crews this athlete created/admin
+  runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
+  runCrewMessages      RunCrewMessage[]      @relation // Messages authored by this athlete
+  runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
+  runCrewLeaderboards  RunCrewLeaderboard[] // Leaderboard entries for this athlete
+  runCrewRuns          RunCrewRun[]          @relation("RunCrewRunCreator") // Runs created by this athlete
+  runCrewRunRSVPs      RunCrewRunRSVP[]      @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
+  runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
+  runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
+  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // RunCrews this athlete manages (future)
 
   // Training Relations
   createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
@@ -171,14 +171,14 @@ model RunCrew {
   updatedAt DateTime @updatedAt
 
   // Relations
-  admin         Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
-  memberships   RunCrewMembership[]   // Junction table for members
-  messages      RunCrewMessage[]      // Simple chat messages (real-time via socket)
-  announcements RunCrewAnnouncement[] // Admin announcements
+  admin              Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  memberships        RunCrewMembership[] // Junction table for members
+  messages           RunCrewMessage[] // Simple chat messages (real-time via socket)
+  announcements      RunCrewAnnouncement[] // Admin announcements
   leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats (calculated cache)
-  runs          RunCrewRun[]          // Runs (MVP1: admin only)
-  events        RunCrewEvent[]        // General events (future - happy hour, social, etc.)
-  managers      RunCrewManager[]      // Delegated managers (future)
+  runs               RunCrewRun[] // Runs (MVP1: admin only)
+  events             RunCrewEvent[] // General events (future - happy hour, social, etc.)
+  managers           RunCrewManager[] // Delegated managers (future)
 
   @@map("run_crews")
 }
@@ -207,7 +207,7 @@ model RunCrewMessage {
   runCrewId String
   athleteId String // Message author
 
-  content   String // Message text (just content, no images/likes)
+  content String // Message text (just content, no images/likes)
 
   createdAt DateTime @default(now())
 
@@ -220,12 +220,12 @@ model RunCrewMessage {
 
 // RunCrew Announcements - Admin announcements
 model RunCrewAnnouncement {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   runCrewId String
-  authorId  String   // Admin who created it
+  authorId  String // Admin who created it
 
-  title     String
-  content   String
+  title   String
+  content String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -270,48 +270,48 @@ model RunCrewLeaderboard {
 
 // RunCrew Runs - MVP1 (Specific to runs, not general events)
 model RunCrewRun {
-  id           String   @id @default(cuid())
-  runCrewId    String
-  createdById  String   // Admin or manager who created the run (MVP1: admin only)
-  
-  title        String
-  date         DateTime
-  startTime    String   // "6:00 AM"
-  location     String
-  address      String?
-  
+  id          String @id @default(cuid())
+  runCrewId   String
+  createdById String // Admin or manager who created the run (MVP1: admin only)
+
+  title     String
+  date      DateTime
+  startTime String // "6:00 AM"
+  location  String
+  address   String?
+
   // Run-specific fields
-  totalMiles   Float?   // Total miles for the run
-  pace         String?  // Target pace (e.g., "8:00-9:00 min/mile")
-  stravaMapUrl String?  // Strava map URL for route visualization
-  
-  description  String?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+  totalMiles   Float? // Total miles for the run
+  pace         String? // Target pace (e.g., "8:00-9:00 min/mile")
+  stravaMapUrl String? // Strava map URL for route visualization
+
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdBy    Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  rsvps        RunCrewRunRSVP[]
-  
+  runCrew   RunCrew          @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy Athlete          @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rsvps     RunCrewRunRSVP[]
+
   @@map("run_crew_runs")
 }
 
 // RunCrew Run RSVP - MVP1
 model RunCrewRunRSVP {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   runId     String
-  athleteId String   // RSVP tied to athleteId
-  
-  status    String   // "going", "maybe", "not-going"
-  
+  athleteId String // RSVP tied to athleteId
+
+  status String // "going", "maybe", "not-going"
+
   createdAt DateTime @default(now())
-  
+
   // Relations
-  run       RunCrewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  athlete   Athlete    @relation("RunCrewRunRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
-  
+  run     RunCrewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  athlete Athlete    @relation("RunCrewRunRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+
   @@unique([runId, athleteId]) // One RSVP per athlete per run
   @@map("run_crew_run_rsvps")
 }
@@ -319,43 +319,43 @@ model RunCrewRunRSVP {
 // RunCrew Events - Future (General events like happy hour, social, etc.)
 // Note: Separate from runs - events are for non-run activities
 model RunCrewEvent {
-  id           String   @id @default(cuid())
-  runCrewId    String
-  organizerId  String   // Athlete ID who created the event
-  
-  title        String
-  date         DateTime
-  time         String   // "6:00 PM"
-  location     String
-  address      String?
-  description  String?
-  eventType    String?  // "happy-hour", "social", "meetup", etc.
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
+  id          String @id @default(cuid())
+  runCrewId   String
+  organizerId String // Athlete ID who created the event
+
+  title       String
+  date        DateTime
+  time        String // "6:00 PM"
+  location    String
+  address     String?
+  description String?
+  eventType   String? // "happy-hour", "social", "meetup", etc.
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  organizer    Athlete  @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
-  rsvps        RunCrewEventRSVP[]
-  
+  runCrew   RunCrew            @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  organizer Athlete            @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  rsvps     RunCrewEventRSVP[]
+
   @@map("run_crew_events")
 }
 
 // RunCrew Event RSVP - Future
 model RunCrewEventRSVP {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   eventId   String
-  athleteId String   // RSVP tied to athleteId
-  
-  status    String   // "going", "maybe", "not-going"
-  
+  athleteId String // RSVP tied to athleteId
+
+  status String // "going", "maybe", "not-going"
+
   createdAt DateTime @default(now())
-  
+
   // Relations
-  event      RunCrewEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  athlete    Athlete      @relation("RunCrewEventRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
-  
+  event   RunCrewEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  athlete Athlete      @relation("RunCrewEventRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+
   @@unique([eventId, athleteId]) // One RSVP per athlete per event
   @@map("run_crew_event_rsvps")
 }
@@ -366,13 +366,13 @@ model RunCrewManager {
   runCrewId String
   athleteId String
   role      String // "admin" or "manager"
-  
+
   createdAt DateTime @default(now())
-  
+
   // Relations
   runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
   athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
-  
+
   @@unique([runCrewId, athleteId])
   @@map("run_crew_managers")
 }
@@ -544,7 +544,7 @@ model Founder {
   crmContacts     CrmContact[]
   roadmapItems    RoadmapItem[]
   companyFounders CompanyFounder[] // Junction table for companies this founder is part of
-  unifiedTasks    Task[]           // Unified tasks (polymorphic link via Task model)
+  unifiedTasks    Task[] // Unified tasks (polymorphic link via Task model)
 
   @@map("founders")
 }
@@ -640,23 +640,23 @@ model RoadmapItem {
 // =====================================================
 
 model Company {
-  id        String @id @default(cuid())
-  name      String
-  address   String?
-  website   String?
-  
+  id      String  @id @default(cuid())
+  name    String
+  address String?
+  website String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
-  founders          CompanyFounder[]
-  employees         CompanyEmployee[]
-  roadmapItems      CompanyRoadmapItem[]
-  tasks             Task[]              // Company tasks (companyId set, founderId null)
-  crmContacts       CompanyCrmContact[]
-  financialSpends   CompanyFinancialSpend[]  // Actual spending
-  financialProjections CompanyFinancialProjection[]  // Projected spending
-  
+  founders             CompanyFounder[]
+  employees            CompanyEmployee[]
+  roadmapItems         CompanyRoadmapItem[]
+  tasks                Task[] // Company tasks (companyId set, founderId null)
+  crmContacts          CompanyCrmContact[]
+  financialSpends      CompanyFinancialSpend[] // Actual spending
+  financialProjections CompanyFinancialProjection[] // Projected spending
+
   @@map("companies")
 }
 
@@ -664,172 +664,178 @@ model CompanyFounder {
   id        String @id @default(cuid())
   companyId String
   founderId String // Links to Founder.id → Athlete.id (for founders who test)
-  
-  role      String? // "CEO", "Co-Founder"
-  joinedAt  DateTime @default(now())
-  
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  founder   Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
-  
+
+  role     String? // "CEO", "Co-Founder"
+  joinedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  founder Founder @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
   @@unique([companyId, founderId])
   @@map("company_founders")
 }
 
 model CompanyEmployee {
-  id          String @id @default(cuid())
-  companyId   String
-  
+  id        String @id @default(cuid())
+  companyId String
+
   // Employee Info (Email-Based, NO Athlete Required)
   email       String
   name        String
   role        String? // "Engineer", "Designer", "PM"
   department  String?
   phoneNumber String?
-  
-  joinedAt    DateTime @default(now())
-  
-  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
+  joinedAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   // NO athleteId - separate concern!
   // If they want app, they sign up separately as Athlete
-  
+
   @@unique([companyId, email]) // One email per company
   @@map("company_employees")
 }
 
 model CompanyRoadmapItem {
-  id          String @id @default(cuid())
-  companyId   String // Links to Company, not Founder
-  
+  id        String @id @default(cuid())
+  companyId String // Links to Company, not Founder
+
   // Item Classification
-  itemType         String @default("Feature") // "Feature" or "Milestone"
+  itemType           String  @default("Feature") // "Feature" or "Milestone"
   parentArchitecture String? // Group related features (e.g., "RunCrew", "Profile")
-  roadmapType      String // "Product", "GTM", "Operations", "Infrastructure", "UX/Design"
-  category         String @default("Frontend Demo") // "Frontend Demo", "API Integration", "Backend Scaffolding", "User Testing", "Release"
-  
+  roadmapType        String // "Product", "GTM", "Operations", "Infrastructure", "UX/Design"
+  category           String  @default("Frontend Demo") // "Frontend Demo", "API Integration", "Backend Scaffolding", "User Testing", "Release"
+
   // Core Details
-  title       String
-  whatItDoes  String? // User value proposition
-  howItHelps  String? // How it helps overall build
-  
+  title      String
+  whatItDoes String? // User value proposition
+  howItHelps String? // How it helps overall build
+
   // Data & Integration
-  fieldsData     String? // What fields/data needed
-  howToGet       String? // APIs, routes, data sources
-  prerequisites  String? // Setup, research, account creation, auth
-  
+  fieldsData    String? // What fields/data needed
+  howToGet      String? // APIs, routes, data sources
+  prerequisites String? // Setup, research, account creation, auth
+
   // Visual & Planning
-  visual       String @default("List") // "List", "Timeline", "Kanban"
-  orderNumber  Int? // Order in sequence (1, 2, 3...)
-  
+  visual      String @default("List") // "List", "Timeline", "Kanban"
+  orderNumber Int? // Order in sequence (1, 2, 3...)
+
   // Time Tracking
   hoursEstimated Int? // Initial estimate
   hoursSpent     Int? // Actual time spent
-  
+
   // Dates & Status
-  targetDate    DateTime?
-  dueDate       DateTime?
-  status        String @default("Not Started") // Not Started, In Progress, Done
-  priority      String @default("P1") // P0, P1, P2
-  completedAt   DateTime?
-  
+  targetDate  DateTime?
+  dueDate     DateTime?
+  status      String    @default("Not Started") // Not Started, In Progress, Done
+  priority    String    @default("P1") // P0, P1, P2
+  completedAt DateTime?
+
   // System
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
   @@map("company_roadmap_items")
 }
 
 model CompanyCrmContact {
   id        String @id @default(cuid())
   companyId String
-  
+
   // Contact Info
-  name         String
-  role         String? // "Club Director", "Partnership Lead", etc.
-  email        String?
-  companyName  String? // Their company (club/organization name)
-  
+  name        String
+  role        String? // "Club Director", "Partnership Lead", etc.
+  email       String?
+  companyName String? // Their company (club/organization name)
+
   // Pipeline Management (BD Focus - Clubs, Partners, Integrations)
-  pipeline  String @default("prospects") // prospects, warm, onboarding, active, churned
-  status    String @default("new") // new, warm, active, exploring, cold
-  
+  pipeline String @default("prospects") // prospects, warm, onboarding, active, churned
+  status   String @default("new") // new, warm, active, exploring, cold
+
   // Next Steps
-  nextStep  String? // "Onboarding call", "Contract review", "Integration setup"
-  
+  nextStep String? // "Onboarding call", "Contract review", "Integration setup"
+
   // Notes
-  notes     String?
-  
+  notes String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   @@map("company_crm_contacts")
 }
 
 model CompanyFinancialSpend {
-  id          String @id @default(cuid())
-  companyId   String
-  
+  id        String @id @default(cuid())
+  companyId String
+
   // INGESTED ITEM DATA - What we're ingesting per transaction
-  date        DateTime  // When the spend occurred
-  amount      Float     // Amount spent (negative for expenses)
-  category    String    // "salaries", "marketing", "operations", "software", "office", etc.
-  description String?   // Transaction description
-  vendor      String?   // Who we paid
-  
+  date        DateTime // When the spend occurred
+  amount      Float // Amount spent (negative for expenses)
+  category    String // "salaries", "marketing", "operations", "software", "office", etc.
+  description String? // Transaction description
+  vendor      String? // Who we paid
+
   // Classification
-  department  String?   // Which department (if applicable)
-  project     String?   // Which project (if applicable)
-  
+  department String? // Which department (if applicable)
+  project    String? // Which project (if applicable)
+
   // Receipt/Proof
-  receiptUrl  String?   // Link to receipt/documentation
-  
+  receiptUrl String? // Link to receipt/documentation
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
   @@map("company_financial_spends")
 }
 
 model CompanyFinancialProjection {
-  id          String @id @default(cuid())
-  companyId   String
-  
+  id        String @id @default(cuid())
+  companyId String
+
   // Projection Period
-  period      String    // "monthly", "quarterly", "yearly"
-  periodStart DateTime  // Start of projection period
-  periodEnd   DateTime  // End of projection period
-  
+  period      String // "monthly", "quarterly", "yearly"
+  periodStart DateTime // Start of projection period
+  periodEnd   DateTime // End of projection period
+
   // TOTAL VALUES - Aggregated/Projected Amounts (NOT individual items)
-  projectedRevenue    Float?  // Projected revenue for period (TOTAL)
-  projectedExpenses   Float   // Projected expenses for period (TOTAL)
-  projectedNet        Float?  // Projected net (revenue - expenses) (TOTAL)
-  
+  projectedRevenue  Float? // Projected revenue for period (TOTAL)
+  projectedExpenses Float // Projected expenses for period (TOTAL)
+  projectedNet      Float? // Projected net (revenue - expenses) (TOTAL)
+
   // Breakdown by Category (TOTAL VALUES per category)
-  categoryBreakdown   Json?   // { "salaries": 50000, "marketing": 10000, "operations": 5000 }
-  
+  categoryBreakdown Json? // { "salaries": 50000, "marketing": 10000, "operations": 5000 }
+
   // Runway Calculation (TOTAL VALUES)
-  currentCash         Float?  // Current cash on hand (TOTAL)
-  monthlyBurnRate    Float?  // Monthly burn (expenses) (TOTAL)
-  runwayMonths        Float?  // Months of runway (calculated: cash / monthlyBurn)
-  
+  currentCash     Float? // Current cash on hand (TOTAL)
+  monthlyBurnRate Float? // Monthly burn (expenses) (TOTAL)
+  runwayMonths    Float? // Months of runway (calculated: cash / monthlyBurn)
+
   // Assumptions
-  assumptions         String? // Notes on assumptions for this projection
-  
+  assumptions String? // Notes on assumptions for this projection
+
   // Status
-  status              String @default("draft") // draft, active, archived
-  
+  status String @default("draft") // draft, active, archived
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
   @@map("company_financial_projections")
 }
 
@@ -838,36 +844,38 @@ model CompanyFinancialProjection {
 // =====================================================
 
 model Task {
-  id        String @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Polymorphic Link - ONE of these must be set
-  founderId String?  // For founder personal tasks (Adam's tasks)
-  companyId String?  // For company-wide tasks
-  
+  founderId String? // For founder personal tasks (Adam's tasks)
+  companyId String? // For company-wide tasks
+
   // Task Details
   title       String
   description String?
-  status      String @default("pending") // pending, in_progress, completed, cancelled
-  priority    String @default("medium") // low, medium, high, urgent
+  status      String    @default("pending") // pending, in_progress, completed, cancelled
+  priority    String    @default("medium") // low, medium, high, urgent
   dueDate     DateTime?
-  
+
   // Department (for company tasks)
-  department  String? // "Engineering", "Design", "Marketing"
-  
+  department String? // "Engineering", "Design", "Marketing"
+
   // Founder Priority Flag (for company tasks)
   isTopPriority Boolean @default(false) // Founder can mark "most important now"
-  
+
   // Completion
   completedAt DateTime?
-  
+
   // System
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   // Relations
-  founder Founder? @relation(fields: [founderId], references: [id], onDelete: Cascade)
-  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  founder         Founder?       @relation(fields: [founderId], references: [id], onDelete: Cascade)
+  company         Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String?
+
   @@map("tasks")
 }
 
@@ -877,10 +885,10 @@ model Task {
 
 model Message {
   id        String   @id @default(cuid())
-  groupId   String   // RunCrew ID
-  authorId  String   // Athlete ID
-  author    String   // Author name (denormalized for quick display)
-  content   String   // Message content
+  groupId   String // RunCrew ID
+  authorId  String // Athlete ID
+  author    String // Author name (denormalized for quick display)
+  content   String // Message content
   createdAt DateTime @default(now())
 
   @@index([groupId, createdAt]) // Efficient queries by group and time
@@ -892,162 +900,150 @@ model Message {
 // =====================================================
 
 model GoFastCompany {
-  id          String   @id @default(cuid())
-  containerId String   @unique  // Unique container identifier for GoFast operations
-  
+  id          String @id @default(cuid())
+  containerId String @unique // Unique container identifier for GoFast operations
+
   // Company Details (Upserted by founder during onboarding)
-  companyName String   // "GoFast Inc"
-  address     String?  // "2604 N. George Mason Dr."
-  city        String?  // "Arlington"
-  state       String?  // "VA"
-  website     String?  // "gofastcrushgoals.com"
-  description String?  // Company description
-  
+  companyName String // "GoFast Inc"
+  address     String? // "2604 N. George Mason Dr."
+  city        String? // "Arlington"
+  state       String? // "VA"
+  website     String? // "gofastcrushgoals.com"
+  description String? // Company description
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations - All scoped to this single company
-  staffRoles  CompanyStaffRole[]  // All staff via junction
-  contacts    Contact[]            // CRM contacts
-  pipelines   Pipeline[]           // BD Pipeline (contact-driven, config-based)
-  productPipelineItems ProductPipelineItem[]  // Product Pipeline (product module, user-driven)
-  financialSpends CompanyFinancialSpend[]
+  staff                CompanyStaff[] // Direct relation to staff (single-tenant, no junction needed)
+  contacts             Contact[] // CRM contacts
+  pipelines            Pipeline[] // BD Pipeline (contact-driven, config-based)
+  pipelineConfigs      PipelineConfig[] // Pipeline configurations
+  productPipelineItems ProductPipelineItem[] // Product Pipeline (product module, user-driven)
+  financialSpends      CompanyFinancialSpend[]
   financialProjections CompanyFinancialProjection[]
-  roadmapItems CompanyRoadmapItem[]
-  tasks       Task[]
-  
+  roadmapItems         CompanyRoadmapItem[]
+  tasks                Task[]
+
   @@map("gofast_company")
 }
 
 model CompanyStaff {
-  id          String   @id @default(cuid())
-  firebaseId  String   @unique  // Firebase auth ID (for authentication)
-  name        String?  // Full name (from Firebase displayName or firstName/lastName)
-  email       String?  // Email address (from Firebase)
-  photoURL    String?  // Profile photo URL (from Firebase - stored for quick access)
-  
+  id         String  @id @default(cuid())
+  firebaseId String  @unique // Firebase auth ID (for authentication)
+  name       String? // Full name (from Firebase displayName or firstName/lastName)
+  email      String? // Email address (from Firebase)
+  photoURL   String? // Profile photo URL (from Firebase - stored for quick access)
+
+  // Company and Role (direct fields - single-tenant, no junction needed)
+  companyId  String // Links to GoFastCompany.id (single company)
+  role       String // "founder", "admin", "manager", "employee" (from roleConfig.js)
+  department String? // Optional department assignment
+
   // Verification Code (for onboarding/re-authentication)
-  verificationCode String?  // Unique code for employee onboarding (future: can be changed)
-  
-  // Reverse relations
-  companyRoles CompanyStaffRole[]  // Junction table with roles
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  verificationCode String? // Unique code for employee onboarding (future: can be changed)
+
+  // Relations
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  joinedAt  DateTime @default(now()) // When staff joined company
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("company_staff")
 }
 
-model CompanyStaffRole {
-  id        String @id @default(cuid())
-  companyId String
-  staffId   String // Links to CompanyStaff.id (NOT Athlete.id)
-  
-  // Role-Based Access Control (role values defined in roleConfig.js)
-  role      String  // "founder", "admin", "manager", "employee" (REQUIRED - validated against roleConfig)
-  department String? // Optional department assignment
-  
-  joinedAt  DateTime @default(now())
-  
-  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  staff     CompanyStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  
-  @@unique([companyId, staffId])
-  @@map("company_staff_roles")
-}
-
 model Contact {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (containerId)
+
   // Core person data (aligned with Ignite pattern)
-  firstName   String?
-  lastName    String?
-  goesBy      String?  // Preferred name
-  email       String?
-  phone       String?
-  title       String?
-  
-  // Pipeline Tracking (via Pipeline model - config-based)
-  pipelineId  String?  // Links to Pipeline.id (optional - contact may not be in pipeline yet)
-  
+  firstName String?
+  lastName  String?
+  goesBy    String? // Preferred name
+  email     String?
+  phone     String?
+  title     String?
+
   // Conversion Path (Contact → Athlete)
-  athleteId   String?  // Links to Athlete.id if contact converted to athlete
-  
+  athleteId String? // Links to Athlete.id if contact converted to athlete
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  pipeline    Pipeline?     @relation(fields: [pipelineId], references: [id], onDelete: SetNull)
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipelines Pipeline[]    @relation("ContactPipelines") // One contact can have multiple pipelines (via Pipeline model)
+
   @@map("contacts")
 }
 
 model Pipeline {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  contactId   String  // Links to Contact.id (contact-driven pipeline)
-  
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (containerId)
+  contactId String // Links to Contact.id (contact-driven pipeline)
+
   // Pipeline Configuration (from PipelineConfig)
-  configId    String  // Links to PipelineConfig.id (which pipeline config)
-  stageId     String  // Current stage ID (from PipelineConfig.stages)
-  
+  configId String // Links to PipelineConfig.id (which pipeline config)
+  stageId  String // Current stage ID (from PipelineConfig.stages)
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contact     Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company GoFastCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contact Contact        @relation("ContactPipelines", fields: [contactId], references: [id], onDelete: Cascade)
+  config  PipelineConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
+
   @@unique([contactId, configId]) // One pipeline per contact per config
   @@map("pipelines")
 }
 
 model PipelineConfig {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (containerId)
+
   // Pipeline Definition
-  name        String  // "BD Pipeline", "Sales Pipeline", etc.
+  name        String // "BD Pipeline", "Sales Pipeline", etc.
   description String?
-  
+
   // Stages (JSON array of stage definitions)
-  stages      Json    // [{ id, name, order, color, etc. }]
-  
+  stages Json // [{ id, name, order, color, etc. }]
+
   // System
-  isActive    Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  pipelines Pipeline[] // Pipelines using this config
+
   @@map("pipeline_configs")
 }
 
 model ProductPipelineItem {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (containerId)
+
   // User-Driven Product Module Fields
-  name        String  // Product feature/module name (user input)
+  name        String // Product feature/module name (user input)
   description String? // Description (user input)
   timeItTakes String? // Time it takes (e.g., "2 weeks", "1 month") (user input)
-  
+
   // Status
-  status      String @default("pending") // pending, in_progress, completed, cancelled
-  priority    String @default("medium") // low, medium, high, urgent
-  
+  status   String @default("pending") // pending, in_progress, completed, cancelled
+  priority String @default("medium") // low, medium, high, urgent
+
   // Dates
   startedAt   DateTime?
   completedAt DateTime?
-  
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   @@map("product_pipeline_items")
 }
