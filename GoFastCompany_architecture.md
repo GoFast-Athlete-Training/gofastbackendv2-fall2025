@@ -454,7 +454,7 @@ model Task {
    - If Firebase tokens lost: Re-enter code (future: can change code)
 
 3. **Company Details Upsert** (Founder only)
-   - Upsert `GoFastCompany` record with:
+   - Create `GoFastCompany` record with:
      - `companyName`: "GoFast Inc"
      - `address`: "2604 N. George Mason Dr."
      - `city`: "Arlington"
@@ -495,7 +495,7 @@ POST   /api/staff/verify-code         → Verify verification code (for onboardi
 ```
 GET    /api/company/hydrate           → Hydrate GoFastCompany + all relations (single company)
 GET    /api/company                   → Get GoFastCompany details
-POST   /api/company/upsert            → Upsert GoFastCompany (founder only - during onboarding)
+POST   /api/company/create            → Create GoFastCompany (founder only - during onboarding)
 PUT    /api/company                   → Update GoFastCompany (founder only)
 ```
 
@@ -648,36 +648,42 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 
 **Location**: `middleware/firebaseMiddleware.js`
 
-**Environment Variable**: `GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY`
-- **Note**: Different from GoFast app Firebase service key
-- **Naming**: `GOFAST_COMPANY_` prefix to distinguish from athlete app Firebase
-- **Purpose**: GoFast Company Stack uses separate Firebase project/service account
+**Environment Variable**: `FIREBASE_SERVICE_ACCOUNT`
+- **Note**: Uses the same Firebase project (`gofast-a5f94`) as the GoFast athlete app
+- **Purpose**: Since both apps use the same Firebase project, they share the same service account key
+- **Render**: Uses existing `FIREBASE_SERVICE_ACCOUNT` environment variable (already configured)
 
 ### Route Patterns
 
 #### Pattern A: StaffCreateRoute (Universal Personhood)
 
-**File**: `routes/Staff/staffCreateRoute.js`  
+**File**: `routes/Company/staffCreateRoute.js`  
 **Endpoint**: `POST /api/staff/create`  
 **Auth**: NO middleware required (happens before protected routes)
 
 **Purpose**: Find or create CompanyStaff by Firebase ID. This happens AFTER Firebase authentication - it's entity creation/management, NOT authentication.
 
+**Note**: All company-related routes are in `routes/Company/` folder.
+
 #### Pattern B: StaffHydrateRoute (Hydration)
 
-**File**: `routes/Staff/staffHydrateRoute.js`  
+**File**: `routes/Company/staffHydrateRoute.js`  
 **Endpoint**: `GET /api/staff/hydrate`  
 **Auth**: `verifyFirebaseToken` middleware required
 
 **Purpose**: Find CompanyStaff's full account/profile by Firebase ID from verified token. This is the "hydration" route that loads complete CompanyStaff data with company and role.
 
+**Note**: All company-related routes are in `routes/Company/` folder.
+
 #### Pattern C: Protected Entity Creation (Child Entities)
 
-**File**: `routes/Company/companyUpsertRoute.js`  
-**Endpoint**: `POST /api/company/upsert`  
+**File**: `routes/Company/companyCreateRoute.js`  
+**Endpoint**: `POST /api/company/create`  
 **Auth**: `verifyFirebaseToken` middleware required
 
-**Purpose**: Upsert GoFastCompany record (founder only - during onboarding). Creates company details and links founder via CompanyStaffRole junction.
+**Purpose**: Create GoFastCompany record (founder only - during onboarding). Creates company details and links founder via CompanyStaffRole junction.
+
+**Note**: All company-related routes are in `routes/Company/` folder.
 
 ---
 
@@ -716,7 +722,7 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 
 6. **Onboarding Flow**
    - GF Splash → Auth check → Code verification → Company upsert → Profile setup → Platform access
-   - Founder upserts company details during onboarding
+   - Founder creates company details during onboarding
    - Employees get unique link with code (future)
 
 7. **Schema-First**

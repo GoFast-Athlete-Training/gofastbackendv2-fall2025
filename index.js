@@ -50,8 +50,11 @@ import founderHydrateRouter from './routes/Founder/founderHydrateRoute.js';
 // Admin routes
 import adminHydrateRouter from './routes/Admin/adminHydrateRoute.js';
 import adminUpsertRouter from './routes/Admin/adminUpsertRoute.js';
-// Company routes
+// Company routes (GoFast Company Stack - ALL company-related routes here)
 import companyRoadmapRouter from './routes/Company/companyRoadmapRoute.js';
+import companyCreateRouter from './routes/Company/companyCreateRoute.js';
+import staffCreateRouter from './routes/Company/staffCreateRoute.js';
+import staffHydrateRouter from './routes/Company/staffHydrateRoute.js';
 
 dotenv.config();
 
@@ -139,7 +142,11 @@ app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/foun
 // Legacy admin route compatibility - /api/athlete/admin/hydrate
 app.use('/api/athlete/admin', adminHydrateRouter); // /hydrate (redirects to /api/admin/athletes/hydrate)
 // Company routes
+app.use('/api/company', companyCreateRouter); // /create (FIRST - most specific)
 app.use('/api/company', companyRoadmapRouter); // /:companyId/roadmap, /roadmap/:itemId
+// Staff routes (GoFast Company Stack)
+app.use('/api/staff', staffHydrateRouter); // /hydrate (FIRST - most specific)
+app.use('/api/staff', staffCreateRouter); // /create
 // Messages routes (Group Wall Messaging)
 app.use('/api/messages', messagesRouter); // /:groupId (GET), / (POST)
 
@@ -200,4 +207,6 @@ httpServer.listen(PORT, async () => {
 
 // Export for potential use elsewhere
 export { io };
+export default app;
+
 export default app;
