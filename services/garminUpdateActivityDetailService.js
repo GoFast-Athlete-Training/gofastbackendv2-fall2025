@@ -3,13 +3,13 @@ import GarminFieldMapper from './GarminFieldMapper.js';
 
 /**
  * Update activity detail data from Garmin activity-details webhook
- * @param {string} summaryId - Garmin's activity summaryId (sourceActivityId)
+ * @param {string|number} activityId - Garmin's activityId (matches sourceActivityId from summary webhook)
  * @param {Object} garminDetailPayload - Raw Garmin detail webhook payload
  * @returns {Promise<Object|null>} - Updated activity record or null if not found
  */
-export async function updateActivityDetail(summaryId, garminDetailPayload) {
-  if (!summaryId) {
-    console.warn('⚠️ Missing summaryId in updateActivityDetail()');
+export async function updateActivityDetail(activityId, garminDetailPayload) {
+  if (!activityId) {
+    console.warn('⚠️ Missing activityId in updateActivityDetail()');
     return null;
   }
 
@@ -21,12 +21,13 @@ export async function updateActivityDetail(summaryId, garminDetailPayload) {
   const prisma = getPrismaClient();
 
   try {
-    console.log(`🔍 Looking up activity by sourceActivityId: ${summaryId.toString()}`);
-    console.log(`💡 This summaryId should match the activityId from the summary webhook`);
+    console.log(`🔍 Looking up activity by sourceActivityId: ${activityId.toString()}`);
+    console.log(`💡 This activityId should match the sourceActivityId saved from summary webhook`);
+    console.log(`💡 Note: Garmin's summaryId has "-detail" suffix, but we use activityId (number) to match`);
     
-    // Find the matching activity record using summaryId (sourceActivityId is unique)
+    // Find the matching activity record using activityId (sourceActivityId is unique)
     const activity = await prisma.athleteActivity.findUnique({
-      where: { sourceActivityId: summaryId.toString() },
+      where: { sourceActivityId: activityId.toString() },
       select: {
         id: true,
         athleteId: true,
@@ -36,9 +37,9 @@ export async function updateActivityDetail(summaryId, garminDetailPayload) {
     });
 
     if (!activity) {
-      console.error(`❌ No matching activity found for summaryId ${summaryId}`);
-      console.error(`💡 This means the summary webhook (activityId: ${summaryId}) was not received first, or the IDs don't match`);
-      console.error(`💡 The summaryId from details webhook MUST match the activityId from summary webhook`);
+      console.error(`❌ No matching activity found for activityId ${activityId}`);
+      console.error(`💡 This means the summary webhook (activityId: ${activityId}) was not received first, or the IDs don't match`);
+      console.error(`💡 The activityId from details webhook MUST match the sourceActivityId from summary webhook`);
       
       // DEBUG: Show recent activities to help debug
       const recentActivities = await prisma.athleteActivity.findMany({
@@ -50,9 +51,9 @@ export async function updateActivityDetail(summaryId, garminDetailPayload) {
       return null;
     }
     
-    console.log(`✅ MATCH FOUND: summaryId ${summaryId} matches sourceActivityId ${activity.sourceActivityId}`);
+    console.log(`✅ MATCH FOUND: activityId ${activityId} matches sourceActivityId ${activity.sourceActivityId}`);
 
-    console.log(`✅ Found activity: ${activity.id} for summaryId ${summaryId}`);
+    console.log(`✅ Found activity: ${activity.id} for activityId ${activityId}`);
     console.log(`📊 Current detailData: ${activity.detailData ? 'EXISTS' : 'NULL'}`);
 
     // Map detail data using GarminFieldMapper
@@ -69,7 +70,7 @@ export async function updateActivityDetail(summaryId, garminDetailPayload) {
 
     // Update the activity with mapped detail data
     const updated = await prisma.athleteActivity.update({
-      where: { sourceActivityId: summaryId.toString() },
+      where: { sourceActivityId: activityId.toString() },
       data: {
         detailData: mappedDetailData.detailData, // Only the mapped detail data
         hydratedAt: mappedDetailData.hydratedAt,
@@ -84,7 +85,7 @@ export async function updateActivityDetail(summaryId, garminDetailPayload) {
       }
     });
 
-    console.log(`✅ Activity detail updated for summaryId ${summaryId}`);
+    console.log(`✅ Activity detail updated for activityId ${activityId}`);
     console.log(`✅ Detail data saved - keys:`, Object.keys(updated.detailData || {}));
     console.log(`✅ hydratedAt: ${updated.hydratedAt}`);
 

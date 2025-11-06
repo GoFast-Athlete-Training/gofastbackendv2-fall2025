@@ -18,29 +18,49 @@ router.post("/activity-details", async (req, res) => {
   try {
     console.log('📊 Garmin activity detail received');
     console.log('📊 Detail payload keys:', Object.keys(req.body));
-    console.log('📊 Detail payload sample:', JSON.stringify(req.body, null, 2).substring(0, 1000));
     
-    // Try different field names for summaryId
-    const summaryId = req.body?.summaryId || req.body?.activityId || req.body?.activitySummaryId || req.body?.activity?.summaryId;
+    // Garmin sends { activityDetails: [...] } - an array of activity details
+    const activityDetails = req.body?.activityDetails || (Array.isArray(req.body) ? req.body : [req.body]);
     
-    console.log(`🔍 Extracted summaryId: ${summaryId} (type: ${typeof summaryId})`);
-    
-    if (!summaryId) {
-      console.error('❌ No summaryId found in activity details payload');
+    if (!Array.isArray(activityDetails) || activityDetails.length === 0) {
+      console.error('❌ Invalid payload structure - expected { activityDetails: [...] } or array');
       console.error('📊 Available keys:', Object.keys(req.body));
-      console.error('📊 Full payload:', JSON.stringify(req.body, null, 2));
       return;
     }
     
-    // Use service to update activity detail
-    const updated = await updateActivityDetail(summaryId, req.body);
+    console.log(`📊 Processing ${activityDetails.length} activity detail(s)`);
     
-    if (!updated) {
-      console.error(`❌ Failed to update activity detail for summaryId ${summaryId}`);
-      return;
+    // Process each activity detail
+    for (const activityDetail of activityDetails) {
+      try {
+        // Extract activityId (this should match sourceActivityId from summary webhook)
+        // Note: summaryId has "-detail" suffix, so use activityId instead
+        const activityId = activityDetail.activityId || activityDetail.summaryId?.replace('-detail', '') || activityDetail.summary?.activityId;
+        
+        console.log(`🔍 Processing activity detail - activityId: ${activityId}, summaryId: ${activityDetail.summaryId}`);
+        console.log(`📊 Activity detail keys:`, Object.keys(activityDetail));
+        
+        if (!activityId) {
+          console.error('❌ No activityId found in activity detail');
+          console.error('📊 Activity detail:', JSON.stringify(activityDetail, null, 2).substring(0, 500));
+          continue;
+        }
+        
+        // Use service to update activity detail (pass the activityId, not summaryId)
+        const updated = await updateActivityDetail(activityId.toString(), activityDetail);
+        
+        if (!updated) {
+          console.error(`❌ Failed to update activity detail for activityId ${activityId}`);
+          continue;
+        }
+        
+        console.log(`✅ Activity detail updated successfully for activityId ${activityId}`);
+        
+      } catch (detailError) {
+        console.error('❌ Error processing individual activity detail:', detailError);
+        // Continue with next activity detail
+      }
     }
-    
-    console.log(`✅ Activity detail updated successfully for summaryId ${summaryId}`);
     
   } catch (err) {
     console.error('❌ Error saving Garmin detail data:', err);
