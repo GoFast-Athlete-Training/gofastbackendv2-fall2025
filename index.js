@@ -208,5 +208,3 @@ httpServer.listen(PORT, async () => {
 // Export for potential use elsewhere
 export { io };
 export default app;
-
-export default app;
