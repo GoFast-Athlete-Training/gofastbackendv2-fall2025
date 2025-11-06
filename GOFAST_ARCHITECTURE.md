@@ -1146,9 +1146,11 @@ npm run dev
 - 🚧 RunCrew admin operations (update, delegate, broadcast)
 - 🚧 RunCrew leaderboard calculation service
 - 🚧 RunCrew events & RSVP (schema addition needed)
-- ✅ Profile update route (`PUT /api/athlete/:id/profile`)
+- ✅ Profile update route (`PUT /api/athlete/:id/profile`) - ✅ Firebase auth + security checks
 - ✅ Profile hydration route (`GET /api/athlete/hydrate`)
 - ✅ Profile picture upload endpoint (`POST /api/upload`)
+- ✅ Athlete find-or-create service (`AthleteFindOrCreateService.js`)
+- ✅ Service layer pattern for profile operations
 - 🚧 Profile completion calculation and tracking
 - 🚧 Draft saving mechanism
 - 🚧 Image processing (resize, compress)
@@ -1159,15 +1161,18 @@ npm run dev
 - 🚧 Implement Garmin activity sync
 - 🚧 Add real leaderboard data
 - 🚧 Crew feed with posts and comments
-- ✅ Profile setup component (`AthleteCreateProfile.jsx`)
-- ✅ Profile display component (`AthleteProfile.jsx`)
+- ✅ Profile setup component (`AthleteCreateProfile.jsx`) - New user onboarding
+- ✅ Profile edit component (`EditProfile.jsx`) - Edit existing profiles ✅ **NEW**
+- ✅ Profile display component (`AthleteProfile.jsx`) - Beautiful card-based UI ✅ **IMPROVED**
 - ✅ Settings component (`Settings.jsx`)
 - ✅ Profile hydration on app load
-- 🚧 Profile picture upload integration (basic upload exists, needs camera/gallery)
+- ✅ Profile picture display on home page navigation ✅ **NEW**
+- ✅ Unified signup/signin flow (data-driven routing) ✅ **NEW**
+- ✅ Axios integration (auto-adds Firebase token) ✅ **NEW**
+- 🚧 Profile picture upload integration (file upload)
 - 🚧 Draft saving (auto-save on blur)
 - 🚧 Profile completion indicator
 - 🚧 Reminder banner on home page
-- 🚧 Profile picture click recovery
 - 🚧 Hub icons component (navigation icons)
 
 ### Admin Dashboard
@@ -1188,23 +1193,48 @@ npm run dev
 
 **Documentation**: See `gofastfrontend-mvp1/docs/GoFastProfile_architecture.md` for complete profile architecture details.
 
+**Status**: ✅ **Core Profile System Complete** - Production-ready with security, separate edit component, and beautiful UI
+
 **Quick Summary**:
 - **Schema**: All profile fields stored in `Athlete` model (no separate Profile model)
 - **Universal Profile**: Core identity fields (firstName, lastName, email, gofastHandle, etc.)
 - **Feature-Specific Fields**: Training and Match profile fields stored in `Athlete` model
 - **Routes**: 
-  - `PUT /api/athlete/:id/profile` - Update profile
+  - `POST /api/athlete/create` - Find or create athlete (service layer pattern)
+  - `PUT /api/athlete/:id/profile` - Update profile (✅ Firebase auth required, ✅ security ownership check)
   - `GET /api/athlete/hydrate` - Universal hydration (includes profile)
   - `POST /api/upload` - Profile picture upload
-- **Frontend**: `AthleteCreateProfile.jsx` (setup), `AthleteProfile.jsx` (display hub), `Settings.jsx` (device connections)
-- **Status**: ✅ Core profile system implemented, 🚧 Profile completion tracking and reminders pending
+- **Frontend Components**: 
+  - `AthleteCreateProfile.jsx` - New user onboarding (route: `/athlete-create-profile`)
+  - `EditProfile.jsx` - Edit existing profile (route: `/athlete-edit-profile`) ✅ **NEW**
+  - `AthleteProfile.jsx` - Beautiful card-based display hub (route: `/athlete-profile`)
+  - `Settings.jsx` - Device connections (Garmin, Strava)
+
+**Recent Updates** (January 2025):
+- ✅ **Service Layer Pattern** - `AthleteFindOrCreateService.js` handles find-or-create logic
+- ✅ **Firebase Token Verification** - All profile routes require authentication
+- ✅ **Security Ownership Check** - Users can only update their own profile
+- ✅ **Separate EditProfile Component** - Different UX for editing vs creating
+- ✅ **Overwrite Capability** - Edit profile fully replaces existing data
+- ✅ **Beautiful Profile Display** - Card-based design with icons and hover effects
+- ✅ **Profile Picture Display** - Shows on home page navigation
+- ✅ **Unified Signup/Signin Flow** - Both use same create route, data-driven routing
+- ✅ **Error Handling** - Clear messages for duplicate handles, forbidden, not found
 
 **Key Implementation**:
 - Profile data flows through `Athlete` model (athlete-first architecture)
 - Universal hydration pattern: Frontend calls `/api/athlete/hydrate`, saves to localStorage, uses everywhere
 - Profile setup is progressive: Users fill out what they need for features they use
 - Settings page exists for device connections (Garmin, Strava)
-- Hub icons for future preferences (not yet implemented)
+- Data-driven routing: Uses `gofastHandle` to determine profile completeness (no flags)
+- Service layer: Business logic separated from route handlers
+
+**Remaining Work**:
+- 🚧 Profile completion calculation and tracking
+- 🚧 Profile picture upload integration (file upload)
+- 🚧 Draft saving (auto-save on blur)
+- 🚧 Reminder banner on home page
+- 🚧 Hub icons for future preferences (Running Preferences, Goals, etc.)
 
 **For complete details**: See `gofastfrontend-mvp1/docs/GoFastProfile_architecture.md`
 

@@ -7,20 +7,26 @@
 
 ## Platform Vision
 
-**Company Outlook is "The Operating System for Founders"** - A comprehensive company management platform where founders can:
-- **Manage** their company operations, finances, and roadmaps
+**GoFast Company Outlook is "The Operating System for GoFast"** - A comprehensive company management platform for GoFast company operations:
+- **Manage** GoFast operations, finances, and roadmaps
 - **Prospect** and convert contacts into users (athletes) or sales channel partners
 - **Track** financial health with actual spending and projections
 - **Plan** product, GTM, and operations roadmaps
 - **Coordinate** team tasks and priorities
 
-**Core Value**: **Company-first operations** - Everything centers around the Company container, with separate auth (CompanyStaff model) and role-based access control via CompanyStaffRole junction (roles defined in roleConfig.js).
+**Core Value**: **Single-tenant company operations** - This is GoFast's internal company management tool (NOT multi-tenant like Ignite). Everything centers around GoFast company, with separate auth (CompanyStaff model) and role-based access control via CompanyStaffRole junction (roles defined in roleConfig.js).
+
+**Key Difference from Ignite**: 
+- **Ignite** = Multi-tenant (multiple companies, each with their own data)
+- **GoFast Company Outlook** = Single-tenant (just GoFast company, similar BD architecture but for one company)
 
 ---
 
-## Core Philosophy: Company-First Architecture
+## Core Philosophy: Single-Company Architecture
 
-Company Outlook is built on a **company-first schema** where the `Company` model (CompanyHQ) is the central container entity. All other models and features link back to `Company` as the source of truth.
+GoFast Company Outlook is built for **one company** (GoFast). The `Company` model represents GoFast company itself. All other models and features link back to this single company.
+
+**Single-Tenant Design**: Unlike Ignite (multi-tenant), this is GoFast's internal tool. No need for CompanyHQ containers or tenant isolation - it's all one company.
 
 **Key Principle**: **Separate auth from athlete identity** - The `CompanyStaff` model handles authentication (Firebase), completely separate from `Athlete` model. This enables:
 - Company operations without requiring athlete signup

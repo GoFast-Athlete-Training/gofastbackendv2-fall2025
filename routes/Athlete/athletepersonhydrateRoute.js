@@ -271,18 +271,43 @@ async function hydrateAthlete(req, res) {
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     
+    // MVP1: Filter for running activities only (case-insensitive)
     const weeklyActivities = await prisma.athleteActivity.findMany({
       where: {
         athleteId: athleteId,
         startTime: {
           gte: sevenDaysAgo,
           lte: now
-        }
+        },
+        // MVP1: Only show running activities (case-insensitive)
+        OR: [
+          { activityType: { equals: 'running', mode: 'insensitive' } },
+          { activityType: { contains: 'run', mode: 'insensitive' } }
+        ]
       },
       orderBy: {
         startTime: 'desc'
+      },
+      select: {
+        id: true,
+        activityName: true,
+        activityType: true,
+        sourceActivityId: true,
+        startTime: true,
+        duration: true,
+        distance: true,
+        calories: true,
+        averageHeartRate: true,
+        maxHeartRate: true,
+        elevationGain: true,
+        averageSpeed: true,
+        deviceName: true,
+        detailData: true,
+        summaryData: true
       }
     });
+    
+    console.log(`✅ Found ${weeklyActivities.length} running activities (last 7 days)`);
     
     // Calculate weekly totals
     const weeklyTotals = {

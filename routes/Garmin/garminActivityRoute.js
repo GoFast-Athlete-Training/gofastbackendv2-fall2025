@@ -28,7 +28,6 @@ router.post("/activity", async (req, res) => {
     
     const activities = payload.activities;
     console.log(`📩 Garmin webhook received (${activities.length} activities)`);
-    console.log(`📊 Webhook payload root keys:`, Object.keys(payload));
     
     // Check if userId is at root level
     if (payload.userId) {
@@ -36,8 +35,10 @@ router.post("/activity", async (req, res) => {
     }
     
     // Process each activity
-    for (const garminActivity of activities) {
+    for (let i = 0; i < activities.length; i++) {
+      const garminActivity = activities[i];
       try {
+        
         // Extract userId and activityId - try multiple field name variations
         // Also check payload root level (userId might be at root, not in each activity)
         const userId = garminActivity.userId || garminActivity.user_id || garminActivity.userIdString || garminActivity.garminUserId || payload.userId;
@@ -54,30 +55,26 @@ router.post("/activity", async (req, res) => {
           continue;
         }
     
-        console.log(`🔍 Looking up athlete for Garmin userId: ${userId} (type: ${typeof userId})`);
-        
-        // DEBUG: Check what's actually in the database
-        const allAthletesWithGarmin = await prisma.athlete.findMany({
-          where: { garmin_user_id: { not: null } },
-          select: { id: true, email: true, garmin_user_id: true }
-        });
-        console.log(`📊 DEBUG: All athletes with garmin_user_id in database:`, allAthletesWithGarmin.map(a => ({ id: a.id, email: a.email, garmin_user_id: a.garmin_user_id })));
-        console.log(`📊 DEBUG: Webhook userId value: "${userId}"`);
+        console.log(`🔍 Processing activity ${activityId} for userId: ${userId}`);
         
         // Lookup athlete using the service
         const athlete = await findAthleteByGarminUserId(userId);
         
         if (!athlete) {
           console.error(`❌ No athlete found for Garmin user ID: ${userId}`);
-          console.error(`❌ Webhook userId type: ${typeof userId}, value: "${userId}"`);
-          console.error(`❌ Available garmin_user_ids in DB:`, allAthletesWithGarmin.map(a => `"${a.garmin_user_id}"`));
-          console.error(`💡 Check if garmin_user_id format matches (UUID string vs number, whitespace, etc.)`);
           continue;
         }
     
         // Normalize webhook format to mapper expected format
         const normalizedActivity = {
           ...garminActivity,
+          // Try multiple field names for activityName
+          activityName: garminActivity.activityName || 
+                        garminActivity.activity_name || 
+                        garminActivity.name || 
+                        garminActivity.displayName || 
+                        garminActivity.title || 
+                        null,
           // Convert activityType string to object format if needed
           activityType: typeof garminActivity.activityType === 'string' 
             ? { typeKey: garminActivity.activityType }
@@ -93,10 +90,14 @@ router.post("/activity", async (req, res) => {
           averageHeartRate: garminActivity.averageHeartRate || garminActivity.averageHeartRateInBeatsPerMinute,
           maxHeartRate: garminActivity.maxHeartRate || garminActivity.maxHeartRateInBeatsPerMinute,
           elevationGain: garminActivity.elevationGain || garminActivity.totalElevationGainInMeters,
+          // Ensure deviceName is captured from deviceMetaData
+          deviceMetaData: garminActivity.deviceMetaData || null,
         };
         
         // Map using GarminFieldMapper
         const mappedActivity = GarminFieldMapper.mapActivitySummary(normalizedActivity, athlete.id);
+        
+        console.log(`✅ Mapped activity: ${mappedActivity.activityName || mappedActivity.activityType || 'Unknown'} (${mappedActivity.deviceName || 'No device'})`);
         
         // Validate the mapped activity
         const validation = GarminFieldMapper.validateActivity(mappedActivity);
