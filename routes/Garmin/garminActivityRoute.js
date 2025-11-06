@@ -67,10 +67,23 @@ router.post("/activity", async (req, res) => {
     
         // Log device info to see what Garmin sends
         console.log(`📱 Device fields check:`);
-        console.log(`   - deviceMetaData:`, garminActivity.deviceMetaData);
+        console.log(`   - deviceMetaData:`, JSON.stringify(garminActivity.deviceMetaData));
         console.log(`   - deviceName:`, garminActivity.deviceName);
-        console.log(`   - device:`, garminActivity.device);
-        console.log(`   - All keys:`, Object.keys(garminActivity).filter(k => k.toLowerCase().includes('device')));
+        console.log(`   - device:`, JSON.stringify(garminActivity.device));
+        console.log(`   - All keys with 'device':`, Object.keys(garminActivity).filter(k => k.toLowerCase().includes('device')));
+        
+        // Extract deviceName from multiple possible locations (Garmin may use deviceModel or deviceName)
+        const extractedDeviceName = garminActivity.deviceMetaData?.deviceName || 
+                                    garminActivity.deviceMetaData?.deviceModel ||
+                                    garminActivity.deviceName || 
+                                    garminActivity.deviceModel ||
+                                    garminActivity.device?.name ||
+                                    garminActivity.device?.deviceName ||
+                                    garminActivity.device?.deviceModel ||
+                                    garminActivity.deviceMetaData?.name ||
+                                    null;
+        
+        console.log(`📱 Extracted deviceName: ${extractedDeviceName || 'NULL'}`);
         
         // Normalize webhook format to mapper expected format
         const normalizedActivity = {
@@ -97,14 +110,16 @@ router.post("/activity", async (req, res) => {
           averageHeartRate: garminActivity.averageHeartRate || garminActivity.averageHeartRateInBeatsPerMinute,
           maxHeartRate: garminActivity.maxHeartRate || garminActivity.maxHeartRateInBeatsPerMinute,
           elevationGain: garminActivity.elevationGain || garminActivity.totalElevationGainInMeters,
-          // Ensure deviceName is captured from deviceMetaData
+          // Ensure deviceMetaData is passed AND explicitly set deviceName
           deviceMetaData: garminActivity.deviceMetaData || null,
+          deviceName: extractedDeviceName, // Explicitly set deviceName for mapper
         };
         
         // Map using GarminFieldMapper
         const mappedActivity = GarminFieldMapper.mapActivitySummary(normalizedActivity, athlete.id);
         
-        console.log(`✅ Mapped activity: ${mappedActivity.activityName || mappedActivity.activityType || 'Unknown'} (${mappedActivity.deviceName || 'No device'})`);
+        console.log(`✅ Mapped activity: ${mappedActivity.activityName || mappedActivity.activityType || 'Unknown'}`);
+        console.log(`✅ Mapped deviceName: ${mappedActivity.deviceName || 'NULL - NOT SAVED!'}`);
         
         // Validate the mapped activity
         const validation = GarminFieldMapper.validateActivity(mappedActivity);
@@ -119,6 +134,9 @@ router.post("/activity", async (req, res) => {
         
         // Remove timestamps from mapped activity (we set them in upsert)
         const { syncedAt, lastUpdatedAt, ...activityData } = mappedActivity;
+        
+        // Log what we're about to save
+        console.log(`💾 About to save deviceName: ${activityData.deviceName || 'NULL - WILL BE NULL IN DB!'}`);
     
         // Upsert into athleteActivity
         const upsertedActivity = await prisma.athleteActivity.upsert({
@@ -135,6 +153,7 @@ router.post("/activity", async (req, res) => {
     });
     
         console.log(`✅ Saved Garmin activity ${activityId} for athlete ${athlete.id}`);
+        console.log(`✅ Saved deviceName in DB: ${upsertedActivity.deviceName || 'NULL - CHECK DATABASE!'}`);
         
       } catch (activityError) {
         console.error('❌ Error processing individual activity:', activityError);
