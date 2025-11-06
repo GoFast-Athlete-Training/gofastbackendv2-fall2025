@@ -2,183 +2,65 @@
 // Follows api/athlete pattern with api/athlete/create
 
 import express from 'express';
-import { getPrismaClient } from '../../config/database.js';
-import { debugFirebaseToken, verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { AthleteFindOrCreateService } from '../../services/AthleteFindOrCreateService.js';
 
 const router = express.Router();
 
 /**
- * Create Athlete from Firebase data
+ * Find or Create Athlete from Firebase data
  * POST /api/athlete/create
- * Links Firebase authentication to Athlete record
+ * 
+ * Uses Firebase token to find existing athlete or create new one.
+ * Handles both signup (new users) and existing users hitting signup button.
+ * 
+ * Flow:
+ * 1. Firebase token verified → req.user contains firebaseId, email, name, picture
+ * 2. Service finds athlete by firebaseId OR creates new one
+ * 3. Returns athlete data (frontend decides routing based on gofastHandle)
  */
 router.post('/create', verifyFirebaseToken, async (req, res) => {
   try {
-    const prisma = getPrismaClient();
-    const { firebaseId, email, firstName, lastName, photoURL } = req.body;
-    
-    console.log('🔐 ATHLETE: ===== ATHLETE CREATION (VERIFIED) =====');
-    console.log('🔐 ATHLETE: Firebase ID:', firebaseId);
-    console.log('🔐 ATHLETE: Email:', email);
-    console.log('🔐 ATHLETE: First Name:', firstName);
-    console.log('🔐 ATHLETE: Last Name:', lastName);
-    console.log('🔐 ATHLETE: Photo URL:', photoURL);
-    console.log('🔐 ATHLETE: Firebase User (verified):', req.user);
-    console.log('✅ ATHLETE: Firebase token verified successfully!');
-    
+    // Get Firebase data from verified token (set by middleware)
+    const firebaseId = req.user?.uid;
+    const email = req.user?.email;
+    const displayName = req.user?.name; // Firebase uses 'name' field for displayName
+    const picture = req.user?.picture; // Firebase photo URL
+
+    console.log('🔐 ATHLETE CREATE: Firebase token verified');
+    console.log('🔐 ATHLETE CREATE: firebaseId:', firebaseId);
+    console.log('🔐 ATHLETE CREATE: email:', email);
+    console.log('🔐 ATHLETE CREATE: displayName:', displayName);
+    console.log('🔐 ATHLETE CREATE: picture:', picture);
+
     if (!firebaseId || !email) {
-      console.log('❌ ATHLETE: Missing required fields - firebaseId or email');
       return res.status(400).json({ 
         success: false,
-        error: 'Missing required fields',
-        required: ['firebaseId', 'email'],
-        received: { firebaseId: !!firebaseId, email: !!email }
+        error: 'Missing required Firebase data',
+        message: 'firebaseId and email are required from Firebase token'
       });
     }
-    
-    console.log('🔐 ATHLETE: Starting athlete lookup/creation process...');
-    
-    // 1. Find existing Athlete by firebaseId first
-    let athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
+
+    // Call service to find or create athlete (upserts all Firebase data)
+    const athlete = await AthleteFindOrCreateService.findOrCreate({
+      firebaseId,
+      email,
+      displayName,
+      picture
     });
-    
-    if (athlete) {
-      console.log('✅ ATHLETE: Existing Athlete found:', athlete.id);
-      console.log('✅ ATHLETE: Athlete email:', athlete.email);
-      console.log('✅ ATHLETE: Athlete status:', athlete.status);
-      
-      // Sync photoURL from Firebase if available and different
-      const firebasePhotoURL = req.user?.picture || photoURL;
-      if (firebasePhotoURL && firebasePhotoURL !== athlete.photoURL) {
-        console.log('🔄 ATHLETE: Updating photoURL from Firebase');
-        athlete = await prisma.athlete.update({
-          where: { id: athlete.id },
-          data: { photoURL: firebasePhotoURL }
-        });
-        console.log('✅ ATHLETE: photoURL updated from Firebase');
-      }
-      
-      return res.json({
-        success: true,
-        message: 'Existing athlete found',
-        athleteId: athlete.id,
-        data: {
-          id: athlete.id,
-          firebaseId: athlete.firebaseId,
-          email: athlete.email,
-          firstName: athlete.firstName,
-          lastName: athlete.lastName,
-          gofastHandle: athlete.gofastHandle,
-          birthday: athlete.birthday,
-          gender: athlete.gender,
-          city: athlete.city,
-          state: athlete.state,
-          primarySport: athlete.primarySport,
-          photoURL: athlete.photoURL,
-          bio: athlete.bio,
-          instagram: athlete.instagram,
-          status: athlete.status,
-          createdAt: athlete.createdAt
-        }
-      });
-    }
-    
-    // 2. Find existing Athlete by email (might have been pre-created)
-    athlete = await prisma.athlete.findFirst({
-      where: { email }
-    });
-    
-    if (athlete) {
-      console.log('✅ ATHLETE: Athlete found by email - linking firebaseId:', athlete.id);
-      console.log('✅ ATHLETE: Linking firebaseId to existing athlete');
-      
-      // Use Firebase picture from token if photoURL not provided in body
-      const finalPhotoURL = photoURL || req.user?.picture || undefined;
-      
-      // Link firebaseId to existing Athlete and update photoURL
-      athlete = await prisma.athlete.update({
-        where: { id: athlete.id },
-        data: { 
-          firebaseId,
-          ...(finalPhotoURL && { photoURL: finalPhotoURL })
-        }
-      });
-      
-      console.log('✅ ATHLETE: Successfully linked firebaseId to existing athlete');
-      return res.json({
-        success: true,
-        message: 'Firebase ID linked to existing athlete',
-        athleteId: athlete.id,
-        data: {
-          id: athlete.id,
-          firebaseId: athlete.firebaseId,
-          email: athlete.email,
-          firstName: athlete.firstName,
-          lastName: athlete.lastName,
-          gofastHandle: athlete.gofastHandle,
-          birthday: athlete.birthday,
-          gender: athlete.gender,
-          city: athlete.city,
-          state: athlete.state,
-          primarySport: athlete.primarySport,
-          photoURL: athlete.photoURL,
-          bio: athlete.bio,
-          instagram: athlete.instagram,
-          status: athlete.status,
-          createdAt: athlete.createdAt
-        }
-      });
-    }
-    
-    // 3. No Athlete found - Create new Athlete
-    console.log('📝 ATHLETE: Creating new Athlete for email:', email);
-    console.log('📝 ATHLETE: Firebase ID:', firebaseId);
-    
-    // Use Firebase picture from token if photoURL not provided in body
-    const finalPhotoURL = photoURL || req.user?.picture || null;
-    
-    athlete = await prisma.athlete.create({
-      data: {
-        firebaseId,
-        email,
-        firstName: firstName || null,
-        lastName: lastName || null,
-        photoURL: finalPhotoURL
-        // Removed hardcoded status: 'active' - we'll track real activity later
-      }
-    });
-    
-    console.log('✅ ATHLETE: ===== ATHLETE CREATED SUCCESSFULLY =====');
-    console.log('✅ ATHLETE: New Athlete ID:', athlete.id);
-    console.log('✅ ATHLETE: Athlete Email:', athlete.email);
-    console.log('✅ ATHLETE: Athlete Firebase ID:', athlete.firebaseId);
-    console.log('✅ ATHLETE: Athlete Created At:', athlete.createdAt);
-    
-    res.status(201).json({
-      success: true,
-      message: 'Athlete created successfully',
-      athleteId: athlete.id,
-      data: {
-        id: athlete.id,
-        firebaseId: athlete.firebaseId,
-        email: athlete.email,
-        firstName: athlete.firstName,
-        lastName: athlete.lastName,
-        photoURL: athlete.photoURL,
-        createdAt: athlete.createdAt
-      }
-    });
+
+    // Format response
+    const response = AthleteFindOrCreateService.formatResponse(athlete);
+
+    // Always return 200 - frontend routes based on gofastHandle, not HTTP status
+    res.status(200).json(response);
     
   } catch (error) {
-    console.error('❌ ATHLETE: ===== ATHLETE CREATION ERROR =====');
-    console.error('❌ ATHLETE: Error message:', error.message);
-    console.error('❌ ATHLETE: Error stack:', error.stack);
-    console.error('❌ ATHLETE: Full error:', error);
+    console.error('❌ ATHLETE CREATE: Error:', error);
     res.status(400).json({ 
       success: false,
       error: error.message,
-      message: 'Failed to create/find athlete'
+      message: 'Failed to find or create athlete'
     });
   }
 });

@@ -1146,16 +1146,29 @@ npm run dev
 - 🚧 RunCrew admin operations (update, delegate, broadcast)
 - 🚧 RunCrew leaderboard calculation service
 - 🚧 RunCrew events & RSVP (schema addition needed)
-- 🚧 Profile setup API endpoints (draft saving, completion tracking, picture upload)
+- ✅ Profile update route (`PUT /api/athlete/:id/profile`)
+- ✅ Profile hydration route (`GET /api/athlete/hydrate`)
+- ✅ Profile picture upload endpoint (`POST /api/upload`)
+- 🚧 Profile completion calculation and tracking
+- 🚧 Draft saving mechanism
+- 🚧 Image processing (resize, compress)
+- 🚧 Cloudinary/S3 integration for image storage
 
 ### Frontend (MVP1)
 - 🚧 Connect RunCrew pages to backend APIs
 - 🚧 Implement Garmin activity sync
 - 🚧 Add real leaderboard data
 - 🚧 Crew feed with posts and comments
-- 🚧 Profile setup flow (see `gofastfrontend-mvp1/profile_ux_architecture.md`)
-- 🚧 Profile picture upload (camera/gallery support)
-- 🚧 Profile completion reminder system
+- ✅ Profile setup component (`AthleteCreateProfile.jsx`)
+- ✅ Profile display component (`AthleteProfile.jsx`)
+- ✅ Settings component (`Settings.jsx`)
+- ✅ Profile hydration on app load
+- 🚧 Profile picture upload integration (basic upload exists, needs camera/gallery)
+- 🚧 Draft saving (auto-save on blur)
+- 🚧 Profile completion indicator
+- 🚧 Reminder banner on home page
+- 🚧 Profile picture click recovery
+- 🚧 Hub icons component (navigation icons)
 
 ### Admin Dashboard
 - 🚧 Add RunCrew management card to `DashboardNavOptions.jsx`
@@ -1171,13 +1184,39 @@ npm run dev
 
 ---
 
+## Profile Architecture
+
+**Documentation**: See `gofastfrontend-mvp1/docs/GoFastProfile_architecture.md` for complete profile architecture details.
+
+**Quick Summary**:
+- **Schema**: All profile fields stored in `Athlete` model (no separate Profile model)
+- **Universal Profile**: Core identity fields (firstName, lastName, email, gofastHandle, etc.)
+- **Feature-Specific Fields**: Training and Match profile fields stored in `Athlete` model
+- **Routes**: 
+  - `PUT /api/athlete/:id/profile` - Update profile
+  - `GET /api/athlete/hydrate` - Universal hydration (includes profile)
+  - `POST /api/upload` - Profile picture upload
+- **Frontend**: `AthleteCreateProfile.jsx` (setup), `AthleteProfile.jsx` (display hub), `Settings.jsx` (device connections)
+- **Status**: ✅ Core profile system implemented, 🚧 Profile completion tracking and reminders pending
+
+**Key Implementation**:
+- Profile data flows through `Athlete` model (athlete-first architecture)
+- Universal hydration pattern: Frontend calls `/api/athlete/hydrate`, saves to localStorage, uses everywhere
+- Profile setup is progressive: Users fill out what they need for features they use
+- Settings page exists for device connections (Garmin, Strava)
+- Hub icons for future preferences (not yet implemented)
+
+**For complete details**: See `gofastfrontend-mvp1/docs/GoFastProfile_architecture.md`
+
+---
+
 ## Related Documentation
 
 - **`docs/GoFastDevOverview.md`** - Complete development guide and stack overview
 - **`docs/RunCrewArchitecture.md`** - Complete RunCrew implementation details
 - **`docs/TrainingArchitecture.md`** - Training plans architecture
 - **`gofastfrontend-demo/docs/GoFast AthleteActivity-Architecture.md`** - Complete activity tracking architecture (Garmin/Strava integration, use cases, data flow, API routes)
-- **`gofastfrontend-mvp1/profile_ux_architecture.md`** - Profile setup UX architecture, completion flow, reminder system, and profile picture upload strategy
+- **`gofastfrontend-mvp1/docs/GoFastProfile_architecture.md`** - Complete profile architecture (schema, routes, frontend, completion tracking, downstream features)
 
 ---
 

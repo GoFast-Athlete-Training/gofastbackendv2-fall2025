@@ -26,8 +26,7 @@ router.put('/:id/profile', async (req, res) => {
       state,
       primarySport,
       bio,
-      instagram,
-      photoURL
+      instagram
     } = req.body;
 
     console.log('📝 PROFILE: Updating athlete:', id);
@@ -47,8 +46,7 @@ router.put('/:id/profile', async (req, res) => {
         state,
         primarySport,
         bio,
-        instagram,
-        ...(photoURL && { photoURL })
+        instagram
       }
     });
 
