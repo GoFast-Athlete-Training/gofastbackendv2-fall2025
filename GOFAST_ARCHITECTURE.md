@@ -45,7 +45,7 @@ GoFast is built on an **athlete-first schema** where the `Athlete` model is the 
 
 ```
 Athlete (Central Identity)
-  ├── Activities (Garmin/Strava sync)
+  ├── Activities (Garmin/Strava sync) → AthleteActivity[]
   ├── RunCrew Memberships (via junction table)
   ├── Training Plans & Races
   └── [Future models: Coach, Investor, etc. - as modular extensions]
@@ -372,6 +372,203 @@ const membership = await tx.runCrewMembership.upsert({
 
 ---
 
+## Activity Tracking Architecture (Athlete-First)
+
+**Location**: `routes/Athlete/athleteActivitiesRoute.js`, `routes/Garmin/garminActivityRoute.js`
+
+**Core Principle**: **Athlete-First** - All activities link to `Athlete` via `athleteId`. Activities are stored in `AthleteActivity` model.
+
+### Two Forks (Per ACTIVITYTRACKING.md)
+
+#### 1. General Activity Tracking
+**Purpose**: Basic activity logging and overview
+- "Hey I did a run, how many miles, cool story"
+- Simple logging of runs, miles, basic metrics
+- General progress tracking
+- Social sharing ("I ran 5 miles today!")
+- Overall activity overview
+
+**Features**:
+- Log run distance/time
+- Basic pace tracking
+- Weekly/monthly totals
+- Simple progress visualization
+- Social activity feed
+
+**Frontend Component**: `AthleteWeekStats.jsx` (to be built)
+- Week overview: Total miles, best mile split
+- Runs scroller: Auto-hydrated from Garmin/Strava
+- Auto-loading from connected devices
+
+#### 2. Training Activity Tracking
+**Purpose**: Structured training program adherence
+- "This run was part of my 16-week plan and did I meet my heart rate targets?"
+- Matches actual runs to planned training runs
+- Tracks adherence to training plan
+- Performance vs. plan analysis
+- Training-specific metrics
+
+**Features**:
+- Match runs to planned workouts
+- Heart rate zone analysis
+- Pace target adherence
+- Training load tracking
+- Plan completion percentage
+- Recovery metrics
+
+**Note**: Training dashboard is separate - don't modify existing training dashboard.
+
+### Data Flow (Athlete-First)
+
+```
+Garmin Webhook → /api/garmin/activity
+  ↓
+GarminFieldMapper.mapActivitySummary()
+  ↓
+AthleteActivity.upsert({ athleteId, sourceActivityId, ... })
+  ↓
+Stored in athlete_activities table (linked via athleteId)
+  ↓
+Frontend: GET /api/athlete/:athleteId/activities
+  ↓
+Display in AthleteWeekStats.jsx (general) or Training dashboard (training)
+```
+
+### AthleteActivity Model (Schema)
+
+**Location**: `prisma/schema.prisma`
+
+**Key Fields**:
+- `athleteId`: Foreign key to `Athlete` (athlete-first link)
+- `sourceActivityId`: Garmin's unique activity ID (join key)
+- `source`: "garmin" or "strava"
+- Core metrics: `activityType`, `activityName`, `startTime`, `duration`, `distance`, `averageSpeed`, `calories`
+- Performance: `averageHeartRate`, `maxHeartRate`, `elevationGain`, `steps`
+- Location: `startLatitude`, `startLongitude`, `summaryPolyline`
+- Hybrid storage: `summaryData` (JSON), `detailData` (JSON)
+
+**Relations**:
+- `athlete`: Many-to-one → `Athlete` (cascade delete)
+
+### API Routes
+
+**Location**: `routes/Athlete/athleteActivitiesRoute.js`
+
+**Endpoints**:
+- `GET /api/athlete/activities` - Fetch ALL activities (all athletes)
+- `GET /api/athlete/:athleteId/activities` - Fetch activities by specific athleteId
+
+**Query Params**:
+- `limit` (default: 100)
+- `offset` (default: 0)
+- `sortBy` (default: 'startTime')
+- `sortOrder` (default: 'desc')
+
+**Response Format**:
+```javascript
+{
+  success: true,
+  athleteId: "athlete123",
+  activities: [
+    {
+      id: "activity123",
+      athleteId: "athlete123",
+      sourceActivityId: "garmin_activity_456",
+      source: "garmin",
+      activityType: "running",
+      activityName: "Morning Run",
+      startTime: "2025-01-15T06:30:00Z",
+      duration: 3600,
+      distance: 5000,
+      averageSpeed: 3.5,
+      calories: 450,
+      averageHeartRate: 165,
+      // ... other fields
+    }
+  ],
+  count: 10,
+  totalCount: 25
+}
+```
+
+### Garmin Integration
+
+**Webhook Handlers**: 
+- `routes/Garmin/garminActivityRoute.js` - Activity summary webhooks
+- `routes/Garmin/garminActivityDetailsRoute.js` - Activity details webhook
+- `routes/Garmin/garminPermissionsRoute.js` - Permission & status routes
+- `routes/Garmin/garminDeregistrationRoute.js` - Deregistration webhook
+
+**Webhook Flow**:
+1. Garmin sends webhook to `POST /api/garmin/activity`
+2. Webhook contains `{ activities: [...] }` array
+3. Each activity has `userId` (Garmin user ID) and `activityId`
+4. Backend finds athlete by `garmin_user_id` using `findAthleteByGarminUserId()`
+5. Maps Garmin fields to `AthleteActivity` using `GarminFieldMapper`
+6. Upserts to `athlete_activities` table with `athleteId` link
+
+**Details Webhook Flow**:
+1. Garmin sends webhook to `POST /api/garmin/activity-details`
+2. Contains detailed activity data (laps, splits, HR zones, etc.)
+3. Finds existing activity by `summaryId` (matches `sourceActivityId`)
+4. Updates activity's `detailData` JSON field
+
+**Field Mapping**: `services/GarminFieldMapper.js`
+- Maps Garmin API fields to our `AthleteActivity` model
+- Handles field name variations
+- Validates activity data
+- Calculates derived fields (pace from speed)
+
+**Garmin Routes** (Complete List):
+- OAuth: `/api/garmin/auth-url`, `/api/garmin/callback`, `/api/garmin/user`
+- Status: `/api/garmin/status`, `/api/garmin/scopes`, `/api/garmin/disconnect`
+- Webhooks: `/api/garmin/activity`, `/api/garmin/activities`, `/api/garmin/activity-details`, `/api/garmin/permissions`, `/api/garmin/deregistration`
+- Manual Sync: `/api/garmin/activities` (GET - TODO), `/api/garmin/activity/sync` (POST - TODO)
+
+### Frontend Display (To Be Built)
+
+**General Activity Tracking**:
+- Component: `AthleteWeekStats.jsx` (MVP1)
+- Route: `/activities` or `/my-runs`
+- Data Source: `GET /api/athlete/:athleteId/activities`
+- Display: Week overview, runs scroller, auto-hydrated from Garmin
+
+**Training Activity Tracking**:
+- Component: Training dashboard (existing, don't modify)
+- Route: `/training` (existing)
+- Data Source: Same `AthleteActivity` table, filtered by training context
+- Display: Matched to training plans, adherence metrics
+
+**Demo Reference**: `gofastfrontend-demo/src/Pages/Training/SeeActivities.jsx`
+- Shows UI pattern for activity display
+- Fields: distance, pace, duration, HR, calories, elevation
+- Has "Match to Training" button (training fork)
+- Has "Reflect on this run" button
+
+### Implementation Status
+
+**Backend**: ✅ Complete
+- ✅ `AthleteActivity` model in schema
+- ✅ Garmin webhook handler (`/api/garmin/activity`)
+- ✅ Activity fetch routes (`/api/athlete/:athleteId/activities`)
+- ✅ Field mapper service (`GarminFieldMapper`)
+- ✅ Athlete lookup service (`findAthleteByGarminUserId`)
+
+**Frontend**: 🚧 To Be Built
+- 🚧 `AthleteWeekStats.jsx` component (general activity tracking)
+- 🚧 Activity display page (`/activities` or `/my-runs`)
+- 🚧 Connect to `/api/athlete/:athleteId/activities`
+- 🚧 Week overview stats (total miles, best split)
+- 🚧 Runs scroller (auto-hydrated from Garmin)
+
+**Integration**: ✅ Ready
+- ✅ Garmin OAuth connected
+- ✅ Webhook receiving activities
+- ✅ Activities stored in database
+- ✅ API routes ready to serve data
+
+---
+
 ## Identity Architecture
 
 **Location**: `gofast-user-dashboard/IDENTITY_ARCHITECTURE.md`
@@ -456,7 +653,7 @@ Founder/Company
 - Crew dashboard with member management
 - Leaderboards (miles, pace, calories)
 - Crew sharing and invites
-- Activity tracking (Garmin integration)
+- Activity tracking (Garmin integration) - See Activity Tracking Architecture below
 
 **Implementation Strategy**:
 1. Copy proven demo structure
