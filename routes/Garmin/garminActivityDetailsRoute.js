@@ -33,28 +33,41 @@ router.post("/activity-details", async (req, res) => {
     // Process each activity detail
     for (const activityDetail of activityDetails) {
       try {
-        // Extract activityId (this should match sourceActivityId from summary webhook)
-        // Note: summaryId has "-detail" suffix, so use activityId instead
-        const activityId = activityDetail.activityId || activityDetail.summaryId?.replace('-detail', '') || activityDetail.summary?.activityId;
+        // Log all key IDs for debugging
+        console.log(`📊 ID EXTRACTION - All available IDs:`);
+        console.log(`   - userId: ${activityDetail.userId}`);
+        console.log(`   - summaryId: ${activityDetail.summaryId}`);
+        console.log(`   - activityId (top-level): ${activityDetail.activityId}`);
+        console.log(`   - summary.activityId: ${activityDetail.summary?.activityId}`);
         
-        console.log(`🔍 Processing activity detail - activityId: ${activityId}, summaryId: ${activityDetail.summaryId}`);
+        // ChatGPT analysis: summary.activityId is the TRUE Garmin activity ID that matches summary webhook
+        // Priority: summary.activityId > activityId > summaryId (without suffix)
+        const realActivityId = activityDetail.summary?.activityId || activityDetail.activityId || activityDetail.summaryId?.replace('-detail', '');
+        
+        console.log(`🔍 Selected realActivityId: ${realActivityId} (matches sourceActivityId from summary webhook)`);
         console.log(`📊 Activity detail keys:`, Object.keys(activityDetail));
         
-        if (!activityId) {
+        if (!realActivityId) {
           console.error('❌ No activityId found in activity detail');
           console.error('📊 Activity detail:', JSON.stringify(activityDetail, null, 2).substring(0, 500));
           continue;
         }
         
-        // Use service to update activity detail (pass the activityId, not summaryId)
-        const updated = await updateActivityDetail(activityId.toString(), activityDetail);
+        // Verify: We should NOT match on detail.activityId alone if summary.activityId exists
+        if (activityDetail.summary?.activityId && activityDetail.activityId && activityDetail.summary.activityId !== activityDetail.activityId) {
+          console.warn(`⚠️ ID MISMATCH: summary.activityId (${activityDetail.summary.activityId}) != activityId (${activityDetail.activityId})`);
+          console.warn(`⚠️ Using summary.activityId (${activityDetail.summary.activityId}) as the true match`);
+        }
+        
+        // Use service to update activity detail (pass the realActivityId)
+        const updated = await updateActivityDetail(realActivityId.toString(), activityDetail);
         
         if (!updated) {
-          console.error(`❌ Failed to update activity detail for activityId ${activityId}`);
+          console.error(`❌ Failed to update activity detail for realActivityId ${realActivityId}`);
           continue;
         }
         
-        console.log(`✅ Activity detail updated successfully for activityId ${activityId}`);
+        console.log(`✅ Activity detail updated successfully for realActivityId ${realActivityId}`);
         
       } catch (detailError) {
         console.error('❌ Error processing individual activity detail:', detailError);

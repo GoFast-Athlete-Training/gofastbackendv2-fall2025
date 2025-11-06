@@ -25,6 +25,14 @@ export async function updateActivityDetail(activityId, garminDetailPayload) {
     console.log(`💡 This activityId should match the sourceActivityId saved from summary webhook`);
     console.log(`💡 Note: Garmin's summaryId has "-detail" suffix, but we use activityId (number) to match`);
     
+    // DEBUG: Show recent sourceActivityIds to help verify matching
+    const recentSourceIds = await prisma.athleteActivity.findMany({
+      take: 5,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, sourceActivityId: true, activityName: true, createdAt: true }
+    });
+    console.log(`📊 Recent sourceActivityIds in DB:`, recentSourceIds.map(a => ({ sourceActivityId: a.sourceActivityId, name: a.activityName })));
+    
     // Find the matching activity record using activityId (sourceActivityId is unique)
     const activity = await prisma.athleteActivity.findUnique({
       where: { sourceActivityId: activityId.toString() },
