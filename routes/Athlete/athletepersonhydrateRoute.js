@@ -146,7 +146,7 @@ async function hydrateAthlete(req, res) {
                 },
                 _count: {
                   select: {
-                    posts: true,
+                    messages: true,
                     leaderboardEntries: true
                   }
                 }
@@ -213,7 +213,7 @@ async function hydrateAthlete(req, res) {
                   },
                   _count: {
                     select: {
-                      posts: true,
+                      messages: true,
                       leaderboardEntries: true
                     }
                   }
@@ -259,7 +259,7 @@ async function hydrateAthlete(req, res) {
         memberCount: membership.runCrew.memberships?.length || 0,
         isAdmin: membership.runCrew.runcrewAdminId === athleteId, // ATHLETE-FIRST: Use athleteId
         joinedAt: membership.joinedAt,
-        postCount: membership.runCrew._count?.posts || 0,
+        messageCount: membership.runCrew._count?.messages || 0,
         leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0
       };
     }).filter(Boolean); // Remove null entries

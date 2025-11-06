@@ -39,18 +39,30 @@ export const saveGarminTokens = async (athleteId, tokens) => {
     if (userInfoResult.success) {
       const garminUserId = userInfoResult.userData.userId;
       
+      console.log(`🔍 Fetched Garmin user info - userId: ${garminUserId}`);
+      console.log(`📊 Full userData keys:`, Object.keys(userInfoResult.userData));
+      
       if (garminUserId) {
         // Update with Garmin user ID
-        await prisma.athlete.update({
+        const updated = await prisma.athlete.update({
           where: { id: athleteId },
           data: {
             garmin_user_id: garminUserId,
             garmin_user_profile: userInfoResult.userData,
             garmin_last_sync_at: new Date()
+          },
+          select: {
+            id: true,
+            garmin_user_id: true,
+            email: true
           }
         });
         
-        console.log(`✅ Garmin user ID saved: ${garminUserId}`);
+        console.log(`✅ Garmin user ID saved successfully!`);
+        console.log(`✅ Verification - athleteId: ${updated.id}, garmin_user_id: ${updated.garmin_user_id}, email: ${updated.email}`);
+      } else {
+        console.warn(`⚠️ No userId found in userData response`);
+        console.warn(`📊 userData:`, JSON.stringify(userInfoResult.userData, null, 2));
       }
     } else {
       console.log(`⚠️ Could not fetch user info: ${userInfoResult.error}`);
@@ -63,20 +75,30 @@ export const saveGarminTokens = async (athleteId, tokens) => {
         
         const profileData = await fetchGarminProfile(tokens.access_token);
         
-        // Update with profile data
-        await prisma.athlete.update({
-          where: { id: athleteId },
-          data: {
-            garmin_user_id: profileData.userId,
-            garmin_last_sync_at: new Date()
-          }
-        });
+        console.log(`🔍 Fetched Garmin profile - userId: ${profileData.userId}`);
+        console.log(`📊 Profile data keys:`, Object.keys(profileData));
         
-        console.log(`✅ Profile data saved for athleteId: ${athleteId}`, {
-          userId: profileData.userId,
-          displayName: profileData.displayName,
-          profileId: profileData.profileId
-        });
+        if (profileData.userId) {
+          // Update with profile data
+          const updated = await prisma.athlete.update({
+            where: { id: athleteId },
+            data: {
+              garmin_user_id: profileData.userId,
+              garmin_last_sync_at: new Date()
+            },
+            select: {
+              id: true,
+              garmin_user_id: true,
+              email: true
+            }
+          });
+          
+          console.log(`✅ Profile data saved for athleteId: ${athleteId}`);
+          console.log(`✅ Verification - athleteId: ${updated.id}, garmin_user_id: ${updated.garmin_user_id}, email: ${updated.email}`);
+        } else {
+          console.warn(`⚠️ No userId found in profileData`);
+          console.warn(`📊 profileData:`, JSON.stringify(profileData, null, 2));
+        }
         
       } catch (profileError) {
         console.log(`⚠️ Could not fetch profile data: ${profileError.message}`);

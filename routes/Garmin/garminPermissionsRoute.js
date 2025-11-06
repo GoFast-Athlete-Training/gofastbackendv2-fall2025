@@ -196,7 +196,20 @@ router.post("/disconnect", async (req, res) => {
     
     // Step 2: Clear ALL Garmin data from database (LOCAL DISCONNECT)
     // This includes garmin_user_id which means webhooks won't match any athlete
-    await prisma.athlete.update({
+    const beforeDisconnect = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_is_connected: true,
+        garmin_access_token: true
+      }
+    });
+    
+    console.log(`🔍 BEFORE DISCONNECT - athleteId: ${beforeDisconnect?.id}, garmin_user_id: ${beforeDisconnect?.garmin_user_id}, connected: ${beforeDisconnect?.garmin_is_connected}`);
+    
+    const updated = await prisma.athlete.update({
       where: { id: athleteId },
       data: {
         garmin_user_id: null,              // ⚠️ This prevents webhook matching
@@ -212,10 +225,56 @@ router.post("/disconnect", async (req, res) => {
         garmin_user_sleep: null,            // Clear sleep data
         garmin_user_preferences: null,      // Clear preferences
         garmin_disconnected_at: new Date()
+      },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_is_connected: true,
+        garmin_access_token: true,
+        garmin_refresh_token: true
       }
     });
     
-    console.log('✅ Garmin disconnected and deregistered for athlete:', athleteId);
+    // Step 3: VERIFY all Garmin data was cleared
+    const verification = await prisma.athlete.findUnique({
+      where: { id: athleteId },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_is_connected: true,
+        garmin_access_token: true,
+        garmin_refresh_token: true,
+        garmin_scope: true,
+        garmin_user_profile: true
+      }
+    });
+    
+    const allCleared = !verification.garmin_user_id && 
+                      !verification.garmin_access_token && 
+                      !verification.garmin_refresh_token &&
+                      verification.garmin_is_connected === false;
+    
+    if (allCleared) {
+      console.log('✅ Garmin disconnected and deregistered for athlete:', athleteId);
+      console.log('✅ VERIFICATION PASSED - All Garmin data cleared:', {
+        athleteId: verification.id,
+        email: verification.email,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token
+      });
+    } else {
+      console.error('❌ VERIFICATION FAILED - Garmin data still present after disconnect!', {
+        athleteId: verification.id,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token
+      });
+    }
     
     res.json({
       success: true,

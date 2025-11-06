@@ -38,6 +38,8 @@ router.put("/deregistration", async (req, res) => {
     
     // 4️⃣ Wipe ALL Garmin data and set disconnected status
     // NOTE: We clear garmin_user_id to prevent webhook matching
+    console.log(`🔍 BEFORE DEREGISTRATION - athleteId: ${athlete.id}, garmin_user_id: ${athlete.garmin_user_id}`);
+    
     const result = await prisma.athlete.updateMany({
       where: { garmin_user_id: userId },
       data: {
@@ -55,8 +57,47 @@ router.put("/deregistration", async (req, res) => {
       }
     });
     
-    // 5️⃣ Log success as required
-    console.log(`✅ Garmin tokens wiped for athlete ${athlete.id} (userId: ${userId})`);
+    // 5️⃣ VERIFY all Garmin data was cleared
+    const verification = await prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_is_connected: true,
+        garmin_access_token: true,
+        garmin_refresh_token: true,
+        garmin_scope: true,
+        garmin_user_profile: true
+      }
+    });
+    
+    const allCleared = !verification.garmin_user_id && 
+                      !verification.garmin_access_token && 
+                      !verification.garmin_refresh_token &&
+                      verification.garmin_is_connected === false;
+    
+    if (allCleared) {
+      console.log(`✅ Garmin tokens wiped for athlete ${athlete.id} (userId: ${userId})`);
+      console.log(`✅ VERIFICATION PASSED - All Garmin data cleared:`, {
+        athleteId: verification.id,
+        email: verification.email,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token,
+        recordsUpdated: result.count
+      });
+    } else {
+      console.error(`❌ VERIFICATION FAILED - Garmin data still present after deregistration!`, {
+        athleteId: verification.id,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token,
+        recordsUpdated: result.count
+      });
+    }
     
   } catch (error) {
     // 6️⃣ Catch any errors, log them, and ensure Garmin always receives a 200 response
@@ -92,6 +133,8 @@ router.post("/deregistration", async (req, res) => {
     
     // 4️⃣ Wipe ALL Garmin data and set disconnected status
     // NOTE: We clear garmin_user_id to prevent webhook matching
+    console.log(`🔍 BEFORE DEREGISTRATION - athleteId: ${athlete.id}, garmin_user_id: ${athlete.garmin_user_id}`);
+    
     const result = await prisma.athlete.updateMany({
       where: { garmin_user_id: userId },
       data: {
@@ -109,8 +152,47 @@ router.post("/deregistration", async (req, res) => {
       }
     });
     
-    // 5️⃣ Log success as required
-    console.log(`✅ Garmin tokens wiped for athlete ${athlete.id} (userId: ${userId})`);
+    // 5️⃣ VERIFY all Garmin data was cleared
+    const verification = await prisma.athlete.findUnique({
+      where: { id: athlete.id },
+      select: {
+        id: true,
+        email: true,
+        garmin_user_id: true,
+        garmin_is_connected: true,
+        garmin_access_token: true,
+        garmin_refresh_token: true,
+        garmin_scope: true,
+        garmin_user_profile: true
+      }
+    });
+    
+    const allCleared = !verification.garmin_user_id && 
+                      !verification.garmin_access_token && 
+                      !verification.garmin_refresh_token &&
+                      verification.garmin_is_connected === false;
+    
+    if (allCleared) {
+      console.log(`✅ Garmin tokens wiped for athlete ${athlete.id} (userId: ${userId})`);
+      console.log(`✅ VERIFICATION PASSED - All Garmin data cleared:`, {
+        athleteId: verification.id,
+        email: verification.email,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token,
+        recordsUpdated: result.count
+      });
+    } else {
+      console.error(`❌ VERIFICATION FAILED - Garmin data still present after deregistration!`, {
+        athleteId: verification.id,
+        garmin_user_id: verification.garmin_user_id,
+        garmin_is_connected: verification.garmin_is_connected,
+        has_token: !!verification.garmin_access_token,
+        has_refresh: !!verification.garmin_refresh_token,
+        recordsUpdated: result.count
+      });
+    }
     
   } catch (error) {
     // 6️⃣ Catch any errors, log them, and ensure Garmin always receives a 200 response

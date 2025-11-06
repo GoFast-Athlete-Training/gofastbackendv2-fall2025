@@ -80,9 +80,14 @@ model Athlete {
   // RunCrew Relations
   adminRunCrews       RunCrew[]            @relation("RunCrewAdmin") // Crews this athlete created/admin
   runCrewMemberships  RunCrewMembership[]  @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
-  runCrewPosts        RunCrewPost[] // Posts authored by this athlete
-  runCrewPostComments RunCrewPostComment[] // Comments authored by this athlete
+  runCrewMessages       RunCrewMessage[] @relation // Messages authored by this athlete
+  runCrewAnnouncements  RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
   runCrewLeaderboards RunCrewLeaderboard[] // Leaderboard entries for this athlete
+  runCrewRuns         RunCrewRun[] @relation("RunCrewRunCreator") // Runs created by this athlete
+  runCrewRunRSVPs     RunCrewRunRSVP[] @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
+  runCrewEvents       RunCrewEvent[] @relation("RunCrewEventOrganizer") // Events organized by this athlete
+  runCrewEventRSVPs   RunCrewEventRSVP[] @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
+  runCrewManagers     RunCrewManager[] @relation("RunCrewManager") // RunCrews this athlete manages (future)
 
   // Training Relations
   createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
@@ -166,10 +171,14 @@ model RunCrew {
   updatedAt DateTime @updatedAt
 
   // Relations
-  admin       Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
-  memberships        RunCrewMembership[] // Junction table for members
-  posts              RunCrewPost[] // Forum posts/banter
-  leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats
+  admin         Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  memberships   RunCrewMembership[]   // Junction table for members
+  messages      RunCrewMessage[]      // Simple chat messages (real-time via socket)
+  announcements RunCrewAnnouncement[] // Admin announcements
+  leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats (calculated cache)
+  runs          RunCrewRun[]          // Runs (MVP1: admin only)
+  events        RunCrewEvent[]        // General events (future - happy hour, social, etc.)
+  managers      RunCrewManager[]      // Delegated managers (future)
 
   @@map("run_crews")
 }
@@ -192,47 +201,40 @@ model RunCrewMembership {
   @@map("run_crew_memberships")
 }
 
-// RunCrew Forum/Posts - For banter and messaging
-model RunCrewPost {
+// RunCrew Messages - Simple chat box (real-time via socket)
+model RunCrewMessage {
   id        String @id @default(cuid())
   runCrewId String
-  athleteId String // Post author
+  athleteId String // Message author
 
-  // Content
-  content  String // Post text/content
-  imageUrl String? // Optional image attachment
+  content   String // Message text (just content, no images/likes)
 
-  // Engagement
-  likes Int @default(0) // Like count
-
-  // Timestamps
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
   // Relations
-  runCrew  RunCrew              @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete  Athlete              @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  comments RunCrewPostComment[] // Post comments/replies
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
-  @@map("run_crew_posts")
+  @@map("run_crew_messages")
 }
 
-// Post comments/replies
-model RunCrewPostComment {
-  id        String @id @default(cuid())
-  postId    String
-  athleteId String // Comment author
-  content   String // Comment text
+// RunCrew Announcements - Admin announcements
+model RunCrewAnnouncement {
+  id        String   @id @default(cuid())
+  runCrewId String
+  authorId  String   // Admin who created it
 
-  // Timestamps
+  title     String
+  content   String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  post    RunCrewPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  athlete Athlete     @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  author  Athlete @relation("RunCrewAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
-  @@map("run_crew_post_comments")
+  @@map("run_crew_announcements")
 }
 
 // RunCrew Leaderboard - Aggregated stats for competition
@@ -264,6 +266,115 @@ model RunCrewLeaderboard {
 
   @@unique([runCrewId, athleteId, period, periodStart]) // Prevent duplicate entries for same period
   @@map("run_crew_leaderboards")
+}
+
+// RunCrew Runs - MVP1 (Specific to runs, not general events)
+model RunCrewRun {
+  id           String   @id @default(cuid())
+  runCrewId    String
+  createdById  String   // Admin or manager who created the run (MVP1: admin only)
+  
+  title        String
+  date         DateTime
+  startTime    String   // "6:00 AM"
+  location     String
+  address      String?
+  
+  // Run-specific fields
+  totalMiles   Float?   // Total miles for the run
+  pace         String?  // Target pace (e.g., "8:00-9:00 min/mile")
+  stravaMapUrl String?  // Strava map URL for route visualization
+  
+  description  String?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy    Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rsvps        RunCrewRunRSVP[]
+  
+  @@map("run_crew_runs")
+}
+
+// RunCrew Run RSVP - MVP1
+model RunCrewRunRSVP {
+  id        String   @id @default(cuid())
+  runId     String
+  athleteId String   // RSVP tied to athleteId
+  
+  status    String   // "going", "maybe", "not-going"
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  run       RunCrewRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  athlete   Athlete    @relation("RunCrewRunRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([runId, athleteId]) // One RSVP per athlete per run
+  @@map("run_crew_run_rsvps")
+}
+
+// RunCrew Events - Future (General events like happy hour, social, etc.)
+// Note: Separate from runs - events are for non-run activities
+model RunCrewEvent {
+  id           String   @id @default(cuid())
+  runCrewId    String
+  organizerId  String   // Athlete ID who created the event
+  
+  title        String
+  date         DateTime
+  time         String   // "6:00 PM"
+  location     String
+  address      String?
+  description  String?
+  eventType    String?  // "happy-hour", "social", "meetup", etc.
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  // Relations
+  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  organizer    Athlete  @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
+  rsvps        RunCrewEventRSVP[]
+  
+  @@map("run_crew_events")
+}
+
+// RunCrew Event RSVP - Future
+model RunCrewEventRSVP {
+  id        String   @id @default(cuid())
+  eventId   String
+  athleteId String   // RSVP tied to athleteId
+  
+  status    String   // "going", "maybe", "not-going"
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  event      RunCrewEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  athlete    Athlete      @relation("RunCrewEventRSVP", fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([eventId, athleteId]) // One RSVP per athlete per event
+  @@map("run_crew_event_rsvps")
+}
+
+// RunCrew Managers - Future (Delegated managers)
+model RunCrewManager {
+  id        String @id @default(cuid())
+  runCrewId String
+  athleteId String
+  role      String // "admin" or "manager"
+  
+  createdAt DateTime @default(now())
+  
+  // Relations
+  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  athlete Athlete @relation("RunCrewManager", fields: [athleteId], references: [id], onDelete: Cascade)
+  
+  @@unique([runCrewId, athleteId])
+  @@map("run_crew_managers")
 }
 
 // =====================================================

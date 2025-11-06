@@ -65,7 +65,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
             },
             _count: {
               select: {
-                posts: true,
+                messages: true,
                 leaderboardEntries: true
               }
             }
@@ -83,7 +83,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
       memberCount: membership.runCrew.memberships.length,
       isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
       joinedAt: membership.joinedAt,
-      postCount: membership.runCrew._count.posts,
+      messageCount: membership.runCrew._count.messages,
       leaderboardCount: membership.runCrew._count.leaderboardEntries
     }));
     
@@ -171,7 +171,7 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
             joinedAt: 'desc'
           }
         },
-        posts: {
+        messages: {
           include: {
             athlete: {
               select: {
@@ -180,27 +180,27 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
                 lastName: true,
                 photoURL: true
               }
-            },
-            comments: {
-              include: {
-                athlete: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    photoURL: true
-                  }
-                }
-              },
-              orderBy: {
-                createdAt: 'asc'
-              }
             }
           },
           orderBy: {
             createdAt: 'desc'
           },
-          take: 20 // Limit to most recent 20 posts
+          take: 20 // Limit to most recent 20 messages
+        },
+        announcements: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoURL: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
         },
         leaderboardEntries: {
           include: {
@@ -217,6 +217,33 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
             { period: 'asc' },
             { totalMiles: 'desc' }
           ]
+        },
+        runs: {
+          include: {
+            createdBy: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoURL: true
+              }
+            },
+            rsvps: {
+              include: {
+                athlete: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    photoURL: true
+                  }
+                }
+              }
+            }
+          },
+          orderBy: {
+            date: 'asc' // Upcoming runs first
+          }
         }
       }
     });

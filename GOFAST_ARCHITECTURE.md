@@ -374,7 +374,7 @@ const membership = await tx.runCrewMembership.upsert({
 
 ## Activity Tracking Architecture (Athlete-First)
 
-**Documentation**: See `gofastfrontend-demo/docs/GoFast Athlete Activity UX.md` for complete activity tracking architecture.
+**Documentation**: See `gofastfrontend-demo/docs/GoFast AthleteActivity-Architecture.md` for complete activity tracking architecture.
 
 **Core Principle**: **Athlete-First** - All activities link to `Athlete` via `athleteId`. Activities are stored in `AthleteActivity` model.
 
@@ -391,7 +391,7 @@ const membership = await tx.runCrewMembership.upsert({
 - **`/activity`** = Creates the activity record in `athlete_activities` table (summary data) - sent immediately after activity
 - **`/activity-details`** = Enriches the activity (updates `detailData` JSON field) - sent later with deep metrics
 
-**For complete details**: See `gofastfrontend-demo/docs/GoFast Athlete Activity UX.md`
+**For complete details**: See `gofastfrontend-demo/docs/GoFast AthleteActivity-Architecture.md`
 
 ---
 
@@ -1176,7 +1176,7 @@ npm run dev
 - **`docs/GoFastDevOverview.md`** - Complete development guide and stack overview
 - **`docs/RunCrewArchitecture.md`** - Complete RunCrew implementation details
 - **`docs/TrainingArchitecture.md`** - Training plans architecture
-- **`gofastfrontend-demo/docs/GoFast Athlete Activity UX.md`** - Complete activity tracking architecture (Garmin/Strava integration, use cases, data flow, API routes)
+- **`gofastfrontend-demo/docs/GoFast AthleteActivity-Architecture.md`** - Complete activity tracking architecture (Garmin/Strava integration, use cases, data flow, API routes)
 - **`gofastfrontend-mvp1/profile_ux_architecture.md`** - Profile setup UX architecture, completion flow, reminder system, and profile picture upload strategy
 
 ---

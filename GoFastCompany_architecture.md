@@ -814,37 +814,312 @@ POST   /api/company/invite/accept                        // Accept invitation (c
 
 ## Authentication & Authorization
 
-### Firebase Token Verification
+### Firebase Authentication Standard
 
-**Middleware**: `middleware/firebaseMiddleware.js`
+**Following**: `FIREBASE-AUTH-AND-USER-MANAGEMENT.md` patterns
 
-**Pattern**:
+**Key Principle**: Firebase establishes universal identity (UID) that connects Owner across all systems. One Firebase UID = One Owner = One Database Entity Record.
+
+### Frontend Firebase Config
+
+**Location**: `gofastcompanyoutlook/src/config/firebaseConfig.js`
+
+**Firebase Project**: `gofast-a5f94` (GoFast Firebase project)
+
+**Exports**:
+- `auth` - Firebase Auth instance
+- `signInWithGoogle()` - Google OAuth sign-in
+- `signOutUser()` - Sign out current user
+- `getCurrentUser()` - Get current authenticated user
+- `signUpWithEmail()` - Email/password sign-up
+- `signInWithEmail()` - Email/password sign-in
+- `getIdToken()` - Get Firebase ID token for authenticated requests
+
+**Usage**:
 ```javascript
-import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { signInWithGoogle, getIdToken } from '../config/firebaseConfig.js';
 
-router.post('/create', verifyFirebaseToken, async (req, res) => {
-  const firebaseId = req.user?.uid; // From verified token
-  // Verify owner matches Firebase user
+// Sign in
+const firebaseUser = await signInWithGoogle();
+// firebaseUser = { uid, email, name, photoURL }
+
+// Get token for API calls
+const idToken = await getIdToken();
+```
+
+### Backend Firebase Middleware
+
+**Location**: `middleware/firebaseMiddleware.js`
+
+**Environment Variable**: `GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY`
+- **Note**: Different from GoFast app Firebase service key
+- **Naming**: `GOFAST_COMPANY_` prefix to distinguish from athlete app Firebase
+- **Purpose**: Company Outlook uses separate Firebase project/service account
+
+**Implementation**:
+```javascript
+import admin from 'firebase-admin';
+
+let firebaseAdmin = null;
+
+const initializeFirebase = () => {
+  if (!firebaseAdmin) {
+    try {
+      // GoFast Company Firebase service account (different from athlete app)
+      const serviceAccount = process.env.GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY;
+      
+      if (!serviceAccount) {
+        console.error('❌ FIREBASE: GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY not set in Render');
+        throw new Error('Firebase service account not configured');
+      }
+
+      const serviceAccountKey = JSON.parse(serviceAccount);
+      
+      firebaseAdmin = admin.initializeApp({
+        credential: admin.credential.cert(serviceAccountKey),
+        projectId: serviceAccountKey.project_id
+      }, 'gofast-company'); // Named app instance to avoid conflicts
+      
+      console.log('✅ FIREBASE: GoFast Company Admin SDK initialized');
+    } catch (error) {
+      console.error('❌ FIREBASE: Failed to initialize:', error.message);
+      throw error;
+    }
+  }
+  return firebaseAdmin;
+};
+
+export const verifyFirebaseToken = async (req, res, next) => {
+  try {
+    const admin = initializeFirebase();
+    
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        error: 'No authorization token provided'
+      });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    
+    // Add user info to request object
+    req.user = {
+      uid: decodedToken.uid,
+      firebaseId: decodedToken.uid,
+      email: decodedToken.email,
+      name: decodedToken.name,
+      picture: decodedToken.picture,
+      emailVerified: decodedToken.email_verified
+    };
+    
+    next();
+  } catch (error) {
+    console.error('❌ FIREBASE: Token verification failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      error: 'Invalid or expired token'
+    });
+  }
+};
+```
+
+### Route Patterns (Following FIREBASE-AUTH-AND-USER-MANAGEMENT.md)
+
+#### Pattern A: OwnerCreateRoute (Universal Personhood)
+
+**File**: `routes/Owner/ownerCreateRoute.js`  
+**Endpoint**: `POST /api/owner/create`  
+**Auth**: NO middleware required (happens before protected routes)
+
+**Purpose**: Find or create Owner by Firebase ID. This happens AFTER Firebase authentication - it's entity creation/management, NOT authentication.
+
+**Implementation**:
+```javascript
+router.post('/create', async (req, res) => {
+  try {
+    const { firebaseId, email, firstName, lastName, photoURL } = req.body;
+    
+    if (!firebaseId || !email) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'firebaseId and email are required' 
+      });
+    }
+    
+    // Find existing owner by firebaseId
+    let owner = await prisma.owner.findUnique({
+      where: { firebaseId }
+    });
+    
+    if (owner) {
+      return res.json({ success: true, owner });
+    }
+    
+    // Create new owner
+    owner = await prisma.owner.create({
+      data: {
+        firebaseId,
+        email,
+        name: firstName && lastName ? `${firstName} ${lastName}` : firstName || email?.split('@')[0],
+        photoURL: photoURL || null
+      }
+    });
+    
+    return res.status(201).json({ success: true, owner });
+  } catch (error) {
+    console.error('❌ OwnerCreate error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 ```
 
-**Flow**:
-1. Frontend sends Firebase token in `Authorization` header
-2. Middleware verifies token with Firebase Admin SDK
-3. Extracts `firebaseId` and attaches to `req.user`
-4. Route handler verifies `ownerId` matches `firebaseId`
+#### Pattern B: OwnerHydrateRoute (Hydration)
 
-**For User-Facing Routes**:
+**File**: `routes/Owner/ownerHydrateRoute.js`  
+**Endpoint**: `GET /api/owner/hydrate`  
+**Auth**: `verifyFirebaseToken` middleware required
+
+**Purpose**: Find Owner's full account/profile by Firebase ID from verified token. This is the "hydration" route that loads complete Owner data.
+
+**Implementation**:
 ```javascript
-import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
-
-router.get('/protected-route', verifyFirebaseToken, async (req, res) => {
-  const firebaseId = req.user?.uid; // Extracted by middleware
-  // Use firebaseId to find owner
+router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
+  try {
+    const firebaseId = req.user?.uid; // From verified token
+    
+    if (!firebaseId) {
+      return res.status(401).json({
+        success: false,
+        error: 'Firebase authentication required'
+      });
+    }
+    
+    const owner = await prisma.owner.findUnique({
+      where: { firebaseId },
+      include: {
+        ownedCompanies: {
+          include: {
+            employees: true,
+            crmContacts: true,
+            financialSpends: true,
+            roadmapItems: true,
+            tasks: true
+          }
+        },
+        managedCompanies: true
+      }
+    });
+    
+    if (!owner) {
+      return res.status(404).json({
+        success: false,
+        error: 'Owner not found'
+      });
+    }
+    
+    res.json({
+      success: true,
+      owner,
+      companies: owner.ownedCompanies,
+      managedCompanies: owner.managedCompanies
+    });
+  } catch (error) {
+    console.error('❌ OwnerHydrate error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 ```
 
-**Key Point**: **Separate from Athlete auth** - Owner uses Firebase, Athlete uses separate auth system
+#### Pattern C: Protected Entity Creation (Child Entities)
+
+**File**: `routes/Company/companyCreateRoute.js`  
+**Endpoint**: `POST /api/company/create`  
+**Auth**: `verifyFirebaseToken` middleware required
+
+**Purpose**: Create child entities (CompanyHQ, Contact, etc.) that belong to an authenticated Owner.
+
+**Key Difference**: Pattern A creates universal personhood (Owner) - NO middleware. Pattern C creates child entities - REQUIRES middleware.
+
+### Complete Authentication Flow
+
+1. **User Signs In (Frontend)**
+   ```javascript
+   import { signInWithGoogle } from '../config/firebaseConfig.js';
+   const firebaseUser = await signInWithGoogle();
+   ```
+
+2. **Create/Find Owner in Database (Pattern A)**
+   ```javascript
+   const response = await fetch('/api/owner/create', {
+     method: 'POST',
+     headers: { 'Content-Type': 'application/json' },
+     body: JSON.stringify({
+       firebaseId: firebaseUser.uid,
+       email: firebaseUser.email,
+       firstName: firebaseUser.displayName?.split(' ')[0],
+       lastName: firebaseUser.displayName?.split(' ')[1],
+       photoURL: firebaseUser.photoURL
+     })
+   });
+   const { owner } = await response.json();
+   ```
+
+3. **Hydrate Owner Data (Pattern B)**
+   ```javascript
+   const idToken = await getIdToken();
+   const response = await fetch('/api/owner/hydrate', {
+     method: 'GET',
+     headers: { 'Authorization': `Bearer ${idToken}` }
+   });
+   const { owner } = await response.json();
+   ```
+
+4. **Create Child Entities (Pattern C)**
+   ```javascript
+   const idToken = await getIdToken();
+   const response = await fetch('/api/company/create', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'Authorization': `Bearer ${idToken}`
+     },
+     body: JSON.stringify({
+       companyName: 'My Company',
+       ownerId: owner.id,
+       // ... other fields
+     })
+   });
+   ```
+
+### Environment Variables
+
+**Backend (Render)**:
+```env
+# GoFast Company Firebase Service Account (different from athlete app)
+GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY="{\"type\":\"service_account\",\"project_id\":\"gofast-a5f94\",...}"
+
+# Database
+DATABASE_URL="postgresql://..."
+
+# Port
+PORT=4000
+```
+
+**Frontend**:
+- Firebase config is hardcoded in `src/config/firebaseConfig.js`
+- Uses GoFast Firebase project: `gofast-a5f94`
+
+### Key Points
+
+- ✅ **Separate from Athlete auth** - Owner uses Firebase, Athlete uses separate auth system
+- ✅ **Different Firebase project** - Company Outlook uses `gofast-a5f94` (same project, different service account key)
+- ✅ **Service key naming** - `GOFAST_COMPANY_FIREBASE_SERVICE_ACCOUNT_KEY` to distinguish from athlete app
+- ✅ **Pattern A**: No middleware (universal personhood creation)
+- ✅ **Pattern B**: Requires middleware (hydration)
+- ✅ **Pattern C**: Requires middleware (child entity creation)
 
 ---
 

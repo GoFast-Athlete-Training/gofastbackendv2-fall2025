@@ -34,6 +34,9 @@ import stravaAthleteRoute from './routes/Strava/stravaAthleteRoute.js';
 import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
 import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
 import runCrewHydrateRouter from './routes/RunCrew/runCrewHydrateRoute.js';
+import runCrewMessageRouter from './routes/RunCrew/runCrewMessageRoute.js';
+import runCrewAnnouncementRouter from './routes/RunCrew/runCrewAnnouncementRoute.js';
+import runCrewRunRouter from './routes/RunCrew/runCrewRunRoute.js';
 // Training routes
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
@@ -116,6 +119,9 @@ app.use('/api/strava', stravaAthleteRoute); // /activities
 // RunCrew routes
 app.use('/api/runcrew', runCrewCreateRouter); // /create
 app.use('/api/runcrew', runCrewJoinRouter); // /join
+app.use('/api/runcrew', runCrewMessageRouter); // /:runCrewId/messages
+app.use('/api/runcrew', runCrewAnnouncementRouter); // /:runCrewId/announcements
+app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsvp
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id (more specific /mine must come before /:id)
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
