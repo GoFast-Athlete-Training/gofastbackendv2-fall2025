@@ -541,10 +541,82 @@ model RunCrewManager {
 
 ---
 
+## MVP1 Implementation Status
+
+### ✅ Completed Features
+
+**Core Infrastructure**:
+- ✅ RunCrew creation with join code
+- ✅ Join RunCrew via join code
+- ✅ RunCrew hydration endpoint (`GET /api/runcrew/:id`)
+- ✅ Admin routing (admin vs member views)
+- ✅ Memberships display ("Who's Here")
+
+**Schema**:
+- ✅ All models implemented (RunCrew, RunCrewMembership, RunCrewMessage, RunCrewAnnouncement, RunCrewLeaderboard, RunCrewRun, RunCrewRunRSVP)
+
+**Routes**:
+- ✅ `POST /api/runcrew/create` - Create RunCrew
+- ✅ `POST /api/runcrew/join` - Join RunCrew
+- ✅ `GET /api/runcrew/mine` - Get user's crews
+- ✅ `GET /api/runcrew/:id` - Hydrate single crew
+- ✅ `POST /api/runcrew/:runCrewId/runs` - Create run (admin)
+- ✅ `POST /api/runcrew/runs/:runId/rsvp` - RSVP to run
+
+### 🚧 In Progress / TODO
+
+**Frontend Components**:
+- 🚧 RunCrewCentral - Display members, messages, runs (basic structure exists, needs data integration)
+- 🚧 RunCrewCentralAdmin - Admin actions (create runs, events, announcements)
+- 🚧 RSVP UI - Members can RSVP to runs
+- 🚧 Messages UI - Display and create messages
+
+**Backend Routes**:
+- 🚧 `GET /api/runcrew/runs/:runId/rsvps` - Get RSVPs for a run
+- 🚧 `DELETE /api/runcrew/runs/:runId/rsvp` - Remove RSVP
+- 🚧 `POST /api/runcrew/:runCrewId/events` - Create event
+- 🚧 `POST /api/runcrew/:runCrewId/messages` - Create message
+- 🚧 `POST /api/runcrew/:runCrewId/announcements` - Create announcement
+
+**Features**:
+- 🚧 Event creation (RunCrewEvent model ready, routes needed)
+- 🚧 Message creation (RunCrewMessage model ready, routes needed)
+- 🚧 Announcement creation (RunCrewAnnouncement model ready, routes needed)
+- 🚧 Leaderboard calculation service
+
+### 📋 Implementation Priority
+
+**Phase 1: Run RSVP (Current Focus)**
+1. ✅ RSVP create/update route
+2. 🚧 Frontend RSVP UI (admin view shows RSVPs, members can RSVP)
+3. 🚧 GET RSVPs route
+4. 🚧 DELETE RSVP route
+
+**Phase 2: Event Creation**
+1. ✅ Schema ready (RunCrewEvent)
+2. 🚧 Event creation routes
+3. 🚧 Admin form for creating events
+4. 🚧 Event list display
+
+**Phase 3: Messages & Announcements**
+1. ✅ Schema ready (RunCrewMessage, RunCrewAnnouncement)
+2. 🚧 Message creation routes
+3. 🚧 Announcement creation routes
+4. 🚧 Frontend UI for messages and announcements
+
+**Phase 4: Leaderboard**
+1. ✅ Schema ready (RunCrewLeaderboard)
+2. 🚧 Leaderboard calculation service
+3. 🚧 Frontend leaderboard display
+
+---
+
 ## Related Documentation
 
-- **`GOFAST_ARCHITECTURE.md`** - Main architecture document
-- **`docs/RUNCREW_MVP1_REQUIREMENTS.md`** - MVP1 feature requirements
+- **`../GOFAST_ARCHITECTURE.md`** - Main architecture document
+- **`RunCrewAdmin.md`** - Admin management and capabilities
+- **`JoinRunCrew.md`** - Join code invitation system
+- **`RunCrewMembership.md`** - Membership capability and junction table
 
 ---
 
