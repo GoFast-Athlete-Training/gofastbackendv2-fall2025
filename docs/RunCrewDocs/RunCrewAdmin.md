@@ -2,16 +2,19 @@
 
 **Last Updated**: November 2025  
 **Status**: 🚧 In Development  
-**Pattern**: CRM-style admin interface - "Do stuff, not just see stuff"  
+**Pattern**: Facebook Page / Eventbrite-style admin console – action oriented around runs & events  
 **Related**: `RunCrewArchitecture.md` - General RunCrew architecture
 
 ---
 
 ## Premise
 
-RunCrew Admin provides a **God's eye view** and **functional control** over the RunCrew - the heartbeat of the entire app.
+RunCrew Admin behaves like a **Facebook Page admin center** or **Eventbrite organizer dashboard**:
+- Splash in, instantly see what you can *create* (runs, events, announcements) that move the crew forward.
+- Manage the crew’s brand (logo, description, meet-up point defaults) from the Settings surface.
+- Delegate responsibility (managers) so crews remain healthy without bottlenecking on one admin.
 
-**Core Philosophy**: Admin is a **CRM-style control center** - focused on actions and management, not just viewing data.
+"Do stuff, not just see stuff" still applies, but the context is about **programming the calendar** and **keeping members engaged**, not managing a sales pipeline.
 
 ---
 
@@ -23,80 +26,73 @@ RunCrew Admin provides a **God's eye view** and **functional control** over the 
 - Admin assigned automatically on RunCrew creation (via `runcrewAdminId`)
 - Creator becomes admin by default
 
-**Transfer Admin** (Future):
-- Admin can transfer admin role to another member
-- Requires confirmation
-- Updates `runcrewAdminId` in RunCrew model
-- Previous admin becomes regular member
+**Transfer Admin (Settings UX)**:
+- Settings page surfaces **Transfer Admin** CTA
+- Admin selects new admin from existing members
+- Confirmation modal → updates `runcrewAdminId`
+- Previous admin remains member/manager (can be demoted or elevated via roles panel)
 
 ### 2. Manager Assignment
 
-**Manager Model**: `RunCrewManager` (Future - Schema ready)
-- Admin can assign managers from existing members
-- Managers have delegated permissions:
-  - Create runs
-  - Post announcements
-  - Manage members (add/remove)
-  - View admin dashboard (read-only)
-- Admin can remove managers
+**Manager Model**: `RunCrewManager`
+- Admin can promote/demote managers through **RunCrewAdminRoles.jsx** (new dedicated UX)
+- Managers can create runs/events, post announcements, manage RSVP data (read-only where appropriate)
+- Roles UX groups people similar to a Facebook page roles modal (Admin, Manager, Analyst – future)
 
 **Manager Actions**:
-- `POST /api/runcrew/:id/managers` - Assign manager
-- `DELETE /api/runcrew/:id/managers/:athleteId` - Remove manager
-- Managers appear in separate list in admin view
+- `POST /api/runcrew/:id/managers` - Assign/update manager role
+- `DELETE /api/runcrew/:id/managers/:athleteId` - Remove manager role
+- Roles panel hydrates managers + members list, supports search and filters
 
-### 3. Archive RunCrew
+### 3. Settings Hub (Hydration & Brand Control)
 
-**Archive Functionality**:
-- Admin can archive entire RunCrew (soft delete)
-- Sets `isArchived: true` and `archivedAt: timestamp`
-- Archived crews:
-  - Hidden from member lists
-  - Can be restored by admin
-  - All data preserved
-- Archive action in Settings page
+`/runcrew-settings/:id` hydrates and updates:
+- **Crew Identity**: name, logo (image upload), banner/icon, description, color theme (future)
+- **Join Details**: join code (read-only for now), copy invite link, regenerate code (future)
+- **Meet-Up Defaults**: preferred meet-up point, city, timezone
+- **Transfer Admin**: described above
+- **Manager Roles**: quick launch to `RunCrewAdminRoles.jsx`
+- **Archive Crew**: soft delete / restore actions (future)
 
-**Archive Route**:
-- `POST /api/runcrew/:id/archive` - Archive crew (admin only)
-- `POST /api/runcrew/:id/unarchive` - Restore crew (admin only)
+Hydration must include `logo`, `description`, `joinCode`, `meetUpPoint` (future renamed field), and role metadata so the page renders even if no members are present.
+
+### 4. Archive RunCrew (Future)
+- Archive from Settings (soft delete)
+- Sets `isArchived: true` and `archivedAt`
+- Restore action lives alongside archive button
 
 ---
 
 ## Admin Interface Structure
 
-### Core Admin Actions (CRM-Style)
+### Core Admin Actions (Eventbrite-style)
 
 **1. Create Run (RunCrewRun)**
-- Form: Title, Date, Start Time, Location, Address, Total Miles, Pace, Strava Map URL, Description
-- Action: `POST /api/runcrew/:runCrewId/runs`
-- Admin-only (MVP1), Managers can create (Future)
+- Title-first layout, then scheduling fork (single vs recurring)
+- Requires meet-up point, start time, optional distance/pace
+- Inline form inside Run tab (MVP1)
 
 **2. Create Event (RunCrewEvent)**
-- Form: Title, Date, Time, Location, Address, Description, Event Type
-- Action: `POST /api/runcrew/:runCrewId/events`
-- For non-running activities (happy hour, social, etc.)
+- Reuses run scheduling primitives once runs stabilized
+- Social/non-run activities use same map + meet-up data model (future)
 
 **3. Post Announcement**
-- Form: Title, Content
-- Action: `POST /api/runcrew/:runCrewId/announcements`
-- Admin-only announcements visible to all members
+- Quick composer (title + content)
+- Publishes to crew feed
 
-**4. Manage Members**
-- View all members
-- Remove member: `DELETE /api/runcrew/:id/members/:athleteId`
-- Assign manager: `POST /api/runcrew/:id/managers` (Future)
+**4. Manage Members & Roles**
+- Members list (left rail) with actions: remove, promote, message (future)
+- `RunCrewAdminRoles.jsx` handles role elevation/demotion flows
 
-**5. Run RSVP Management**
-- View RSVPs for each run
-- See who's going, maybe, not going
-- Can manually adjust if needed (Future)
+**5. RSVP Intelligence (Future)**
+- View who’s going/maybe/not going per run
+- Export RSVP list, message attendees (future)
 
 ---
 
 ## Run RSVP System (Priority 1)
 
 ### RunCrewRunRSVP Model
-
 ```prisma
 model RunCrewRunRSVP {
   id        String   @id @default(cuid())
@@ -118,145 +114,92 @@ model RunCrewRunRSVP {
 ### RSVP Routes
 
 **Create/Update RSVP** ✅:
-- `POST /api/runcrew/runs/:runId/rsvp` - Create or update RSVP
-  - Body: `{ status: "going" | "maybe" | "not-going" }`
-  - Auth: `verifyFirebaseToken` (athleteId from token)
-  - Upsert pattern: Creates if doesn't exist, updates if exists
-  - **Status**: ✅ Implemented in `runCrewRunRoute.js`
+- `POST /api/runcrew/runs/:runId/rsvp`
+- Body: `{ status: "going" | "maybe" | "not-going" }`
+- Auth: `verifyFirebaseToken`
+- Upsert pattern
 
 **Get RSVPs for Run** 🚧:
-- `GET /api/runcrew/runs/:runId/rsvps` - Get all RSVPs for a run
-  - Returns: Array of RSVPs with athlete details
-  - Includes: athlete name, photo, status, createdAt
-  - **Status**: 🚧 TODO - Currently included in run hydration
+- `GET /api/runcrew/runs/:runId/rsvps`
+- Needed for admin RSVP tab
 
 **Delete RSVP** 🚧:
-- `DELETE /api/runcrew/runs/:runId/rsvp` - Remove RSVP
-  - Auth: `verifyFirebaseToken` (athleteId from token)
-  - Only athlete can remove their own RSVP
-  - **Status**: 🚧 TODO
+- `DELETE /api/runcrew/runs/:runId/rsvp`
+- Athlete removes their own RSVP
 
 ### RSVP Status Values
-
-- `"going"` - Athlete is attending
-- `"maybe"` - Athlete might attend
-- `"not-going"` - Athlete is not attending
-
----
-
-## Event Creation (RunCrewEvent)
-
-### Event Schema
-
-```prisma
-model RunCrewEvent {
-  id           String   @id @default(cuid())
-  runCrewId    String
-  organizerId  String   // Athlete ID who created the event
-  
-  title        String
-  date         DateTime
-  time         String   // "6:00 PM"
-  location     String
-  address      String?
-  description  String?
-  eventType    String?  // "happy-hour", "social", "meetup", etc.
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  organizer    Athlete  @relation("RunCrewEventOrganizer", fields: [organizerId], references: [id], onDelete: Cascade)
-  rsvps        RunCrewEventRSVP[]
-  
-  @@map("run_crew_events")
-}
-```
-
-### Event Creation Flow
-
-**Admin Interface**:
-- Fill-in form: Title, Date, Time, Location, Address, Description, Event Type
-- Save action: `POST /api/runcrew/:runCrewId/events`
-- Simple form → save → done (CRM-style)
-
-**Event Routes**:
-- `POST /api/runcrew/:runCrewId/events` - Create event (admin/manager)
-- `GET /api/runcrew/:runCrewId/events` - List events (included in hydration)
-- `PUT /api/runcrew/events/:eventId` - Update event (admin/organizer)
-- `DELETE /api/runcrew/events/:eventId` - Delete event (admin/organizer)
+- `"going"`
+- `"maybe"`
+- `"not-going"`
 
 ---
 
-## Admin View Components
+## Run Creation UX Details (Admin Tab)
 
-### RunCrewCentralAdmin.jsx Structure
+### Layout & Fields
+- **Title**: first input (standalone) – required
+- **Date/Time**: friendly picker with AM/PM toggle (`06:30 AM`)
+- **Run Type Fork**:
+  - `Single Day` (default)
+  - `Recurring` (weekly / custom); collects start date, optional end date, recurrence note
+- **Meet-Up Point** (was `location`): primary required field; rename in schema (`meetUpPoint`) during next migration
+- **Address Notes**: optional (parking, suite)
+- **Distance & Pace**: optional metadata fields remain
+- **Map Preview** (future): integrate Google Places + static map post selection
 
-**Admin Actions Section**:
-- Create Run button → Opens form → Save
-- Create Event button → Opens form → Save
-- Post Announcement button → Opens form → Save
-
-**Management Sections**:
-- Members List (with remove action)
-- Runs List (with RSVP counts)
-- Events List
-- Announcements List
-
-**Settings**:
-- Archive Crew
-- Transfer Admin (Future)
-- Manager Management (Future)
+### Future Enhancements
+- Save **Recurrence Template** for quick reuse
+- Auto-post announcement when run is created
+- Export to calendar / generate ICS link
 
 ---
 
-## Implementation Priority
+## Settings vs Admin Tabs
 
-### Phase 1: Run RSVP (Current Priority)
-1. ✅ Schema ready (`RunCrewRunRSVP`)
-2. ✅ RSVP create/update route implemented (`POST /api/runcrew/runs/:runId/rsvp`)
-3. 🚧 Admin view shows RSVPs for runs (frontend)
-4. 🚧 Members can RSVP to runs (frontend)
-5. 🚧 GET RSVPs route (`GET /api/runcrew/runs/:runId/rsvps`)
-6. 🚧 DELETE RSVP route (`DELETE /api/runcrew/runs/:runId/rsvp`)
+- **RunCrewCentralAdmin.jsx**: landing hub for runs/events/announcements + members snapshot (Members block left, actions right)
+- **RunCrewSettings.jsx** (future): brand/identity + administrative controls
+- **RunCrewAdminRoles.jsx**: standalone modal/page invoked from both hub and settings
 
-### Phase 2: Event Creation
-1. ✅ Schema ready (`RunCrewEvent`)
-2. 🚧 Implement event routes
-3. 🚧 Admin form for creating events
-4. 🚧 Event list in admin view
+---
 
-### Phase 3: Manager System
-1. ✅ Schema ready (`RunCrewManager`)
-2. 🚧 Manager assignment routes
-3. 🚧 Manager permissions
-4. 🚧 Manager UI in admin view
+## Implementation Priority (Updated)
 
-### Phase 4: Archive & Transfer
-1. 🚧 Archive route
-2. 🚧 Archive UI in settings
-3. 🚧 Transfer admin route
-4. 🚧 Transfer admin UI
+### Phase 1: Runs & RSVPs (Active)
+1. ✅ Schema ready (`RunCrewRun`, `RunCrewRunRSVP`)
+2. 🚧 Inline run creation form redesign (title-first, fork)
+3. 🚧 Time picker + AM/PM clarity
+4. 🚧 Meet-Up Point rename + Google Places integration (future)
+5. 🚧 RSVP admin view
+
+### Phase 2: Settings Hydration & Roles
+1. 🚧 Hydrate logo, description, join code, meet-up defaults in settings
+2. 🚧 Transfer admin UX
+3. 🚧 `RunCrewAdminRoles.jsx` – role management flows
+4. 🚧 Manager permissions gating in backend routes
+
+### Phase 3: Events & Announcements Enhancements
+1. 🚧 Event creation reuse of run scheduling UX
+2. 🚧 Announcement composer polish + scheduling
+3. 🚧 Archive crew / restore flows
 
 ---
 
 ## Key Design Principles
 
-1. **CRM-Style**: Focus on actions (create, manage, control) not just viewing
-2. **Fill-in & Save**: Simple forms, immediate actions
-3. **God's Eye View**: Admin sees everything and can control everything
-4. **Modular Actions**: Each admin action is independent (create run, create event, etc.)
-5. **Manager Delegation**: Admin can delegate specific permissions to managers
-6. **Soft Delete**: Archive instead of delete (preserve data)
+1. **Event Programming First**: Everything orbits around runs & meetups.
+2. **Brand Ownership**: Crews feel like pages – logo, description, meet-up defaults.
+3. **Delegated Roles**: Admins spread responsibility via managers.
+4. **Modular UIs**: Distinct surfaces for hub, settings, roles while sharing hydration payloads.
+5. **Soft Delete**: Archive instead of delete (preserve data).
 
 ---
 
 ## Related Documentation
 
-- **`RunCrewArchitecture.md`** - Overall RunCrew architecture and schema
-- **`JoinRunCrew.md`** - Join code invitation system
-- **`RunCrewMembership.md`** - Membership capability (used for member management)
-- **`../GOFAST_ARCHITECTURE.md`** - Main architecture document
+- **`RunCrewArchitecture.md`** – Overall RunCrew architecture and schema
+- **`JoinRunCrew.md`** – Join code invitation system
+- **`RunCrewMembership.md`** – Membership capability (used for member management)
+- **`../GOFAST_ARCHITECTURE.md`** – Main architecture document
 
 ---
 

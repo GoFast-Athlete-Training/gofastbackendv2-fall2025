@@ -268,22 +268,35 @@ model RunCrewLeaderboard {
   @@map("run_crew_leaderboards")
 }
 
-// RunCrew Runs - MVP1 (Specific to runs, not general events)
+// RunCrew Runs - MVP1
 model RunCrewRun {
-  id          String @id @default(cuid())
-  runCrewId   String
-  createdById String // Admin or manager who created the run (MVP1: admin only)
+  id           String   @id @default(cuid())
+  runCrewId    String
+  createdById  String // Admin or manager who created the run (MVP1: admin only)
 
-  title     String
-  date      DateTime
-  startTime String // "6:00 AM"
-  location  String
-  address   String?
+  // Core presentation
+  title        String
+  runType      String   @default("single") // "single" | "recurring"
+  date         DateTime // Start date for single run or first occurrence
+  startTime    String   // "06:30 AM" – stored as human-readable string
+  timezone     String?  // IANA tz ("America/Chicago") for clarity
+
+  // Meet-up logistics
+  meetUpPoint   String
+  meetUpAddress String?
+  meetUpPlaceId String?
+  meetUpLat     Float?
+  meetUpLng     Float?
+
+  // Recurrence metadata (future-ready)
+  recurrenceRule   String?
+  recurrenceEndsOn DateTime?
+  recurrenceNote   String?
 
   // Run-specific fields
-  totalMiles   Float? // Total miles for the run
-  pace         String? // Target pace (e.g., "8:00-9:00 min/mile")
-  stravaMapUrl String? // Strava map URL for route visualization
+  totalMiles   Float?   // Total miles for the run
+  pace         String?  // Target pace (e.g., "8:00-9:00 min/mile")
+  stravaMapUrl String?  // Strava map URL for route visualization
 
   description String?
 
@@ -291,8 +304,8 @@ model RunCrewRun {
   updatedAt DateTime @updatedAt
 
   // Relations
-  runCrew   RunCrew          @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdBy Athlete          @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  runCrew   RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
   rsvps     RunCrewRunRSVP[]
 
   @@map("run_crew_runs")

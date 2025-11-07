@@ -10,13 +10,13 @@
 
 ## Premise
 
-RunCrew is a way for runners to form groups and share the things that are organic to running communities:
+RunCrew operates closer to an **Eventbrite-for-runners** experience than a CRM. Admins and managers spin up runs and crew-related events that keep athletes coming back:
 
-1. **Running Together** - Prescribed time, place, meetups with RSVP capability
-2. **Chatter** - Dynamic, interactive chat for banter and motivation
-3. **Leaderboard** - Friendly competition tracking miles, pace, and calories
+1. **Plan Runs & Meetups** – Create single-day or recurring runs, capture meet-up logistics, and manage RSVPs.
+2. **Coordinate Crew Logistics** – Surface where to meet, who is leading, and what to expect (map, pacing, distance).
+3. **Keep Community Engaged** – Chat, announcements, and leaderboards layer on top of the run/event cadence to sustain momentum.
 
-**Core Value**: Accountability through community - runners stay motivated by connecting with others, coordinating runs, and competing in friendly leaderboards.
+**Core Value**: Deliver reliable coordination (time, place, map, leader) so accountability sticks inside the crew.
 
 ---
 
@@ -60,14 +60,36 @@ if (isAdmin) {
 ```
 
 **Routing**:
-- Admin crews → `/runcrew/admin/:id` (admin view with special UX)
+- Admin crews → `/runcrew/admin/:id` (admin view with Facebook Page style UX)
 - Member crews → `/runcrew/:id` (member view)
 
 **Component Responsibilities**:
 - Universal hydration saves to localStorage on app load
 - Components read from localStorage (no API calls)
-- `RunCrewAdmin.jsx` - Admin view, reads from localStorage
+- `RunCrewCentralAdmin.jsx` - Admin view, reads from localStorage
 - `RunCrewCentral.jsx` - Member view, reads from localStorage
+- `RunCrewAdminRoles.jsx` (new) - Dedicated roles management UX for admin + managers (documented in `RunCrewAdmin.md`)
+
+---
+
+## Run Creation UX (MVP1)
+
+### Form Layout
+- **Run Title** sits alone at the top (H3 style) for clarity.
+- **Scheduling fork**:
+  - `Single Day` (default): requires run date + start time.
+  - `Recurring Series`: prompts for cadence (weekly / custom), start date, optional end date ("Ends on"), and inherits start time.
+- **Time Picker** uses human-friendly input with AM/PM toggle (`06:30 AM`). Future enhancement: native time picker on mobile.
+- **Meet-Up Point** replaces the generic `location` label. `address` becomes optional context (suite, parking notes).
+- **Google Places** (Future): auto-complete Meet-Up Point via Google Maps Places API, persist `placeId`, lat/long for map previews.
+- **Map Preview** (Future): render static map after selection to confirm meetup visual.
+
+### Data Model Impact
+- `RunCrewRun.location` becomes "meetUpPoint" (string) in future schema migration; `address` remains optional detail.
+- Recurrence metadata stored in adjunct table or JSON (post-MVP). MVP1 stores only single date/time.
+
+### RSVP + Event Bridge
+- Runs remain separate from `RunCrewEvent` for MVP1. Once runs mature, event creation UX reuses the same scheduling primitives (title-first, single vs recurring, map).
 
 ---
 
@@ -201,40 +223,47 @@ model RunCrewAnnouncement {
 
 ```prisma
 model RunCrewRun {
-  id           String   @id @default(cuid())
-  runCrewId    String
-  createdById  String   // Admin or manager who created the run (MVP1: admin only)
-  
-  title        String
-  date         DateTime
-  startTime    String   // "6:00 AM"
-  location     String
-  address      String?
-  
-  // Run-specific fields
-  totalMiles   Float?   // Total miles for the run
-  pace         String?  // Target pace (e.g., "8:00-9:00 min/mile")
-  stravaMapUrl String?  // Strava map URL for route visualization
-  
-  description  String?
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  runCrew      RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdBy    Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
-  rsvps        RunCrewRunRSVP[]
-  
+  id             String   @id @default(cuid())
+  runCrewId      String
+  createdById    String   // Admin or manager who created the run
+
+  // Core presentation
+  title          String
+  runType        String   @default("single") // "single" | "recurring"
+  date           DateTime // Start date for single run or first occurrence
+  startTime      String   // "06:30 AM" – stored as human-readable string
+  timezone       String?  // IANA tz ("America/Chicago") for proper scheduling
+
+  // Meet-up logistics
+  meetUpPoint    String   // Human-friendly meetup name (Coffee Bar on 5th)
+  meetUpAddress  String?  // Optional detail (suite, parking deck, etc.)
+  meetUpPlaceId  String?  // Google Places ID (future)
+  meetUpLat      Float?   // Latitude (future)
+  meetUpLng      Float?   // Longitude (future)
+
+  // Recurrence metadata (optional for future series generator)
+  recurrenceRule    String?   // RFC5545 string or JSON (e.g. "FREQ=WEEKLY;BYDAY=MO,WE")
+  recurrenceEndsOn  DateTime? // Optional end date for recurring runs
+  recurrenceNote    String?   // Human-readable note ("Every Tue/Thu")
+
+  // Run-specific extras
+  totalMiles     Float?
+  pace           String?
+  stravaMapUrl   String?
+  description    String?
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  runCrew        RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy      Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  rsvps          RunCrewRunRSVP[]
+
   @@map("run_crew_runs")
 }
 ```
 
-**Purpose**: Coordinate group runs (specific to running activities)
-- **MVP1**: Only admin can create runs (via `createdById` - tied to `runcrewAdminId`)
-- **Future**: Managers can also create runs (when `RunCrewManager` model added)
-- Run-specific fields: totalMiles, pace, stravaMapUrl, startTime
-- RSVP system for attendance tracking (tied to athleteId)
-- **Hydration**: `createdBy` relation shows who created the run
+> **Migration note:** `location` and `address` fields from the previous revision will migrate into `meetUpPoint` and `meetUpAddress`. During transition we can keep both fields in the database or run a one-time script to backfill the new columns, then drop the legacy ones once frontend/backend rely solely on the new names.
 
 ### RunCrewRunRSVP Model
 **Table**: `run_crew_run_rsvps`
