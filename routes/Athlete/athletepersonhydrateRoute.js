@@ -287,8 +287,17 @@ async function hydrateAthlete(req, res) {
       
       // QUERYABLE MODEL: Check RunCrewManager for admin status (not just runcrewAdminId field)
       const crewFromDB = membership.runCrew;
-      const adminManagers = crewFromDB.managers || [];
-      const isAdminFromManager = adminManagers.some(m => m.athleteId === athleteId && m.role === 'admin'); // Using 'admin' string for now, can import RUNCREW_ROLES.ADMIN if needed
+      const allManagers = crewFromDB.managers || [];
+      
+      // Transform managers to include athleteId and role directly (not nested in athlete relation)
+      const managers = allManagers.map(m => ({
+        athleteId: m.athleteId, // Direct field from RunCrewManager
+        role: m.role, // Direct field from RunCrewManager
+        athlete: m.athlete // Include athlete details for display
+      }));
+      
+      // Check if current athlete is admin
+      const isAdminFromManager = managers.some(m => m.athleteId === athleteId && m.role === 'admin');
       
       // Fallback: Check runcrewAdminId for backward compatibility
       const runcrewAdminId = crewFromDB.runcrewAdminId;
@@ -304,13 +313,12 @@ async function hydrateAthlete(req, res) {
         isAdminFromManager: isAdminFromManager,
         isAdminFromField: isAdminFromField,
         isAdmin: isAdmin,
-        adminManagers: adminManagers.map(m => ({ athleteId: m.athleteId, role: m.role })),
-        runcrewAdminId: runcrewAdminId, // Backward compatibility
-        runCrewObject: crewFromDB
+        managers: managers.map(m => ({ athleteId: m.athleteId, role: m.role })),
+        runcrewAdminId: runcrewAdminId
       });
       
       // If no admin found, log a warning
-      if (!isAdmin && !runcrewAdminId && adminManagers.length === 0) {
+      if (!isAdmin && !runcrewAdminId && managers.length === 0) {
         console.warn('⚠️ ATHLETE PERSON HYDRATE: No admin found for crew:', crewFromDB.id, crewFromDB.name);
       }
       
@@ -319,7 +327,7 @@ async function hydrateAthlete(req, res) {
         memberCount: membership.runCrew.memberships?.length || 0,
         isAdmin: isAdmin, // QUERYABLE MODEL: From RunCrewManager (queryable!) or runcrewAdminId fallback
         runcrewAdminId: runcrewAdminId, // Backward compatibility
-        managers: adminManagers, // QUERYABLE MODEL: Include managers array for frontend
+        managers: managers, // QUERYABLE MODEL: Include ALL managers array with athleteId and role for frontend
         joinedAt: membership.joinedAt,
         messageCount: membership.runCrew._count?.messages || 0,
         leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0
