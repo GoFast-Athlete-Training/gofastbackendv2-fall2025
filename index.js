@@ -38,6 +38,7 @@ import runCrewMessageRouter from './routes/RunCrew/runCrewMessageRoute.js';
 import runCrewAnnouncementRouter from './routes/RunCrew/runCrewAnnouncementRoute.js';
 import runCrewRunRouter from './routes/RunCrew/runCrewRunRoute.js';
 import runCrewEventRouter from './routes/RunCrew/runCrewEventRoute.js';
+import runCrewManagerRouter from './routes/RunCrew/runCrewManagerRoute.js';
 // Training routes
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
@@ -127,6 +128,7 @@ app.use('/api/runcrew', runCrewMessageRouter); // /:runCrewId/messages
 app.use('/api/runcrew', runCrewAnnouncementRouter); // /:runCrewId/announcements
 app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsvp
 app.use('/api/runcrew', runCrewEventRouter); // /:runCrewId/events
+app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
