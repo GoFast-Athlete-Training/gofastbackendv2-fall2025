@@ -16,12 +16,12 @@ const router = express.Router();
  * Uses upsertService to handle all models universally
  * Works with any model that follows the standard pattern
  */
-async function genericUpsertHandler(req, res, modelConfig) {
+async function genericUpsertHandler(req, res, modelConfig, modelKey) {
   try {
     const prisma = getPrismaClient();
     const { athleteId, ...additionalFields } = req.body;
     
-    console.log(`🚀 GENERIC UPSERT ${modelConfig.name}:`, { athleteId, additionalFields });
+    console.log(`🚀 GENERIC UPSERT ${modelConfig.name} (${modelKey}):`, { athleteId, additionalFields });
     
     if (!athleteId) {
       return res.status(400).json({
@@ -46,13 +46,16 @@ async function genericUpsertHandler(req, res, modelConfig) {
     }
     
     // Build data object for upsert
+    // For composite unique (e.g., runCrewManager), include both fields
     const data = {
       [modelConfig.linkField]: athleteId,
       ...additionalFields
     };
     
+    console.log(`📦 GENERIC UPSERT ${modelKey}: Built data object:`, data);
+    
     // Validate data
-    const validation = validateUpsertData(model, data);
+    const validation = validateUpsertData(modelKey, data);
     if (!validation.valid) {
       return res.status(400).json({
         success: false,
@@ -62,7 +65,7 @@ async function genericUpsertHandler(req, res, modelConfig) {
     }
     
     // Upsert via service
-    const result = await upsertModel(model, data);
+    const result = await upsertModel(modelKey, data);
     
     return res.json({
       success: true,
@@ -274,7 +277,7 @@ router.post('/upsert', async (req, res) => {
   } else {
     // No custom handler - use generic upsert via service
     console.log(`✅ UNIVERSAL UPSERT: Using generic handler for ${model}`);
-    return genericUpsertHandler(req, res, modelConfig);
+    return genericUpsertHandler(req, res, modelConfig, model);
   }
 });
 
@@ -299,7 +302,7 @@ const handlerRegistry = {
 // Dynamically register model-specific routes (for direct access)
 UPSERT_CONFIG.getAvailableModels().forEach(({ value: modelKey }) => {
   const modelConfig = UPSERT_CONFIG.getModelConfig(modelKey);
-  const handler = handlerRegistry[modelKey] || ((req, res) => genericUpsertHandler(req, res, modelConfig));
+  const handler = handlerRegistry[modelKey] || ((req, res) => genericUpsertHandler(req, res, modelConfig, modelKey));
   
   router.post(`/upsert/${modelKey}`, handler);
   console.log(`✅ Registered route: POST /api/admin/upsert/${modelKey}`);

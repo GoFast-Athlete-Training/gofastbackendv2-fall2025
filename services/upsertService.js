@@ -34,11 +34,16 @@ export const upsertModel = async (modelKey, data) => {
     // Prisma format for composite unique: { field1_field2: { field1: value1, field2: value2 } }
     const fields = uniqueField.split('_');
     
+    console.log(`🔧 UPSERT SERVICE: Building composite unique constraint: ${uniqueField}`, {
+      fields,
+      dataFields: Object.keys(data)
+    });
+    
     // Build composite where clause
     const compositeWhere = {};
     for (const field of fields) {
       if (!data[field]) {
-        throw new Error(`Missing required field for composite unique: ${field}`);
+        throw new Error(`Missing required field for composite unique: ${field}. Available fields: ${Object.keys(data).join(', ')}`);
       }
       compositeWhere[field] = data[field];
     }
@@ -48,6 +53,8 @@ export const upsertModel = async (modelKey, data) => {
     where = {
       [uniqueField]: compositeWhere
     };
+    
+    console.log(`✅ UPSERT SERVICE: Composite where clause built:`, where);
   } else {
     // Single field unique constraint
     const fieldValue = data[linkField] || data[uniqueField];
@@ -60,6 +67,7 @@ export const upsertModel = async (modelKey, data) => {
   console.log(`🔄 UPSERT SERVICE: Upserting ${modelConfig.name}`, {
     modelKey,
     prismaModel,
+    uniqueField,
     where,
     data
   });
