@@ -10,19 +10,23 @@ import { upsertModel, validateUpsertData } from '../../services/upsertService.js
 const router = express.Router();
 
 // CORS middleware for admin routes
+// Admin routes work without Firebase auth (internal admin tool)
 router.use((req, res, next) => {
   const origin = req.headers.origin;
-  // Allow all origins (Bearer token auth doesn't need strict origin matching)
+  // Allow all origins (admin routes are internal, no strict origin matching needed)
   res.header('Access-Control-Allow-Origin', origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   res.header('Access-Control-Allow-Credentials', 'false');
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
   
-  // Handle preflight requests
+  // Handle preflight requests immediately
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    console.log('✅ CORS: Handling preflight request for', req.path);
+    return res.status(200).end();
   }
   
+  console.log('✅ CORS: Allowing request from origin:', origin);
   next();
 });
 
