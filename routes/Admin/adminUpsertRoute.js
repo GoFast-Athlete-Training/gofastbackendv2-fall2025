@@ -52,7 +52,25 @@ async function genericUpsertHandler(req, res, modelConfig, modelKey) {
       ...additionalFields
     };
     
-    console.log(`📦 GENERIC UPSERT ${modelKey}: Built data object:`, data);
+    // Ensure all required fields are strings (Prisma expects consistent types)
+    if (modelConfig.uniqueField && modelConfig.uniqueField.includes('_')) {
+      // For composite unique, ensure all fields are properly typed
+      const fields = modelConfig.uniqueField.split('_');
+      fields.forEach(field => {
+        if (data[field] && typeof data[field] !== 'string') {
+          data[field] = String(data[field]);
+        }
+      });
+    }
+    
+    console.log(`📦 GENERIC UPSERT ${modelKey}: Built data object:`, {
+      data,
+      modelConfig: {
+        linkField: modelConfig.linkField,
+        uniqueField: modelConfig.uniqueField,
+        prismaModel: modelConfig.prismaModel
+      }
+    });
     
     // Validate data
     const validation = validateUpsertData(modelKey, data);
