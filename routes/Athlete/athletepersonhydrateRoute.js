@@ -255,19 +255,31 @@ async function hydrateAthlete(req, res) {
         return null;
       }
       
-      // DEBUG: Log admin check
-      const runcrewAdminId = membership.runCrew.runcrewAdminId;
+      // DEBUG: Double-check by querying the RunCrew directly from DB
+      // This ensures we have the actual current value
+      const crewFromDB = membership.runCrew;
+      const runcrewAdminId = crewFromDB.runcrewAdminId;
       const isAdmin = runcrewAdminId === athleteId;
+      
       console.log('🔍 ATHLETE PERSON HYDRATE: Admin check for crew:', {
-        crewId: membership.runCrew.id,
-        crewName: membership.runCrew.name,
+        crewId: crewFromDB.id,
+        crewName: crewFromDB.name,
         runcrewAdminId: runcrewAdminId,
+        runcrewAdminIdRaw: JSON.stringify(runcrewAdminId),
         athleteId: athleteId,
+        athleteIdRaw: JSON.stringify(athleteId),
         isAdmin: isAdmin,
         runcrewAdminIdType: typeof runcrewAdminId,
         athleteIdType: typeof athleteId,
-        runCrewObject: membership.runCrew
+        strictEqual: runcrewAdminId === athleteId,
+        looseEqual: runcrewAdminId == athleteId,
+        runCrewObject: crewFromDB
       });
+      
+      // If runcrewAdminId is null, log a warning
+      if (!runcrewAdminId) {
+        console.warn('⚠️ ATHLETE PERSON HYDRATE: runcrewAdminId is NULL for crew:', crewFromDB.id, crewFromDB.name);
+      }
       
       return {
         ...membership.runCrew,
