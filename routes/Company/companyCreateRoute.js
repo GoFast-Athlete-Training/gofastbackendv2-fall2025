@@ -18,13 +18,14 @@ const router = express.Router();
  * Flow:
  * 1. Verify Firebase token (middleware)
  * 2. Find CompanyStaff by firebaseId
- * 3. Check if staff has founder role (or create role if first user)
+ * 3. Check if staff has founder role (direct field, no junction table)
  * 4. Find existing GoFastCompany (should only be one)
  * 5. If exists, update it
  * 6. If not exists, create it
- * 7. Ensure CompanyStaffRole exists linking staff to company
+ * 7. Ensure staff.companyId is set (direct relation, no junction table)
  * 
  * Note: This is Pattern C - requires middleware. Only founder can create company.
+ * CompanyStaff is universal personhood - direct companyId and role (no junction table).
  */
 router.post('/create', verifyFirebaseToken, async (req, res) => {
   try {
@@ -40,11 +41,7 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     const staff = await prisma.companyStaff.findUnique({
       where: { firebaseId },
       include: {
-        companyRoles: {
-          include: {
-            company: true
-          }
-        }
+        company: true
       }
     });
     
@@ -58,18 +55,21 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     }
     
     console.log('✅ COMPANY CREATE: Staff found:', staff.id);
+    console.log('✅ COMPANY CREATE: Staff role:', staff.role);
     
-    // Check if staff has founder role (or is first user - auto-assign founder)
-    let staffRole = staff.companyRoles?.find(r => r.role === 'founder');
+    // Check if staff has founder role (direct field, no junction table)
+    // If no role exists and this is the first staff member, auto-assign founder role
+    const existingCompany = await prisma.goFastCompany.findFirst();
     
-    // If no role exists and this is the first staff member, create founder role
-    if (!staffRole) {
-      // Check if any company exists
-      const existingCompany = await prisma.goFastCompany.findFirst();
-      
+    if (!staff.role || staff.role !== 'founder') {
       if (!existingCompany) {
         // First user - auto-assign founder role
         console.log('📝 COMPANY CREATE: First user - auto-assigning founder role');
+        await prisma.companyStaff.update({
+          where: { id: staff.id },
+          data: { role: 'founder' }
+        });
+        staff.role = 'founder';
       } else {
         // Company exists but user doesn't have founder role
         console.log('❌ COMPANY CREATE: User does not have founder role');
@@ -111,41 +111,16 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         }
       });
       console.log('✅ COMPANY CREATE: Company created:', company.id);
-      
-      // Create CompanyStaffRole if it doesn't exist
-      if (!staffRole) {
-        staffRole = await prisma.companyStaffRole.create({
-          data: {
-            companyId: company.id,
-            staffId: staff.id,
-            role: 'founder',
-            department: null
-          }
-        });
-        console.log('✅ COMPANY CREATE: CompanyStaffRole created:', staffRole.id);
-      }
     }
     
-    // Ensure CompanyStaffRole exists (in case company existed but role didn't)
-    if (!staffRole) {
-      staffRole = await prisma.companyStaffRole.findFirst({
-        where: {
-          companyId: company.id,
-          staffId: staff.id
-        }
+    // Ensure staff.companyId is set (direct relation, no junction table)
+    if (!staff.companyId || staff.companyId !== company.id) {
+      console.log('📝 COMPANY CREATE: Updating staff.companyId to:', company.id);
+      await prisma.companyStaff.update({
+        where: { id: staff.id },
+        data: { companyId: company.id }
       });
-      
-      if (!staffRole) {
-        staffRole = await prisma.companyStaffRole.create({
-          data: {
-            companyId: company.id,
-            staffId: staff.id,
-            role: 'founder',
-            department: null
-          }
-        });
-        console.log('✅ COMPANY CREATE: CompanyStaffRole created:', staffRole.id);
-      }
+      console.log('✅ COMPANY CREATE: Staff companyId updated');
     }
     
     console.log('✅ COMPANY CREATE: ===== COMPANY CREATED SUCCESSFULLY =====');

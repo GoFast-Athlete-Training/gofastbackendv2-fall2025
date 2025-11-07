@@ -965,8 +965,9 @@ model Contact {
   title     String?
 
   // Pipeline Tracking (config-driven, not relational)
-  audienceType  String? // e.g. "EliteRunner", "RunClub", "RunnerInfluencer", etc. (from pipelineConfig.ts)
-  pipelineStage String? // e.g. "Interest", "Meeting", "Agreement", "OnPlatform" (validated against config)
+  pipelineId    String? // Unique identifier for this contact's pipeline journey (for tracking/grouping)
+  audienceType  String? // e.g. "EliteRunner", "RunClub", "RunnerInfluencer", etc. (from pipelineConfig.js - enum-like)
+  pipelineStage String? // e.g. "Interest", "Meeting", "Agreement", "OnPlatform" (validated against config - enum-like)
 
   // Conversion Path (Contact → Athlete)
   athleteId String? // Links to Athlete.id if contact converted to athlete

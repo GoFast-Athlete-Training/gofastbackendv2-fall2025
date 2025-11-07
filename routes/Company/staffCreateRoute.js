@@ -15,11 +15,12 @@ const router = express.Router();
  * 
  * Flow:
  * 1. Find existing CompanyStaff by firebaseId
- * 2. If found, return it (with companyRoles if they exist)
+ * 2. If found, return it (with company relation if it exists)
  * 3. If not found, create new CompanyStaff
- * 4. If role provided and no companyRoles exist, create GoFastCompany and CompanyStaffRole
+ * 4. If role provided, ensure GoFastCompany exists and assign companyId + role directly
  * 
  * Note: This is Pattern A - NO middleware. Happens after Firebase auth on frontend.
+ * CompanyStaff is universal personhood - direct companyId and role (no junction table).
  */
 router.post('/create', async (req, res) => {
   try {
@@ -46,15 +47,31 @@ router.post('/create', async (req, res) => {
       ? `${firstName} ${lastName}`.trim()
       : firstName || lastName || null;
     
+    // Check if GoFastCompany exists (should only be one)
+    let company = await prisma.goFastCompany.findFirst();
+    
+    if (!company) {
+      // Create GoFastCompany with default values if it doesn't exist
+      company = await prisma.goFastCompany.create({
+        data: {
+          containerId: `gofast-${Date.now()}`, // Unique containerId
+          companyName: 'GoFast Inc',
+          address: '2604 N. George Mason Dr.',
+          city: 'Arlington',
+          state: 'VA',
+          website: 'gofastcrushgoals.com'
+        }
+      });
+      console.log('✅ STAFF CREATE: GoFastCompany created:', company.id);
+    } else {
+      console.log('✅ STAFF CREATE: GoFastCompany already exists:', company.id);
+    }
+    
     // Try to find existing CompanyStaff
     let staff = await prisma.companyStaff.findUnique({
       where: { firebaseId },
       include: {
-        companyRoles: {
-          include: {
-            company: true
-          }
-        }
+        company: true
       }
     });
     
@@ -69,82 +86,32 @@ router.post('/create', async (req, res) => {
           name: staff.name,
           email: staff.email,
           photoURL: staff.photoURL,
-          companyRoles: staff.companyRoles
+          companyId: staff.companyId,
+          role: staff.role,
+          department: staff.department,
+          company: staff.company
         }
       });
     }
     
-    // Create new CompanyStaff
-    console.log('📝 STAFF CREATE: Creating new CompanyStaff...');
+    // Create new CompanyStaff with direct companyId and role (no junction table)
+    console.log('📝 STAFF CREATE: Creating new CompanyStaff with role:', role || 'founder');
     staff = await prisma.companyStaff.create({
       data: {
         firebaseId,
         email,
         name,
-        photoURL
+        photoURL,
+        companyId: company.id, // Direct relation
+        role: role || 'founder', // Direct role field
+        department: null // Can be set later
       },
       include: {
-        companyRoles: {
-          include: {
-            company: true
-          }
-        }
+        company: true
       }
     });
     
     console.log('✅ STAFF CREATE: CompanyStaff created:', staff.id);
-    
-    // If role provided and no company exists, create GoFastCompany and link via CompanyStaffRole
-    if (role && (!staff.companyRoles || staff.companyRoles.length === 0)) {
-      console.log('📝 STAFF CREATE: Creating GoFastCompany and CompanyStaffRole with role:', role);
-      
-      // Check if GoFastCompany already exists (should only be one)
-      let company = await prisma.goFastCompany.findFirst();
-      
-      if (!company) {
-        // Create GoFastCompany with default values
-        company = await prisma.goFastCompany.create({
-          data: {
-            containerId: `gofast-${Date.now()}`, // Unique containerId
-            companyName: 'GoFast Inc',
-            address: '2604 N. George Mason Dr.',
-            city: 'Arlington',
-            state: 'VA',
-            website: 'gofastcrushgoals.com'
-          }
-        });
-        console.log('✅ STAFF CREATE: GoFastCompany created:', company.id);
-      } else {
-        console.log('✅ STAFF CREATE: GoFastCompany already exists:', company.id);
-      }
-      
-      // Create CompanyStaffRole junction
-      const staffRole = await prisma.companyStaffRole.create({
-        data: {
-          companyId: company.id,
-          staffId: staff.id,
-          role: role || 'founder', // Default to founder if not provided
-          department: null // Can be set later
-        },
-        include: {
-          company: true
-        }
-      });
-      
-      console.log('✅ STAFF CREATE: CompanyStaffRole created:', staffRole.id);
-      
-      // Reload staff with new role
-      staff = await prisma.companyStaff.findUnique({
-        where: { firebaseId },
-        include: {
-          companyRoles: {
-            include: {
-              company: true
-            }
-          }
-        }
-      });
-    }
     
     console.log('✅ STAFF CREATE: ===== STAFF CREATED SUCCESSFULLY =====');
     
@@ -157,7 +124,10 @@ router.post('/create', async (req, res) => {
         name: staff.name,
         email: staff.email,
         photoURL: staff.photoURL,
-        companyRoles: staff.companyRoles
+        companyId: staff.companyId,
+        role: staff.role,
+        department: staff.department,
+        company: staff.company
       }
     });
     

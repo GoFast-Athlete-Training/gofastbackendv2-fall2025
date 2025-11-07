@@ -10,13 +10,15 @@ import { validateStage, getAudienceConfig } from '../config/pipelineConfig.js';
 /**
  * Update contact pipeline stage
  * Validates stage against pipelineConfig before updating
+ * Auto-generates pipelineId if not present
  * 
  * @param {string} contactId - Contact ID
  * @param {string} audienceType - Audience type (e.g., "EliteRunner", "RunClub")
  * @param {string} stage - Pipeline stage (e.g., "Interest", "Meeting", "Agreement")
+ * @param {string} pipelineId - Optional pipeline ID (auto-generated if not provided)
  * @returns {Promise<Object>} Updated contact
  */
-export async function updateContactStage(contactId, audienceType, stage) {
+export async function updateContactStage(contactId, audienceType, stage, pipelineId = null) {
   const prisma = getPrismaClient();
 
   // Validate audience type exists
@@ -28,10 +30,19 @@ export async function updateContactStage(contactId, audienceType, stage) {
   // Validate stage is valid for this audience type
   validateStage(audienceType, stage);
 
+  // Get current contact to check if pipelineId exists
+  const currentContact = await prisma.contact.findUnique({
+    where: { id: contactId },
+  });
+
+  // Generate pipelineId if not provided and contact doesn't have one
+  const finalPipelineId = pipelineId || currentContact?.pipelineId || `pipeline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
   // Update contact
   const contact = await prisma.contact.update({
     where: { id: contactId },
     data: {
+      pipelineId: finalPipelineId,
       audienceType,
       pipelineStage: stage,
     },

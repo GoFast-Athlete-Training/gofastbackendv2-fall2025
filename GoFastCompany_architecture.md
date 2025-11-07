@@ -37,7 +37,7 @@ GoFast Company Stack is built for **one company** (GoFast). The `GoFastCompany` 
 
 ```
 GoFastCompany (Single Record - containerId)
-  ├── Staff (Firebase Auth - Role-based via CompanyStaffRole junction)
+  ├── Staff (Firebase Auth - Direct companyId + role, universal personhood)
   ├── Contacts (CRM - Universal personhood, may become athletes)
   ├── Pipeline/Stage (Config-based pipeline tracking)
   ├── Financial Data (Spends, Projections)
@@ -46,7 +46,7 @@ GoFastCompany (Single Record - containerId)
   └── [Future: Products, Deals, Integrations]
 ```
 
-**Note**: `CompanyStaff` is for GoFast Company Stack authentication - separate from `Athlete` identity. Role-based access via `CompanyStaffRole` junction table (roles: founder, community manager - config-based).
+**Note**: `CompanyStaff` is universal personhood for the company - separate from `Athlete` identity. Direct `companyId` and `role` fields (no junction table needed - single-tenant).
 
 ---
 
@@ -72,7 +72,7 @@ model GoFastCompany {
   updatedAt   DateTime @updatedAt
   
   // Relations - All scoped to this single company
-  staffRoles  CompanyStaffRole[]  // All staff via junction
+  staff       CompanyStaff[]  // Direct relation to staff (single-tenant, no junction needed)
   contacts    Contact[]            // CRM contacts
   pipelines   Pipeline[]           // BD Pipeline (contact-driven, config-based)
   productPipelineItems ProductPipelineItem[]  // Product Pipeline (product module, user-driven)
@@ -91,7 +91,7 @@ model GoFastCompany {
 - **All data scoped to containerId** - No multi-tenancy, just one company
 - **Company details upserted by founder** during onboarding flow
 
-### CompanyStaff Model (Company Auth - Firebase)
+### CompanyStaff Model (Company Auth - Firebase - Universal Personhood)
 
 ```prisma
 model CompanyStaff {
@@ -101,12 +101,18 @@ model CompanyStaff {
   email       String?  // Email address (from Firebase)
   photoURL    String?  // Profile photo URL (from Firebase - stored for quick access)
   
+  // Company and Role (direct fields - single-tenant, no junction needed)
+  companyId   String   // Links to GoFastCompany.id (single company)
+  role        String   // "founder", "admin", "manager", "employee" (from roleConfig.js)
+  department  String?  // Optional department assignment
+  
   // Verification Code (for onboarding/re-authentication)
   verificationCode String?  // Unique code for employee onboarding (future: can be changed)
   
-  // Reverse relations
-  companyRoles CompanyStaffRole[]  // Junction table with roles
+  // Relations
+  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
   
+  joinedAt    DateTime @default(now()) // When staff joined company
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
@@ -118,40 +124,14 @@ model CompanyStaff {
 - `email` = From Firebase auth
 - `photoURL` = From Firebase `photoURL` - **Stored in CompanyStaff model for quick access**
 
-**Key Architecture Point**: CompanyStaff is separate from Athlete
+**Key Architecture Point**: CompanyStaff is universal personhood for the company
 - **NO athleteId** - CompanyStaff is NOT an athlete extension
 - **Separate auth system** - Uses Firebase, not athlete auth
-- **Role-based access** - Roles assigned via `CompanyStaffRole` junction table
+- **Direct companyId and role** - No junction table needed (single-tenant, one company)
+- **Universal personhood** - Similar to `Contact` but for staff members
+- **Role-based access** - Direct `role` field (founder, admin, manager, employee from roleConfig.js)
 - **Verification code** - For employee onboarding (unique link with code)
 - **Future**: If Firebase tokens lost, re-enter code (future: can change code)
-
-### CompanyStaffRole Junction (Role-Based Access)
-
-```prisma
-model CompanyStaffRole {
-  id        String @id @default(cuid())
-  companyId String  // Links to GoFastCompany.id (containerId)
-  staffId   String  // Links to CompanyStaff.id (NOT Athlete.id)
-  
-  // Role-Based Access Control (role values from config - for now hardcode "founder")
-  role      String  // "founder", "community_manager" (from config - hardcode "founder" for now)
-  department String? // Optional department assignment
-  
-  joinedAt  DateTime @default(now())
-  
-  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  staff     CompanyStaff @relation(fields: [staffId], references: [id], onDelete: Cascade)
-  
-  @@unique([companyId, staffId])
-  @@map("company_staff_roles")
-}
-```
-
-**Key Architecture Point**: Role-based access via junction table
-- `staffId` → `CompanyStaff.id` (company auth)
-- **NOT** `Athlete.id` (separate system)
-- **For now**: Hardcode role as "founder" (config will follow for "community_manager" and others)
-- **Future**: Roles defined in config (founder, community manager, etc.)
 - If staff wants to use GoFast app, they sign up separately as Athlete
 
 ### Contact Model (CRM - Universal Personhood)
@@ -473,8 +453,7 @@ model Task {
 ### Employee Onboarding (Future)
 
 - Employee receives unique link with verification code
-- Enters code → Creates CompanyStaff record
-- Assigned role via CompanyStaffRole junction
+- Enters code → Creates CompanyStaff record with companyId and role (direct fields)
 - Profile setup → Platform access
 
 ---
@@ -681,7 +660,7 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 **Endpoint**: `POST /api/company/create`  
 **Auth**: `verifyFirebaseToken` middleware required
 
-**Purpose**: Create GoFastCompany record (founder only - during onboarding). Creates company details and links founder via CompanyStaffRole junction.
+**Purpose**: Create GoFastCompany record (founder only - during onboarding). Creates company details and ensures staff.companyId is set (direct relation, no junction table).
 
 **Note**: All company-related routes are in `routes/Company/` folder.
 
@@ -715,10 +694,10 @@ DELETE /api/company/tasks/:taskId                    // Delete task
    - **Different purposes**: BD Pipeline = CRM/sales tracking. Product Pipeline = Product development tracking
    - **Product pipeline is main focus** (founder wants product pipeline module and display)
 
-5. **Role-Based Access (Hardcoded for Now)**
-   - `CompanyStaffRole` junction for role assignment
+5. **Role-Based Access (Direct Fields)**
+   - Direct `role` field on `CompanyStaff` (no junction table - single-tenant)
    - **For now**: Hardcode role as "founder" only
-   - **Future**: Config-based roles (founder, community manager, etc.)
+   - **Future**: Config-based roles via roleConfig.js (founder, admin, manager, employee)
 
 6. **Onboarding Flow**
    - GF Splash → Auth check → Code verification → Company upsert → Profile setup → Platform access
@@ -773,7 +752,7 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 **Architecture Pattern**: Single-Tenant Company-First with Separate Auth & Config-Based Pipeline  
 **Container**: GoFastCompany (single record with containerId)  
 **Auth Model**: CompanyStaff (Firebase) - separate from Athlete identity  
-**Access Control**: Role-based via `CompanyStaffRole` junction (hardcoded "founder" for now)  
+**Access Control**: Role-based via direct `role` field on `CompanyStaff` (hardcoded "founder" for now, config-based in future)  
 **CRM Pattern**: Contacts with config-based BD pipeline/stage tracking (aligned with Ignite)  
 **Product Pipeline**: User-driven product module tracking (name, description, timeItTakes)  
 **Current Focus**: Product Pipeline Module (user-driven, NOT contact-driven)

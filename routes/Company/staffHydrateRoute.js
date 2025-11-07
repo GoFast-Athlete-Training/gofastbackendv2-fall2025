@@ -17,10 +17,11 @@ const router = express.Router();
  * Flow:
  * 1. Verify Firebase token (middleware)
  * 2. Find CompanyStaff by firebaseId
- * 3. Include companyRoles with company data
- * 4. Return full staff profile
+ * 3. Include company relation (direct, no junction table)
+ * 4. Return full staff profile with company and role
  * 
  * Note: This is Pattern B - requires middleware. Used for hydration after auth.
+ * CompanyStaff is universal personhood - direct companyId and role (no junction table).
  */
 router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
   try {
@@ -30,18 +31,11 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     console.log('🚀 STAFF HYDRATE: ===== HYDRATING STAFF =====');
     console.log('🚀 STAFF HYDRATE: Firebase ID:', firebaseId);
     
-    // Find CompanyStaff with all relations
+    // Find CompanyStaff with company relation (direct, no junction table)
     const staff = await prisma.companyStaff.findUnique({
       where: { firebaseId },
       include: {
-        companyRoles: {
-          include: {
-            company: true
-          },
-          orderBy: {
-            joinedAt: 'desc'
-          }
-        }
+        company: true
       }
     });
     
@@ -55,7 +49,8 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     }
     
     console.log('✅ STAFF HYDRATE: Staff found:', staff.id);
-    console.log('✅ STAFF HYDRATE: Company roles:', staff.companyRoles?.length || 0);
+    console.log('✅ STAFF HYDRATE: Role:', staff.role);
+    console.log('✅ STAFF HYDRATE: Company:', staff.company?.companyName || 'None');
     
     // Format response
     const response = {
@@ -66,24 +61,22 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
         name: staff.name,
         email: staff.email,
         photoURL: staff.photoURL,
-        companyRoles: staff.companyRoles.map(role => ({
-          id: role.id,
-          role: role.role,
-          department: role.department,
-          joinedAt: role.joinedAt,
-          company: {
-            id: role.company.id,
-            containerId: role.company.containerId,
-            companyName: role.company.companyName,
-            address: role.company.address,
-            city: role.company.city,
-            state: role.company.state,
-            website: role.company.website,
-            description: role.company.description,
-            createdAt: role.company.createdAt,
-            updatedAt: role.company.updatedAt
-          }
-        })),
+        companyId: staff.companyId,
+        role: staff.role,
+        department: staff.department,
+        joinedAt: staff.joinedAt,
+        company: staff.company ? {
+          id: staff.company.id,
+          containerId: staff.company.containerId,
+          companyName: staff.company.companyName,
+          address: staff.company.address,
+          city: staff.company.city,
+          state: staff.company.state,
+          website: staff.company.website,
+          description: staff.company.description,
+          createdAt: staff.company.createdAt,
+          updatedAt: staff.company.updatedAt
+        } : null,
         createdAt: staff.createdAt,
         updatedAt: staff.updatedAt
       }
