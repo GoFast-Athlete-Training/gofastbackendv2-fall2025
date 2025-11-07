@@ -68,9 +68,12 @@ async function genericUpsertHandler(req, res, modelConfig, modelKey) {
     
     // Build data object for upsert
     // For composite unique (e.g., runCrewManager), include both fields
+    // Remove 'model' field - it's only for routing, not for Prisma
+    const { model, ...cleanAdditionalFields } = additionalFields;
+    
     const data = {
       [modelConfig.linkField]: athleteId,
-      ...additionalFields
+      ...cleanAdditionalFields
     };
     
     // Ensure all required fields are strings (Prisma expects consistent types)
