@@ -128,30 +128,44 @@ async function hydrateAthlete(req, res) {
         // ATHLETE-FIRST: RunCrew memberships relation - explicitly included
         runCrewMemberships: {
           include: {
-            runCrew: {
-              include: {
-                admin: {
-                  select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    photoURL: true
-                  }
-                },
-                memberships: {
-                  select: {
-                    athleteId: true
-                  }
-                },
-                _count: {
-                  select: {
-                    messages: true,
-                    leaderboardEntries: true
+                  runCrew: {
+                include: {
+                  admin: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      email: true,
+                      photoURL: true
+                    }
+                  },
+                  managers: {
+                    where: { role: 'admin' }, // QUERYABLE MODEL - Check RunCrewManager for admins
+                    include: {
+                      athlete: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                          photoURL: true
+                        }
+                      }
+                    }
+                  },
+                  memberships: {
+                    select: {
+                      athleteId: true
+                    }
+                  },
+                  _count: {
+                    select: {
+                      messages: true,
+                      leaderboardEntries: true
+                    }
                   }
                 }
               }
-            }
           },
           orderBy: {
             joinedAt: 'desc'
@@ -206,6 +220,20 @@ async function hydrateAthlete(req, res) {
                       photoURL: true
                     }
                   },
+                  managers: {
+                    where: { role: 'admin' }, // QUERYABLE MODEL - Check RunCrewManager for admins
+                    include: {
+                      athlete: {
+                        select: {
+                          id: true,
+                          firstName: true,
+                          lastName: true,
+                          email: true,
+                          photoURL: true
+                        }
+                      }
+                    }
+                  },
                   memberships: {
                     select: {
                       athleteId: true
@@ -255,37 +283,41 @@ async function hydrateAthlete(req, res) {
         return null;
       }
       
-      // DEBUG: Double-check by querying the RunCrew directly from DB
-      // This ensures we have the actual current value
+      // QUERYABLE MODEL: Check RunCrewManager for admin status (not just runcrewAdminId field)
       const crewFromDB = membership.runCrew;
-      const runcrewAdminId = crewFromDB.runcrewAdminId;
-      const isAdmin = runcrewAdminId === athleteId;
+      const adminManagers = crewFromDB.managers || [];
+      const isAdminFromManager = adminManagers.some(m => m.athleteId === athleteId && m.role === 'admin'); // Using 'admin' string for now, can import RUNCREW_ROLES.ADMIN if needed
       
-      console.log('🔍 ATHLETE PERSON HYDRATE: Admin check for crew:', {
+      // Fallback: Check runcrewAdminId for backward compatibility
+      const runcrewAdminId = crewFromDB.runcrewAdminId;
+      const isAdminFromField = runcrewAdminId === athleteId;
+      
+      // Primary: Use RunCrewManager model (queryable!)
+      const isAdmin = isAdminFromManager || isAdminFromField;
+      
+      console.log('🔍 ATHLETE PERSON HYDRATE: Admin check for crew (QUERYABLE MODEL):', {
         crewId: crewFromDB.id,
         crewName: crewFromDB.name,
-        runcrewAdminId: runcrewAdminId,
-        runcrewAdminIdRaw: JSON.stringify(runcrewAdminId),
         athleteId: athleteId,
-        athleteIdRaw: JSON.stringify(athleteId),
+        isAdminFromManager: isAdminFromManager,
+        isAdminFromField: isAdminFromField,
         isAdmin: isAdmin,
-        runcrewAdminIdType: typeof runcrewAdminId,
-        athleteIdType: typeof athleteId,
-        strictEqual: runcrewAdminId === athleteId,
-        looseEqual: runcrewAdminId == athleteId,
+        adminManagers: adminManagers.map(m => ({ athleteId: m.athleteId, role: m.role })),
+        runcrewAdminId: runcrewAdminId, // Backward compatibility
         runCrewObject: crewFromDB
       });
       
-      // If runcrewAdminId is null, log a warning
-      if (!runcrewAdminId) {
-        console.warn('⚠️ ATHLETE PERSON HYDRATE: runcrewAdminId is NULL for crew:', crewFromDB.id, crewFromDB.name);
+      // If no admin found, log a warning
+      if (!isAdmin && !runcrewAdminId && adminManagers.length === 0) {
+        console.warn('⚠️ ATHLETE PERSON HYDRATE: No admin found for crew:', crewFromDB.id, crewFromDB.name);
       }
       
       return {
         ...membership.runCrew,
         memberCount: membership.runCrew.memberships?.length || 0,
-        isAdmin: isAdmin, // ATHLETE-FIRST: Use athleteId
-        runcrewAdminId: runcrewAdminId, // Explicitly include for frontend
+        isAdmin: isAdmin, // QUERYABLE MODEL: From RunCrewManager (queryable!) or runcrewAdminId fallback
+        runcrewAdminId: runcrewAdminId, // Backward compatibility
+        managers: adminManagers, // QUERYABLE MODEL: Include managers array for frontend
         joinedAt: membership.joinedAt,
         messageCount: membership.runCrew._count?.messages || 0,
         leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0

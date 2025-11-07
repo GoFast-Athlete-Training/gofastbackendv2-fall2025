@@ -5,6 +5,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { RUNCREW_ROLES } from '../../config/runCrewRoleConfig.js';
 
 const router = express.Router();
 
@@ -61,7 +62,7 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
   try {
     // Create RunCrew and upsert membership in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create RunCrew with runcrewAdminId (proper relationship)
+      // Create RunCrew (keep runcrewAdminId for backward compatibility, but use RunCrewManager as primary)
       const runCrew = await tx.runCrew.create({
         data: {
           name: name.trim(),
@@ -69,7 +70,16 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
           description: req.body.description?.trim(),
           logo: req.body.logo,
           icon: req.body.icon,
-          runcrewAdminId: athleteId // Proper relationship - creator is admin
+          runcrewAdminId: athleteId // Backward compatibility - but RunCrewManager is the source of truth
+        }
+      });
+      
+      // Create RunCrewManager entry with role="admin" (QUERYABLE MODEL)
+      const adminManager = await tx.runCrewManager.create({
+        data: {
+          runCrewId: runCrew.id,
+          athleteId: athleteId,
+          role: RUNCREW_ROLES.ADMIN // Primary admin relationship - queryable!
         }
       });
       
@@ -101,6 +111,20 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
               lastName: true,
               email: true,
               photoURL: true
+            }
+          },
+          managers: {
+            where: { role: 'admin' }, // Include admin managers
+            include: {
+              athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  photoURL: true
+                }
+              }
             }
           },
           memberships: {
