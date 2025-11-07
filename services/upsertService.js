@@ -72,19 +72,32 @@ export const upsertModel = async (modelKey, data) => {
     data
   });
   
-  // Upsert (create or update)
-  const result = await prisma[prismaModel].upsert({
-    where: where,
-    update: data, // Update existing record
-    create: data // Create new record if doesn't exist
-  });
-  
-  console.log(`✅ UPSERT SERVICE: Successfully upserted ${modelConfig.name}`, {
-    id: result.id,
-    modelKey
-  });
-  
-  return result;
+  try {
+    // Upsert (create or update)
+    const result = await prisma[prismaModel].upsert({
+      where: where,
+      update: data, // Update existing record
+      create: data // Create new record if doesn't exist
+    });
+    
+    console.log(`✅ UPSERT SERVICE: Successfully upserted ${modelConfig.name}`, {
+      id: result.id,
+      modelKey
+    });
+    
+    return result;
+  } catch (prismaError) {
+    console.error(`❌ UPSERT SERVICE: Prisma error for ${modelConfig.name}:`, {
+      error: prismaError.message,
+      code: prismaError.code,
+      meta: prismaError.meta,
+      where,
+      data
+    });
+    
+    // Re-throw with more context
+    throw new Error(`Prisma upsert failed for ${modelConfig.name}: ${prismaError.message}. Where: ${JSON.stringify(where)}, Data: ${JSON.stringify(data)}`);
+  }
 };
 
 /**
