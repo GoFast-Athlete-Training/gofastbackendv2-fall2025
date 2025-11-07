@@ -1,10 +1,11 @@
 // Admin Upsert Routes
 // Universal admin upsert system - creates model records and links to athleteId
-// Pattern: Universal entry point → dynamically dispatches using MODEL_CONFIG
+// Pattern: Universal entry point → dynamically dispatches using UPSERT_CONFIG → upsertService
 
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
-import { MODEL_CONFIG } from '../../config/modelConfig.js';
+import { UPSERT_CONFIG } from '../../config/upsertConfig.js';
+import { upsertModel, validateUpsertData } from '../../services/upsertService.js';
 
 const router = express.Router();
 
@@ -12,35 +13,21 @@ const router = express.Router();
 
 /**
  * Generic Upsert Handler
- * Works with any model that follows the standard pattern:
- * - Links via athleteId (or linkField from config)
- * - Has unique constraint on linkField
- * - Returns standard response format
+ * Uses upsertService to handle all models universally
+ * Works with any model that follows the standard pattern
  */
 async function genericUpsertHandler(req, res, modelConfig) {
   try {
     const prisma = getPrismaClient();
-    const { athleteId } = req.body;
-    const { prismaModel, linkField, uniqueField } = modelConfig;
+    const { athleteId, ...additionalFields } = req.body;
     
-    if (!prismaModel) {
-      return res.status(500).json({
-        success: false,
-        error: 'Model configuration error',
-        message: 'prismaModel not defined in MODEL_CONFIG'
-      });
-    }
-    
-    const linkFieldName = linkField || 'athleteId';
-    const uniqueFieldName = uniqueField || linkFieldName;
-    
-    console.log(`🚀 GENERIC UPSERT ${modelConfig.name}: Athlete ID:`, athleteId);
+    console.log(`🚀 GENERIC UPSERT ${modelConfig.name}:`, { athleteId, additionalFields });
     
     if (!athleteId) {
       return res.status(400).json({
         success: false,
         error: 'Missing required field',
-        required: [linkFieldName]
+        required: ['athleteId']
       });
     }
     
@@ -58,38 +45,29 @@ async function genericUpsertHandler(req, res, modelConfig) {
       });
     }
     
-    // Check if record already exists
-    const existing = await prisma[prismaModel].findUnique({
-      where: { [uniqueFieldName]: athleteId },
-      include: {
-        athlete: {
-          select: { id: true, email: true, firstName: true, lastName: true }
-        }
-      }
-    });
+    // Build data object for upsert
+    const data = {
+      [modelConfig.linkField]: athleteId,
+      ...additionalFields
+    };
     
-    if (existing) {
-      return res.json({
-        success: true,
-        message: `${modelConfig.name} already exists`,
-        [modelConfig.name.toLowerCase()]: existing
+    // Validate data
+    const validation = validateUpsertData(model, data);
+    if (!validation.valid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        errors: validation.errors
       });
     }
     
-    // Create new record
-    const created = await prisma[prismaModel].create({
-      data: { [linkFieldName]: athleteId },
-      include: {
-        athlete: {
-          select: { id: true, email: true, firstName: true, lastName: true }
-        }
-      }
-    });
+    // Upsert via service
+    const result = await upsertModel(model, data);
     
-    return res.status(201).json({
+    return res.json({
       success: true,
-      message: `${modelConfig.name} created successfully`,
-      [modelConfig.name.toLowerCase()]: created
+      message: `${modelConfig.name} upserted successfully`,
+      data: result
     });
     
   } catch (error) {
@@ -242,44 +220,51 @@ async function upsertFounder(req, res) {
 
 /**
  * UNIVERSAL UPSERT ROUTE
- * POST /api/admin/upsert?model=founder
- * Universal entry point - dynamically dispatches using MODEL_CONFIG
+ * POST /api/admin/upsert
+ * Universal entry point - uses UPSERT_CONFIG and upsertService
+ * 
+ * Request body:
+ * {
+ *   "model": "founder" | "runCrewManager" | ...,
+ *   "athleteId": "cmh9pl5in0000rj1wkijpxl2t",
+ *   ...additionalFields (if required)
+ * }
  * 
  * How it works:
- * 1. Gets model from query param
- * 2. Looks up model config from MODEL_CONFIG
- * 3. Finds handler function from handlerRegistry
- * 4. Calls handler or uses generic upsert if no custom handler
+ * 1. Gets model from request body
+ * 2. Looks up model config from UPSERT_CONFIG
+ * 3. Validates data
+ * 4. Uses upsertService to mutate
  */
 router.post('/upsert', async (req, res) => {
-  const { model } = req.query;
+  const { model, athleteId, ...additionalFields } = req.body;
   
   if (!model) {
-    const availableModels = MODEL_CONFIG.getAvailableModels().map(m => m.value);
+    const availableModels = UPSERT_CONFIG.getAvailableModels().map(m => m.value);
     return res.status(400).json({
       success: false,
       error: 'Model parameter required',
-      message: `Specify model: ?model=${availableModels.join('|')}`,
+      message: `Specify model in request body`,
       availableModels: availableModels
     });
   }
 
-  console.log(`🔄 UNIVERSAL UPSERT: Requested model: ${model}`);
+  console.log(`🔄 UNIVERSAL UPSERT: Requested model: ${model}`, { athleteId, additionalFields });
 
   // Get model config
-  const modelConfig = MODEL_CONFIG.getModelConfig(model);
+  const modelConfig = UPSERT_CONFIG.getModelConfig(model);
   
   if (!modelConfig) {
-    const availableModels = MODEL_CONFIG.getAvailableModels().map(m => m.value);
+    const availableModels = UPSERT_CONFIG.getAvailableModels().map(m => m.value);
     return res.status(400).json({
       success: false,
       error: 'Unknown model',
-      message: `Model '${model}' not found in MODEL_CONFIG`,
+      message: `Model '${model}' not found in UPSERT_CONFIG`,
       availableModels: availableModels
     });
   }
 
-  // Get handler from registry
+  // Get handler from registry (for custom handlers like founder)
   const handler = handlerRegistry[model];
   
   if (handler) {
@@ -287,7 +272,7 @@ router.post('/upsert', async (req, res) => {
     console.log(`✅ UNIVERSAL UPSERT: Using custom handler for ${model}`);
     return handler(req, res);
   } else {
-    // No custom handler - use generic upsert
+    // No custom handler - use generic upsert via service
     console.log(`✅ UNIVERSAL UPSERT: Using generic handler for ${model}`);
     return genericUpsertHandler(req, res, modelConfig);
   }
@@ -311,9 +296,9 @@ const handlerRegistry = {
   // Example: trainingGoal: upsertTrainingGoal,
 };
 
-// Dynamically register model-specific routes
-MODEL_CONFIG.getAvailableModels().forEach(({ value: modelKey }) => {
-  const modelConfig = MODEL_CONFIG.getModelConfig(modelKey);
+// Dynamically register model-specific routes (for direct access)
+UPSERT_CONFIG.getAvailableModels().forEach(({ value: modelKey }) => {
+  const modelConfig = UPSERT_CONFIG.getModelConfig(modelKey);
   const handler = handlerRegistry[modelKey] || ((req, res) => genericUpsertHandler(req, res, modelConfig));
   
   router.post(`/upsert/${modelKey}`, handler);
