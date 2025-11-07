@@ -917,9 +917,7 @@ model GoFastCompany {
 
   // Relations - All scoped to this single company
   staff                CompanyStaff[] // Direct relation to staff (single-tenant, no junction needed)
-  contacts             Contact[] // CRM contacts
-  pipelines            Pipeline[] // BD Pipeline (contact-driven, config-based)
-  pipelineConfigs      PipelineConfig[] // Pipeline configurations
+  contacts             Contact[] // CRM contacts (config-driven pipeline stages)
   productPipelineItems ProductPipelineItem[] // Product Pipeline (product module, user-driven)
   financialSpends      CompanyFinancialSpend[]
   financialProjections CompanyFinancialProjection[]
@@ -966,60 +964,23 @@ model Contact {
   phone     String?
   title     String?
 
+  // Pipeline Tracking (config-driven, not relational)
+  audienceType  String? // e.g. "EliteRunner", "RunClub", "RunnerInfluencer", etc. (from pipelineConfig.ts)
+  pipelineStage String? // e.g. "Interest", "Meeting", "Agreement", "OnPlatform" (validated against config)
+
   // Conversion Path (Contact → Athlete)
   athleteId String? // Links to Athlete.id if contact converted to athlete
 
+  // Notes
+  notes String?
+
   // System
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  pipelines Pipeline[]    @relation("ContactPipelines") // One contact can have multiple pipelines (via Pipeline model)
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("contacts")
-}
-
-model Pipeline {
-  id        String @id @default(cuid())
-  companyId String // Links to GoFastCompany.id (containerId)
-  contactId String // Links to Contact.id (contact-driven pipeline)
-
-  // Pipeline Configuration (from PipelineConfig)
-  configId String // Links to PipelineConfig.id (which pipeline config)
-  stageId  String // Current stage ID (from PipelineConfig.stages)
-
-  // System
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  company GoFastCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contact Contact        @relation("ContactPipelines", fields: [contactId], references: [id], onDelete: Cascade)
-  config  PipelineConfig @relation(fields: [configId], references: [id], onDelete: Cascade)
-
-  @@unique([contactId, configId]) // One pipeline per contact per config
-  @@map("pipelines")
-}
-
-model PipelineConfig {
-  id        String @id @default(cuid())
-  companyId String // Links to GoFastCompany.id (containerId)
-
-  // Pipeline Definition
-  name        String // "BD Pipeline", "Sales Pipeline", etc.
-  description String?
-
-  // Stages (JSON array of stage definitions)
-  stages Json // [{ id, name, order, color, etc. }]
-
-  // System
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  company   GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  pipelines Pipeline[] // Pipelines using this config
-
-  @@map("pipeline_configs")
 }
 
 model ProductPipelineItem {
