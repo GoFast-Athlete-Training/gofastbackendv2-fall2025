@@ -254,10 +254,26 @@ async function hydrateAthlete(req, res) {
         console.warn('⚠️ ATHLETE PERSON HYDRATE: Membership found but runCrew relation is null:', membership.id);
         return null;
       }
+      
+      // DEBUG: Log admin check
+      const runcrewAdminId = membership.runCrew.runcrewAdminId;
+      const isAdmin = runcrewAdminId === athleteId;
+      console.log('🔍 ATHLETE PERSON HYDRATE: Admin check for crew:', {
+        crewId: membership.runCrew.id,
+        crewName: membership.runCrew.name,
+        runcrewAdminId: runcrewAdminId,
+        athleteId: athleteId,
+        isAdmin: isAdmin,
+        runcrewAdminIdType: typeof runcrewAdminId,
+        athleteIdType: typeof athleteId,
+        runCrewObject: membership.runCrew
+      });
+      
       return {
         ...membership.runCrew,
         memberCount: membership.runCrew.memberships?.length || 0,
-        isAdmin: membership.runCrew.runcrewAdminId === athleteId, // ATHLETE-FIRST: Use athleteId
+        isAdmin: isAdmin, // ATHLETE-FIRST: Use athleteId
+        runcrewAdminId: runcrewAdminId, // Explicitly include for frontend
         joinedAt: membership.joinedAt,
         messageCount: membership.runCrew._count?.messages || 0,
         leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0
@@ -389,8 +405,23 @@ async function hydrateAthlete(req, res) {
       hasBio: !!athlete.bio
     };
     
+    // Count admin crews from runCrews array (where isAdmin === true)
+    const adminCrewsFromRunCrews = runCrews.filter(crew => crew.isAdmin === true);
+    
     console.log('🎯 ATHLETE PERSON HYDRATE: Returning hydrated athlete data for athleteId:', athleteId);
-    console.log('🎯 ATHLETE PERSON HYDRATE: RunCrews count:', runCrews.length, 'Admin crews:', athlete.adminRunCrews?.length || 0);
+    console.log('🎯 ATHLETE PERSON HYDRATE: RunCrews count:', runCrews.length);
+    console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from runCrews.isAdmin):', adminCrewsFromRunCrews.length);
+    console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from adminRunCrews relation):', athlete.adminRunCrews?.length || 0);
+    
+    // Log each crew's admin status
+    runCrews.forEach((crew, index) => {
+      console.log(`🎯 ATHLETE PERSON HYDRATE: Crew ${index + 1} - ${crew.name}:`, {
+        id: crew.id,
+        isAdmin: crew.isAdmin,
+        runcrewAdminId: crew.runcrewAdminId,
+        athleteId: athleteId
+      });
+    });
     
     // CORS handled by main middleware
     res.json({
