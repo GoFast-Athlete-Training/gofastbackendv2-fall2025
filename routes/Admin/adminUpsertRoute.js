@@ -9,6 +9,23 @@ import { upsertModel, validateUpsertData } from '../../services/upsertService.js
 
 const router = express.Router();
 
+// CORS middleware for admin routes
+router.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // Allow all origins (Bearer token auth doesn't need strict origin matching)
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'false');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  
+  next();
+});
+
 // Handler functions will be defined below, then registry built at the end
 
 /**
