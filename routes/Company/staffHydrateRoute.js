@@ -58,13 +58,14 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
       staff: {
         id: staff.id,
         firebaseId: staff.firebaseId,
-        name: staff.name,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
         email: staff.email,
         photoURL: staff.photoURL,
         companyId: staff.companyId,
         role: staff.role,
-        department: staff.department,
-        joinedAt: staff.joinedAt,
+        startDate: staff.startDate,
+        salary: staff.salary,
         company: staff.company ? {
           id: staff.company.id,
           containerId: staff.company.containerId,
