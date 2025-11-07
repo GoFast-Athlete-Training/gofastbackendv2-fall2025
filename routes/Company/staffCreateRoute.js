@@ -5,31 +5,36 @@
 
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
+import { validateRole, getRoleConfig } from '../../config/roleConfig.js';
 
 const router = express.Router();
 
 /**
  * Find or Create CompanyStaff
  * POST /api/staff/create
- * Body: { firebaseId, email, firstName, lastName, photoURL, role }
+ * Body: { firebaseId, email, firstName, lastName, photoURL, role, startDate, salary }
  * 
  * Flow:
  * 1. Find existing CompanyStaff by firebaseId
  * 2. If found, return it (with company relation if it exists)
  * 3. If not found, create new CompanyStaff
- * 4. If role provided, ensure GoFastCompany exists and assign companyId + role directly
+ * 4. If role provided, validate against roleConfig and ensure GoFastCompany exists
+ * 5. Assign companyId + role directly (no junction table)
  * 
  * Note: This is Pattern A - NO middleware. Happens after Firebase auth on frontend.
  * CompanyStaff is universal personhood - direct companyId and role (no junction table).
+ * Role validated against config/roleConfig.js (Founder, CFO, Sales, Marketing, Community Manager).
  */
 router.post('/create', async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { firebaseId, email, firstName, lastName, photoURL, role } = req.body;
+    const { firebaseId, email, firstName, lastName, photoURL, role, startDate, salary } = req.body;
     
     console.log('🚀 STAFF CREATE: ===== FINDING/CREATING STAFF =====');
     console.log('🚀 STAFF CREATE: Firebase ID:', firebaseId);
     console.log('🚀 STAFF CREATE: Email:', email);
+    console.log('🚀 STAFF CREATE: First Name:', firstName);
+    console.log('🚀 STAFF CREATE: Last Name:', lastName);
     console.log('🚀 STAFF CREATE: Role:', role);
     
     // Validation
@@ -42,10 +47,18 @@ router.post('/create', async (req, res) => {
       });
     }
     
-    // Build name from firstName/lastName
-    const name = firstName && lastName 
-      ? `${firstName} ${lastName}`.trim()
-      : firstName || lastName || null;
+    // Validate role against config (if provided)
+    const finalRole = role || 'Founder'; // Default to Founder if not provided
+    try {
+      validateRole(finalRole);
+    } catch (error) {
+      console.log('❌ STAFF CREATE: Invalid role:', error.message);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid role',
+        message: error.message
+      });
+    }
     
     // Check if GoFastCompany exists (should only be one)
     let company = await prisma.goFastCompany.findFirst();
@@ -83,28 +96,32 @@ router.post('/create', async (req, res) => {
         staff: {
           id: staff.id,
           firebaseId: staff.firebaseId,
-          name: staff.name,
+          firstName: staff.firstName,
+          lastName: staff.lastName,
           email: staff.email,
           photoURL: staff.photoURL,
           companyId: staff.companyId,
           role: staff.role,
-          department: staff.department,
+          startDate: staff.startDate,
+          salary: staff.salary,
           company: staff.company
         }
       });
     }
     
     // Create new CompanyStaff with direct companyId and role (no junction table)
-    console.log('📝 STAFF CREATE: Creating new CompanyStaff with role:', role || 'founder');
+    console.log('📝 STAFF CREATE: Creating new CompanyStaff with role:', finalRole);
     staff = await prisma.companyStaff.create({
       data: {
         firebaseId,
         email,
-        name,
+        firstName,
+        lastName,
         photoURL,
         companyId: company.id, // Direct relation
-        role: role || 'founder', // Direct role field
-        department: null // Can be set later
+        role: finalRole, // Direct role field (validated against config)
+        startDate: startDate ? new Date(startDate) : null,
+        salary: salary ? parseFloat(salary) : null
       },
       include: {
         company: true
@@ -121,12 +138,14 @@ router.post('/create', async (req, res) => {
       staff: {
         id: staff.id,
         firebaseId: staff.firebaseId,
-        name: staff.name,
+        firstName: staff.firstName,
+        lastName: staff.lastName,
         email: staff.email,
         photoURL: staff.photoURL,
         companyId: staff.companyId,
         role: staff.role,
-        department: staff.department,
+        startDate: staff.startDate,
+        salary: staff.salary,
         company: staff.company
       }
     });
