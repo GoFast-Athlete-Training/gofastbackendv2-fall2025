@@ -38,8 +38,7 @@ GoFast Company Stack is built for **one company** (GoFast). The `GoFastCompany` 
 ```
 GoFastCompany (Single Record - containerId)
   ├── Staff (Firebase Auth - Direct companyId + role, universal personhood)
-  ├── Contacts (CRM - Universal personhood, may become athletes)
-  ├── Pipeline/Stage (Config-based pipeline tracking)
+  ├── Contacts (CRM - Universal personhood, config-driven pipeline: audienceType + pipelineStage)
   ├── Financial Data (Spends, Projections)
   ├── Roadmap Items (Product, GTM, Ops)
   ├── Tasks (Company-wide)
@@ -73,8 +72,7 @@ model GoFastCompany {
   
   // Relations - All scoped to this single company
   staff       CompanyStaff[]  // Direct relation to staff (single-tenant, no junction needed)
-  contacts    Contact[]            // CRM contacts
-  pipelines   Pipeline[]           // BD Pipeline (contact-driven, config-based)
+  contacts    Contact[]            // CRM contacts (config-driven pipeline: audienceType + pipelineStage)
   productPipelineItems ProductPipelineItem[]  // Product Pipeline (product module, user-driven)
   financialSpends CompanyFinancialSpend[]
   financialProjections CompanyFinancialProjection[]
@@ -138,105 +136,93 @@ model CompanyStaff {
 
 ```prisma
 model Contact {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  
+  id        String @id @default(cuid())
+  companyId String // Links to GoFastCompany.id (containerId)
+
   // Core person data (aligned with Ignite pattern)
-  firstName   String?
-  lastName    String?
-  goesBy      String?  // Preferred name
-  email       String?
-  phone       String?
-  title       String?
+  firstName String?
+  lastName  String?
+  goesBy    String? // Preferred name
+  email     String?
+  phone     String?
+  title     String?
   
-  // Pipeline Tracking (via Pipeline model - config-based)
-  pipelineId  String?  // Links to Pipeline.id (optional - contact may not be in pipeline yet)
-  pipeline    Pipeline? @relation(fields: [pipelineId], references: [id])
-  
-  // Conversion Tracking
-  athleteId   String?  // Optional: Link to Athlete if contact converted to athlete user
+  // Pipeline Tracking (config-driven, not relational)
+  pipelineId    String? // Unique identifier for this contact's pipeline journey (for tracking/grouping)
+  audienceType  String? // e.g. "EliteRunner", "RunClub", "RunnerInfluencer", etc. (from pipelineConfig.js - enum-like)
+  pipelineStage String? // e.g. "Interest", "Meeting", "Agreement", "OnPlatform" (validated against config - enum-like)
+
+  // Conversion Path (Contact → Athlete)
+  athleteId String? // Links to Athlete.id if contact converted to athlete
   
   // Notes
-  notes       String?
+  notes String?
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   @@map("contacts")
 }
 ```
 
-**Key Architecture Point**: Universal personhood with config-based pipeline
+**Key Architecture Point**: Universal personhood with config-driven pipeline
 - **Aligned with Ignite** - Uses `contacts` model (broad, aligns with Ignite pattern)
-- **Pipeline via Pipeline model** - Not direct fields, uses `pipelineId` → `Pipeline` model
-- **Config-based** - Pipeline and stage defined in config tables (avoids unused models)
+- **Config-driven pipeline** - Direct fields (`audienceType`, `pipelineStage`) validated against `config/pipelineConfig.js`
+- **No relational models** - No Pipeline or PipelineConfig models - all config-driven
+- **Enum-like values** - `audienceType` and `pipelineStage` are validated against config (like enums)
+- **Pipeline ID tracking** - `pipelineId` field for tracking/grouping (unique identifier)
 - **May become athletes** - `athleteId` link for conversion (relational connection)
-- **No separate prospect/partner models** - All contacts, differentiated by pipeline/stage
+- **No separate prospect/partner models** - All contacts, differentiated by `audienceType`/`pipelineStage`
 
-### Pipeline Model (Config-Based Pipeline Tracking)
+### Pipeline Configuration (`config/pipelineConfig.js`)
 
-```prisma
-model Pipeline {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  contactId   String  @unique  // One pipeline per contact
-  
-  // Pipeline Configuration (from config tables)
-  pipeline    String  // Pipeline identifier (e.g., "product", "sales", "partnership")
-  stage       String  // Stage identifier (e.g., "prospect", "qualified", "closed")
-  
-  // Pipeline Metadata
-  status      String @default("active") // active, won, lost, paused
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  contact     Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  
-  @@map("pipelines")
-}
+**Config-Driven Pipeline System** - No database models, just a config file.
+
+```javascript
+export const pipelineConfig = {
+  EliteRunner: {
+    label: "Elite Runner",
+    description: "Top-tier athletes invited to represent the GoFast platform.",
+    stages: ["Interest", "Meeting", "Agreement", "OnPlatform"],
+  },
+  RunnerInfluencer: {
+    label: "Runner Influencer",
+    description: "Content-driven athletes who can amplify GoFast through reach and authenticity.",
+    stages: ["Interest", "Meeting", "Agreement", "OnPlatform"],
+  },
+  RunMerch: {
+    label: "Run Merch Partner",
+    description: "Brands offering running gear, apparel, or accessories through GoFast.",
+    stages: ["Interest", "Meeting", "Agreement", "OnPlatform"],
+  },
+  RunFeed: {
+    label: "Run Feed Partner",
+    description: "Content, podcasts, or media channels featuring GoFast athletes or clubs.",
+    stages: ["Interest", "Meeting", "Agreement", "OnPlatform"],
+  },
+  RunClub: {
+    label: "Run Club Organizer",
+    description: "Local or regional clubs organizing weekly runs and crew challenges.",
+    stages: ["Interest", "Demo", "Agreement", "OnPlatform"], // "Demo" instead of "Meeting"
+  },
+  RunEventOrganizer: {
+    label: "Run Event Organizer",
+    description: "Race directors or event organizers integrating GoFast for results, tracking, or sponsorship.",
+    stages: ["Interest", "Pitch", "Agreement", "OnPlatform"], // "Pitch" instead of "Meeting"
+  },
+};
 ```
 
-**Key Architecture Point**: Config-based pipeline tracking
-- **Separate Pipeline model** - Not direct fields on Contact
-- **Config-based** - Pipeline and stage values come from config tables
-- **One pipeline per contact** - `contactId` is unique
-- **Avoids unused models** - No separate prospect/sales channel partner models
-- **Differentiation by pipeline/stage** - Same contact model, different pipeline/stage values
-
-### PipelineConfig Model (Pipeline/Stage Configuration)
-
-```prisma
-model PipelineConfig {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
-  
-  // Pipeline Configuration
-  pipeline    String  // Pipeline identifier (e.g., "product", "sales", "partnership")
-  stage       String  // Stage identifier (e.g., "prospect", "qualified", "closed")
-  order       Int     // Order within pipeline (for display)
-  
-  // Display
-  displayName String  // Human-readable name
-  color       String? // Color for UI display
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  @@unique([companyId, pipeline, stage])
-  @@map("pipeline_configs")
-}
-```
-
-**Key Architecture Point**: Config-based pipeline/stage definitions
-- **Defined in config table** - Not hardcoded
-- **Company-scoped** - Each company can have custom pipelines/stages
-- **For now**: Product pipeline is the focus (founder wants pipeline module and display)
+**Key Architecture Point**: Config-driven, not relational
+- **Direct import helper** - Config file imported directly by backend services and frontend (no API route)
+- **Frontend dropdowns** - Frontend imports config to build dropdowns for `audienceType` and `pipelineStage`
+- **Backend validation** - `contactService.js` validates `audienceType`/`pipelineStage` against config
+- **Enum-like behavior** - Config acts like enums - type-safe, validated values
+- **No database models** - All pipeline logic in config file, not database tables
+- **Future scalability** - Easy to add new audience types or stages by updating config
 
 ### CompanyFinancialSpend (Actual Spending - INDIVIDUAL ITEMS)
 
@@ -481,7 +467,7 @@ PUT    /api/company                   → Update GoFastCompany (founder only)
 ### Contact Routes (CRM - Aligned with Ignite Pattern)
 
 ```
-GET    /api/contacts?pipeline={pipeline}&stage={stage}  // Filter by pipeline/stage
+GET    /api/contacts?companyId=xxx&audienceType=xxx&pipelineStage=xxx  // Filter by audienceType/pipelineStage
 GET    /api/contacts/:contactId                       // Single contact detail
 POST   /api/contacts                                  // Create contact
 PUT    /api/contacts/:contactId                      // Update contact
@@ -490,22 +476,25 @@ DELETE /api/contacts/:contactId                       // Delete contact
 POST   /api/contacts/:contactId/convert-to-athlete   // Convert contact → Athlete user
 ```
 
-### BD Pipeline Routes (Contact-Driven, Config-Based)
+### Contact Pipeline Routes (Config-Driven)
 
 ```
-GET    /api/pipelines                                 // Get all BD pipeline configs
-GET    /api/pipelines/:pipelineId                    // Get BD pipeline config
-POST   /api/pipelines                                 // Create BD pipeline config
-PUT    /api/pipelines/:pipelineId                    // Update BD pipeline config
-
-GET    /api/contacts?pipeline={pipeline}&stage={stage}  // Get contacts in BD pipeline
-POST   /api/contacts/:contactId/pipeline             // Assign contact to BD pipeline/stage
-PUT    /api/contacts/:contactId/pipeline             // Update contact BD pipeline/stage
+GET    /api/contacts?companyId=xxx                              // List all contacts
+GET    /api/contacts?companyId=xxx&audienceType=EliteRunner     // Filter by audienceType
+GET    /api/contacts?companyId=xxx&pipelineStage=Interest       // Filter by pipelineStage
+GET    /api/contacts/:contactId                                 // Get single contact
+POST   /api/contacts                                            // Create contact
+PUT    /api/contacts/:contactId                                 // Update contact (includes audienceType/pipelineStage)
+PUT    /api/contacts/:contactId/pipeline                        // Update contact pipeline (audienceType + pipelineStage, validates against config)
+DELETE /api/contacts/:contactId                                 // Delete contact
+POST   /api/contacts/:contactId/convert-to-athlete              // Convert contact → Athlete user
 ```
 
-**Key Routes**: BD Pipeline (contact-driven, config-based)
-- `GET /api/contacts?pipeline=bd&stage=prospect` - Get contacts in BD pipeline
-- Pipeline/stage display based on PipelineConfig
+**Key Routes**: Contact Pipeline (config-driven)
+- `GET /api/contacts?companyId=xxx&audienceType=RunClub` - Get contacts by audience type
+- `GET /api/contacts?companyId=xxx&pipelineStage=Meeting` - Get contacts by pipeline stage
+- `PUT /api/contacts/:contactId/pipeline` - Update contact pipeline (validates against `config/pipelineConfig.js`)
+- Pipeline config imported directly from `config/pipelineConfig.js` (no API route needed)
 
 ### Product Pipeline Routes (Product Module - User-Driven)
 
@@ -576,7 +565,7 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 - `ProductPipeline.jsx` (`/product-pipeline`) - Product pipeline module display (founder wants this)
   - Shows product pipeline items (name, description, timeItTakes)
   - User-driven product development tracking
-  - NOT contact-driven (different from BD pipeline)
+  - NOT contact-driven (different from Contact Pipeline)
 - `ProductPipelineItem.jsx` (`/product-pipeline/:itemId`) - Product pipeline item detail
 
 ### CRM Pages
@@ -686,13 +675,14 @@ DELETE /api/company/tasks/:taskId                    // Delete task
    - Conversion tracked via `athleteId` link (relational connection)
    - Contact remains in CRM regardless of conversion
 
-4. **Two Separate Pipeline Systems**
-   - **BD Pipeline** = Contact-driven, config-based (`Pipeline` model linked to `Contact`)
-   - **Product Pipeline** = Product module, user-driven (`ProductPipelineItem` model - NOT linked to contacts)
-   - **BD Pipeline**: `Pipeline` model for contact pipeline/stage tracking (config-based)
-   - **Product Pipeline**: `ProductPipelineItem` model with name, description, timeItTakes (user input)
-   - **Different purposes**: BD Pipeline = CRM/sales tracking. Product Pipeline = Product development tracking
-   - **Product pipeline is main focus** (founder wants product pipeline module and display)
+4. **Config-Driven Contact Pipeline System**
+   - **Contact Pipeline** = Config-driven (direct `audienceType` and `pipelineStage` fields on Contact)
+   - **No relational models** - No Pipeline or PipelineConfig models, all validated against `config/pipelineConfig.js`
+   - **Enum-like values** - `audienceType` (EliteRunner, RunClub, etc.) and `pipelineStage` (Interest, Meeting, Agreement, etc.)
+   - **Frontend dropdowns** - Config file imported directly by frontend for dropdowns
+   - **Backend validation** - `contactService.js` validates against config before saving
+   - **Product Pipeline** = Separate system - `ProductPipelineItem` model with name, description, timeItTakes (user input)
+   - **Different purposes**: Contact Pipeline = CRM/BD tracking (config-driven). Product Pipeline = Product development tracking (user-driven)
 
 5. **Role-Based Access (Direct Fields)**
    - Direct `role` field on `CompanyStaff` (no junction table - single-tenant)
@@ -739,8 +729,8 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 2. ✅ **containerId** = Unique identifier for all GoFast operations (GoFastCRM, GoFastFinance)
 3. ✅ **CompanyStaff = Company Auth** - Separate from Athlete identity
 4. ✅ **Contacts = Universal Personhood** - Aligned with Ignite pattern, may become athletes
-5. ✅ **Config-Based Pipeline** - Pipeline/stage via config tables (avoids unused models)
-6. ✅ **Two Pipeline Systems** - BD Pipeline (contact-driven, config-based) vs Product Pipeline (product module, user-driven with name, description, timeItTakes)
+5. ✅ **Config-Driven Contact Pipeline** - Direct `audienceType` and `pipelineStage` fields on Contact, validated against `config/pipelineConfig.js` (no relational models)
+6. ✅ **Two Pipeline Systems** - Contact Pipeline (config-driven: audienceType + pipelineStage) vs Product Pipeline (product module, user-driven with name, description, timeItTakes)
 7. ✅ **Product Pipeline Focus** - Founder wants product pipeline module and display (main focus now)
 7. ✅ **Role Hardcoded** - For now, hardcode role as "founder" (config will follow)
 8. ✅ **Onboarding Flow** - GF Splash → Code verify → Company upsert → Profile setup → Platform
@@ -753,6 +743,6 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 **Container**: GoFastCompany (single record with containerId)  
 **Auth Model**: CompanyStaff (Firebase) - separate from Athlete identity  
 **Access Control**: Role-based via direct `role` field on `CompanyStaff` (hardcoded "founder" for now, config-based in future)  
-**CRM Pattern**: Contacts with config-based BD pipeline/stage tracking (aligned with Ignite)  
+**CRM Pattern**: Contacts with config-driven pipeline (`audienceType` + `pipelineStage` fields, validated against `config/pipelineConfig.js`)  
 **Product Pipeline**: User-driven product module tracking (name, description, timeItTakes)  
 **Current Focus**: Product Pipeline Module (user-driven, NOT contact-driven)
