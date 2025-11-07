@@ -78,13 +78,27 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 // --- End Upload Setup ---
 
-// CORS - Simple config for Bearer token auth (no cookies)
+// CORS - Explicitly whitelist frontend domains
+const allowedOrigins = [
+  'https://dashboard.gofastcrushgoals.com',
+  'https://athlete.gofastcrushgoals.com',
+  'http://localhost:3000', // Local dev
+  'http://localhost:5173', // Vite dev server
+  'http://localhost:5174', // Alternative Vite port
+];
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+    // Allow requests with no origin (like mobile apps, Postman, or curl requests)
     if (!origin) return callback(null, true);
-    // Allow all origins for MVP (Bearer tokens don't need strict origin matching)
-    callback(null, true);
+    
+    // Check if origin is in whitelist
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`⚠️ CORS: Blocked request from origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
