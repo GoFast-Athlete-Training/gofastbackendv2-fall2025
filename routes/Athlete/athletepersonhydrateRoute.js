@@ -140,7 +140,8 @@ async function hydrateAthlete(req, res) {
                     }
                   },
                   managers: {
-                    where: { role: 'admin' }, // QUERYABLE MODEL - Check RunCrewManager for admins
+                    // QUERYABLE MODEL - Include ALL managers (admin and manager roles)
+                    // Frontend needs full managers array to check admin status
                     include: {
                       athlete: {
                         select: {
@@ -221,7 +222,8 @@ async function hydrateAthlete(req, res) {
                     }
                   },
                   managers: {
-                    where: { role: 'admin' }, // QUERYABLE MODEL - Check RunCrewManager for admins
+                    // QUERYABLE MODEL - Include ALL managers (admin and manager roles)
+                    // Frontend needs full managers array to check admin status
                     include: {
                       athlete: {
                         select: {
