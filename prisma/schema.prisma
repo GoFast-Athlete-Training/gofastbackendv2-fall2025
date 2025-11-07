@@ -928,16 +928,22 @@ model GoFastCompany {
 }
 
 model CompanyStaff {
-  id         String  @id @default(cuid())
-  firebaseId String  @unique // Firebase auth ID (for authentication)
-  name       String? // Full name (from Firebase displayName or firstName/lastName)
-  email      String? // Email address (from Firebase)
-  photoURL   String? // Profile photo URL (from Firebase - stored for quick access)
+  id         String @id @default(cuid())
+  firebaseId String @unique // Firebase auth ID (for authentication)
+
+  // Name fields (separate, not combined)
+  firstName String? // First name
+  lastName  String? // Last name
+  email     String // Email address (required)
+  photoURL  String? // Profile photo URL (from Firebase - stored for quick access)
 
   // Company and Role (direct fields - single-tenant, no junction needed)
-  companyId  String // Links to GoFastCompany.id (single company)
-  role       String // "founder", "admin", "manager", "employee" (from roleConfig.js)
-  department String? // Optional department assignment
+  companyId String // Links to GoFastCompany.id (single company)
+  role      String // "Founder", "CFO", "Sales", "Marketing", "Community Manager" (from roleConfig.js - enum-like)
+
+  // Employment details (founder/CEO can fill in)
+  startDate DateTime? // Start date (when staff joined/started)
+  salary    Float? // Salary (optional, founder/CEO can set)
 
   // Verification Code (for onboarding/re-authentication)
   verificationCode String? // Unique code for employee onboarding (future: can be changed)
@@ -945,7 +951,6 @@ model CompanyStaff {
   // Relations
   company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  joinedAt  DateTime @default(now()) // When staff joined company
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

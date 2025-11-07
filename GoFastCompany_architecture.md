@@ -93,33 +93,38 @@ model GoFastCompany {
 
 ```prisma
 model CompanyStaff {
-  id          String   @id @default(cuid())
-  firebaseId  String   @unique  // Firebase auth ID (for authentication)
-  name        String?  // Full name (from Firebase displayName or firstName/lastName)
-  email       String?  // Email address (from Firebase)
-  photoURL    String?  // Profile photo URL (from Firebase - stored for quick access)
+  id         String  @id @default(cuid())
+  firebaseId String  @unique // Firebase auth ID (for authentication)
   
+  // Name fields (separate, not combined)
+  firstName  String? // First name
+  lastName   String? // Last name
+  email      String  // Email address (required)
+  photoURL   String? // Profile photo URL (from Firebase - stored for quick access)
+
   // Company and Role (direct fields - single-tenant, no junction needed)
-  companyId   String   // Links to GoFastCompany.id (single company)
-  role        String   // "founder", "admin", "manager", "employee" (from roleConfig.js)
-  department  String?  // Optional department assignment
+  companyId  String // Links to GoFastCompany.id (single company)
+  role       String // "Founder", "CFO", "Sales", "Marketing", "Community Manager" (from roleConfig.js - enum-like)
   
+  // Employment details (founder/CEO can fill in)
+  startDate  DateTime? // Start date (when staff joined/started)
+  salary     Float?    // Salary (optional, founder/CEO can set)
+
   // Verification Code (for onboarding/re-authentication)
-  verificationCode String?  // Unique code for employee onboarding (future: can be changed)
-  
+  verificationCode String? // Unique code for employee onboarding (future: can be changed)
+
   // Relations
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
-  joinedAt    DateTime @default(now()) // When staff joined company
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 ```
 
 **Firebase Integration**:
 - `firebaseId` = Firebase UID (universal identifier)
-- `name` = Parsed from Firebase `displayName` (format: "First Last") or set manually
-- `email` = From Firebase auth
+- `firstName`, `lastName` = Separate name fields (from Firebase or manually set)
+- `email` = From Firebase auth (required field)
 - `photoURL` = From Firebase `photoURL` - **Stored in CompanyStaff model for quick access**
 
 **Key Architecture Point**: CompanyStaff is universal personhood for the company
@@ -127,10 +132,32 @@ model CompanyStaff {
 - **Separate auth system** - Uses Firebase, not athlete auth
 - **Direct companyId and role** - No junction table needed (single-tenant, one company)
 - **Universal personhood** - Similar to `Contact` but for staff members
-- **Role-based access** - Direct `role` field (founder, admin, manager, employee from roleConfig.js)
+- **Role-based access** - Direct `role` field validated against `config/roleConfig.js` (enum-like)
+- **Employment details** - `startDate` and `salary` can be set by founder/CEO
 - **Verification code** - For employee onboarding (unique link with code)
 - **Future**: If Firebase tokens lost, re-enter code (future: can change code)
 - If staff wants to use GoFast app, they sign up separately as Athlete
+
+### Role Configuration (`config/roleConfig.js`)
+
+**Config-Driven Role System** - Similar to pipeline config, enum-like values.
+
+```javascript
+export const ROLES = {
+  FOUNDER: 'Founder',
+  CFO: 'CFO',
+  SALES: 'Sales',
+  MARKETING: 'Marketing',
+  COMMUNITY_MANAGER: 'Community Manager'
+};
+```
+
+**Key Architecture Point**: Config-driven roles
+- **Direct import helper** - Config file imported directly by backend services and frontend (no API route)
+- **Frontend dropdowns** - Frontend imports config to build dropdowns for role selection
+- **Backend validation** - Validates role against config before saving
+- **Enum-like behavior** - Config acts like enums - type-safe, validated values
+- **Founder/CEO can set** - Founder/CEO can assign roles and fill in startDate/salary
 
 ### Contact Model (CRM - Universal Personhood)
 
