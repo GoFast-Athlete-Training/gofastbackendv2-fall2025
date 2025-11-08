@@ -18,6 +18,8 @@ RunCrew operates closer to an **Eventbrite-for-runners** experience than a CRM. 
 
 **Core Value**: Deliver reliable coordination (time, place, map, leader) so accountability sticks inside the crew.
 
+> **RunCrew-first identity**: Run pages do not mint their own tokens. All auth still flows through the athlete (Firebase ID). Once the athlete selects a crew, we stay in a runCrew-first context—subsequent API calls only need the `runCrewId` because the backend can rehydrate the crew + memberships using the athlete ID from the Firebase token. If we ever pivot to crew-specific tokens we’d need a totally separate identity flow (`runCrewId+athleteId` combos) with additional calls; that’s intentionally out-of-scope right now.
+
 ---
 
 ## Architecture Philosophy

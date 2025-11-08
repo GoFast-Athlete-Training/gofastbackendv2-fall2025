@@ -14,6 +14,8 @@ RunCrew Admin behaves like a **Facebook Page admin center** or **Eventbrite orga
 - Manage the crew’s brand (logo, description, meet-up point defaults) from the Settings surface.
 - Delegate responsibility (managers) so crews remain healthy without bottlenecking on one admin.
 
+**Authentication note**: RunCrew remains an athlete-first identity model. Pages themselves never mint tokens. Every admin action still arrives with the athlete’s Firebase token; the backend rehydrates the crew using `runCrewId` + that athlete. This is deliberate—moving to crew-issued tokens would require new identity flows (`runCrewId + athleteId` combos, additional lookups) and is outside the MVP scope.
+
 "Do stuff, not just see stuff" still applies, but the context is about **programming the calendar** and **keeping members engaged**, not managing a sales pipeline.
 
 ---
