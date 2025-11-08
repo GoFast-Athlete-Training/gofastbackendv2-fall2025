@@ -12,15 +12,40 @@ const router = express.Router();
 router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { runCrewId } = req.params;
-  const { title, date, startTime, location, address, totalMiles, pace, stravaMapUrl, description } = req.body;
+  const {
+    title,
+    runType = 'single',
+    date,
+    startTime,
+    timezone,
+    meetUpPoint,
+    meetUpAddress,
+    meetUpPlaceId,
+    meetUpLat,
+    meetUpLng,
+    totalMiles,
+    pace,
+    stravaMapUrl,
+    stravaPolyline, // reserved for future use (ignored for now)
+    description,
+    recurrenceRule,
+    recurrenceEndsOn,
+    recurrenceNote,
+    // Legacy fallback fields (pre-migration)
+    location: legacyLocation,
+    address: legacyAddress
+  } = req.body;
   const firebaseId = req.user?.uid;
 
+  const normalizedPoint = (meetUpPoint || legacyLocation || '').trim();
+  const normalizedAddress = (meetUpAddress || legacyAddress || '')?.trim?.() || null;
+
   // Validation
-  if (!title?.trim() || !date || !startTime?.trim() || !location?.trim()) {
+  if (!title?.trim() || !date || !startTime?.trim() || !normalizedPoint) {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields',
-      required: ['title', 'date', 'startTime', 'location']
+      required: ['title', 'date', 'startTime', 'meetUpPoint']
     });
   }
 
@@ -59,6 +84,22 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
 
     // Parse date
     const runDate = new Date(date);
+    if (Number.isNaN(runDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid date format'
+      });
+    }
+
+    let recurrenceEndsDate = null;
+    if (recurrenceEndsOn) {
+      const parsedEnd = new Date(recurrenceEndsOn);
+      recurrenceEndsDate = Number.isNaN(parsedEnd.getTime()) ? null : parsedEnd;
+    }
+
+    const parsedMiles = totalMiles ? parseFloat(totalMiles) : null;
+    const parsedLat = meetUpLat !== undefined && meetUpLat !== null && meetUpLat !== '' ? parseFloat(meetUpLat) : null;
+    const parsedLng = meetUpLng !== undefined && meetUpLng !== null && meetUpLng !== '' ? parseFloat(meetUpLng) : null;
 
     // Create run
     const run = await prisma.runCrewRun.create({
@@ -66,14 +107,22 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
         runCrewId,
         createdById: athlete.id, // Admin who created it
         title: title.trim(),
+        runType,
         date: runDate,
         startTime: startTime.trim(),
-        location: location.trim(),
-        address: address?.trim(),
-        totalMiles: totalMiles ? parseFloat(totalMiles) : null,
-        pace: pace?.trim(),
-        stravaMapUrl: stravaMapUrl?.trim(),
-        description: description?.trim()
+        timezone: timezone?.trim() || null,
+        meetUpPoint: normalizedPoint,
+        meetUpAddress: normalizedAddress,
+        meetUpPlaceId: meetUpPlaceId?.trim() || null,
+        meetUpLat: parsedLat,
+        meetUpLng: parsedLng,
+        recurrenceRule: recurrenceRule?.trim() || null,
+        recurrenceEndsOn: recurrenceEndsDate,
+        recurrenceNote: recurrenceNote?.trim() || null,
+        totalMiles: Number.isNaN(parsedMiles) ? null : parsedMiles,
+        pace: pace?.trim() || null,
+        stravaMapUrl: stravaMapUrl?.trim() || null,
+        description: description?.trim() || null
       },
       include: {
         createdBy: {
