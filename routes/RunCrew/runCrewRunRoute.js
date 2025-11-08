@@ -64,7 +64,10 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
 
     // Verify RunCrew exists and athlete is admin (MVP1: admin only)
     const runCrew = await prisma.runCrew.findUnique({
-      where: { id: runCrewId }
+      where: { id: runCrewId },
+      include: {
+        managers: true
+      }
     });
 
     if (!runCrew) {
@@ -74,11 +77,22 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    if (runCrew.runcrewAdminId !== athlete.id) {
+    const isAdmin = runCrew.runcrewAdminId === athlete.id;
+    const isManager = runCrew.managers?.some(manager => (
+      manager.athleteId === athlete.id && ['admin', 'manager'].includes(manager.role)
+    ));
+
+    if (!isAdmin && !isManager) {
+      console.warn('🚫 RUN CREATE UNAUTHORIZED', {
+        runCrewId,
+        requestingAthleteId: athlete.id,
+        runcrewAdminId: runCrew.runcrewAdminId,
+        managers: runCrew.managers.map(m => ({ athleteId: m.athleteId, role: m.role }))
+      });
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
-        message: 'Only admins can create runs (MVP1)'
+        message: 'Only admins or managers can create runs'
       });
     }
 
