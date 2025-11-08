@@ -373,6 +373,23 @@ model RunCrewEventRSVP {
   @@map("run_crew_event_rsvps")
 }
 
+// =====================================================
+// EVENT VOLUNTEER SIGNUPS - Universal Event Volunteer Model
+// =====================================================
+
+model EventVolunteer {
+  id        String   @id @default(cuid())
+  eventSlug String
+  name      String
+  email     String
+  role      String
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@map("event_volunteers")
+  @@index([eventSlug])
+}
+
 // RunCrew Managers - Future (Delegated managers)
 model RunCrewManager {
   id        String @id @default(cuid())
