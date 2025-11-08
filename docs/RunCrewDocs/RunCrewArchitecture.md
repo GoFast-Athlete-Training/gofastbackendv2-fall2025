@@ -68,7 +68,8 @@ if (isAdmin) {
 **Component Responsibilities**:
 - Universal hydration saves to localStorage on app load
 - Components read from localStorage (no API calls)
-- `RunCrewCentralAdmin.jsx` - Admin view, reads from localStorage
+- `useHydratedAthlete()` returns the cached `athleteProfile` and **elevates** the single-crew context by looking at `athlete.runCrews[0]` (MVP1 is single crew). It exposes `runCrewId`, `runCrewAdminId` (truthy when the athlete is the crew admin), and the `primaryCrew` object for downstream components.
+- `RunCrewCentralAdmin.jsx` - Admin view, reads from localStorage via the API, lives at `/crew/crewadmin` (no params) and verifies context via `GET /api/runcrew/:runCrewId/context/:athleteId`
 - `RunCrewCentral.jsx` - Member view, reads from localStorage
 - `RunCrewAdminRoles.jsx` (new) - Dedicated roles management UX for admin + managers (documented in `RunCrewAdmin.md`)
 

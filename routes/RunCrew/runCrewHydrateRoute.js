@@ -298,6 +298,90 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
   }
 });
 
+/**
+ * RunCrew context verification
+ * GET /api/runcrew/:runCrewId/context/:athleteId
+ * Confirms that the athlete belongs to the crew and returns a lightweight payload.
+ */
+router.get('/:runCrewId/context/:athleteId', verifyFirebaseToken, async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { runCrewId, athleteId } = req.params;
+    const firebaseId = req.user?.uid;
+
+    console.log('🔍 RUNCREW CONTEXT: crew', runCrewId, 'athlete', athleteId);
+
+    // Verify athlete via firebase
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete || athlete.id !== athleteId) {
+      console.log('❌ RUNCREW CONTEXT: Athlete mismatch or not found');
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Athlete mismatch'
+      });
+    }
+
+    const membership = await prisma.runCrewMembership.findFirst({
+      where: {
+        athleteId,
+        runCrewId
+      },
+      include: {
+        runCrew: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            runcrewAdminId: true,
+            managers: {
+              select: {
+                athleteId: true,
+                role: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!membership) {
+      console.log('❌ RUNCREW CONTEXT: Membership not found');
+      return res.status(404).json({
+        success: false,
+        error: 'Not Found',
+        message: 'Athlete is not a member of this crew'
+      });
+    }
+
+    const runCrew = membership.runCrew;
+    const isAdmin =
+      runCrew.runcrewAdminId === athleteId ||
+      (runCrew.managers || []).some(manager => manager.athleteId === athleteId && manager.role === 'admin');
+
+    res.json({
+      success: true,
+      runCrew: {
+        id: runCrew.id,
+        name: runCrew.name,
+        description: runCrew.description,
+        runcrewAdminId: runCrew.runcrewAdminId,
+        isAdmin
+      }
+    });
+  } catch (error) {
+    console.error('❌ RUNCREW CONTEXT: Error', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to verify crew context',
+      message: error.message
+    });
+  }
+});
+
 export default router;
 
 
