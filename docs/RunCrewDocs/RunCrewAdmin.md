@@ -14,9 +14,21 @@ RunCrew Admin behaves like a **Facebook Page admin center** or **Eventbrite orga
 - Manage the crew’s brand (logo, description, meet-up point defaults) from the Settings surface.
 - Delegate responsibility (managers) so crews remain healthy without bottlenecking on one admin.
 
-**Authentication note**: RunCrew remains an athlete-first identity model. Pages themselves never mint tokens. Every admin action still arrives with the athlete’s Firebase token; the backend rehydrates the crew using `runCrewId` + that athlete. This is deliberate—moving to crew-issued tokens would require new identity flows (`runCrewId + athleteId` combos, additional lookups) and is outside the MVP scope.
+**Authentication note**: RunCrew remains an athlete-first identity model. Pages themselves never mint tokens. Every admin action still arrives with the athlete’s Firebase token; the backend rehydrates the crew using `runCrewId` + that athlete. This is deliberate—moving to crew-issued tokens would require new identity flows (`runCrewId + athleteId` combos, additional lookups) and is outside the MVP scope. `verifyFirebaseToken` is strictly an authentication check; crew membership and role gating always happen inside each RunCrew route via Prisma lookups.
 
 "Do stuff, not just see stuff" still applies, but the context is about **programming the calendar** and **keeping members engaged**, not managing a sales pipeline.
+
+---
+
+## Hydration Flow (Current Implementation)
+
+- Admin surfaces fetch fresh data per module via backend routes scoped to the active `runCrewId` (no localStorage cache).
+- Core calls:
+  - `GET /api/runcrew/:id` → crew metadata, admin info, memberships.
+  - `GET /api/runcrew/:id/runs` → run schedule + RSVP roster.
+  - `GET /api/runcrew/:id/events` → event inventory + RSVPs.
+- `RunCrewCentralAdmin.jsx` rehydrates on mount and after create/update/delete flows by calling the endpoints above.
+- `verifyFirebaseToken` only validates the Firebase token; each route enforces membership/admin rights with Prisma before returning data.
 
 ---
 
@@ -133,6 +145,23 @@ model RunCrewRunRSVP {
 - `"going"`
 - `"maybe"`
 - `"not-going"`
+
+---
+
+## Run Lifecycle & Cleanup
+
+**Create**
+- `POST /api/runcrew/:runCrewId/runs` creates a run (admin/manager/creator, gating handled in route). The admin UI immediately re-fetches `GET /api/runcrew/:id` and `GET /api/runcrew/:id/runs` to reflect server truth.
+
+**Edit**
+- `PATCH /api/runcrew/runs/:runId` updates run logistics (admin, manager, or run creator). Route reconfirms membership/admin role before persisting changes.
+
+**Delete**
+- `DELETE /api/runcrew/runs/:runId` removes the run (and cascades RSVPs). The frontend rehydrates runs afterwards so listings collapse without relying on stale caches.
+
+**Auto cleanup (after date)**
+- MVP behaviour filters past runs client-side (`RunCrewCentralAdmin.jsx` only renders runs whose `date` is in the future).
+- Future enhancement: add a scheduled worker or soft-delete flag to archive historical runs so hydration routes only return upcoming inventory.
 
 ---
 
