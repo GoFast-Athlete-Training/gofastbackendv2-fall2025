@@ -43,6 +43,8 @@ import runCrewManagerRouter from './routes/RunCrew/runCrewManagerRoute.js';
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
 import trainingDayRouter from './routes/Training/trainingDayRoute.js';
+// Event routes
+import eventVolunteerRouter from './routes/Event/eventVolunteerRoute.js';
 // Founder routes
 import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
 import founderCrmRouter from './routes/Founder/founderCrmRoute.js';
@@ -82,6 +84,7 @@ const upload = multer({ storage });
 const allowedOrigins = [
   'https://dashboard.gofastcrushgoals.com',
   'https://athlete.gofastcrushgoals.com',
+  'https://company.gofastcrushgoals.com', // GoFast Company Stack production domain
   'http://localhost:3000', // Local dev
   'http://localhost:5173', // Vite dev server
   'http://localhost:5174', // Alternative Vite port
@@ -144,6 +147,8 @@ app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsv
 app.use('/api/runcrew', runCrewEventRouter); // /:runCrewId/events
 app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
+// Event volunteer routes (public volunteer signups)
+app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /?eventSlug=
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
