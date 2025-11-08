@@ -66,7 +66,8 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
     const runCrew = await prisma.runCrew.findUnique({
       where: { id: runCrewId },
       include: {
-        managers: true
+        managers: true,
+        memberships: true
       }
     });
 
@@ -81,18 +82,20 @@ router.post('/:runCrewId/runs', verifyFirebaseToken, async (req, res) => {
     const isManager = runCrew.managers?.some(manager => (
       manager.athleteId === athlete.id && ['admin', 'manager'].includes(manager.role)
     ));
+    const isMember = runCrew.memberships?.some(membership => membership.athleteId === athlete.id);
 
-    if (!isAdmin && !isManager) {
+    if (!isAdmin && !isManager && !isMember) {
       console.warn('🚫 RUN CREATE UNAUTHORIZED', {
         runCrewId,
         requestingAthleteId: athlete.id,
         runcrewAdminId: runCrew.runcrewAdminId,
-        managers: runCrew.managers.map(m => ({ athleteId: m.athleteId, role: m.role }))
+        managers: runCrew.managers.map(m => ({ athleteId: m.athleteId, role: m.role })),
+        membershipCount: runCrew.memberships.length
       });
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
-        message: 'Only admins or managers can create runs'
+        message: 'You must belong to this crew to create runs'
       });
     }
 
