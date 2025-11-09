@@ -143,14 +143,15 @@ Not a settings panel. It's an action center.
 
 ---
 
-### 5. Messages (Future)
+### 5. Messages
 
 **Display**:
-- Recent messages
-- Text input to post
+- Text box to post
+- Recent messages below
 - Name + timestamp
 
 **Backend**:
+- `POST /api/runcrew/messages`
 - `crew.messages`
 
 ---
