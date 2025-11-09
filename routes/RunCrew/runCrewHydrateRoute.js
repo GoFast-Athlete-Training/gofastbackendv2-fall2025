@@ -31,7 +31,6 @@ router.post('/hydrate', async (req, res) => {
     const runCrew = await prisma.runCrew.findUnique({
       where: { id: runCrewId },
       include: {
-        admin: true,
         managers: {
           include: {
             athlete: true
@@ -95,12 +94,13 @@ router.post('/hydrate', async (req, res) => {
       });
     }
 
+    // HYDRATION V2: Determine admin status from RunCrewManager junction table
     const managerRecord = athleteId
       ? (runCrew.managers || []).find(
           (manager) => manager.athleteId === athleteId && manager.role === 'admin'
         )
       : null;
-    const isAdmin = Boolean(managerRecord) || runCrew.runcrewAdminId === athleteId;
+    const isAdmin = Boolean(managerRecord);
 
     const runCrewForResponse = {
       ...runCrew,
@@ -163,13 +163,20 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
       include: {
         runCrew: {
           include: {
-            admin: {
+            managers: {
               select: {
                 id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                photoURL: true
+                athleteId: true,
+                role: true,
+                athlete: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    email: true,
+                    photoURL: true
+                  }
+                }
               }
             },
             memberships: {
@@ -191,15 +198,21 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
       }
     });
     
-    // Transform to include member count and admin status
-    const runCrews = memberships.map(membership => ({
-      ...membership.runCrew,
-      memberCount: membership.runCrew.memberships.length,
-      isAdmin: membership.runCrew.runcrewAdminId === athlete.id,
-      joinedAt: membership.joinedAt,
-      messageCount: membership.runCrew._count.messages,
-      leaderboardCount: membership.runCrew._count.leaderboardEntries
-    }));
+    // Transform to include member count and admin status (HYDRATION V2)
+    const runCrews = memberships.map(membership => {
+      const isAdmin = (membership.runCrew.managers || []).some(
+        m => m.athleteId === athlete.id && m.role === 'admin'
+      );
+      
+      return {
+        ...membership.runCrew,
+        memberCount: membership.runCrew.memberships.length,
+        isAdmin,
+        joinedAt: membership.joinedAt,
+        messageCount: membership.runCrew._count.messages,
+        leaderboardCount: membership.runCrew._count.leaderboardEntries
+      };
+    });
     
     console.log('✅ RUNCREW MINE: Found', runCrews.length, 'crews');
     
@@ -260,13 +273,17 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
     const runCrew = await prisma.runCrew.findUnique({
       where: { id },
       include: {
-        admin: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            photoURL: true
+        managers: {
+          include: {
+            athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                photoURL: true
+              }
+            }
           }
         },
         memberships: {
@@ -376,8 +393,10 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
       membership => membership.athleteId === athlete.id
     );
     
-    // Check if athlete is the admin (proper relationship)
-    const isAdmin = runCrew.runcrewAdminId === athlete.id;
+    // HYDRATION V2: Check if athlete is the admin via RunCrewManager
+    const isAdmin = (runCrew.managers || []).some(
+      m => m.athleteId === athlete.id && m.role === 'admin'
+    );
     
     if (!isMember && !isAdmin) {
       console.log('❌ RUNCREW HYDRATE: Athlete is not a member or admin');
