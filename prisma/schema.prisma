@@ -78,7 +78,7 @@ model Athlete {
   activities AthleteActivity[]
 
   // RunCrew Relations
-  adminRunCrews        RunCrew[]             @relation("RunCrewAdmin") // Crews this athlete created/admin
+  // NOTE: Admin status is now determined via runCrewManagers with role='admin'
   runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
   runCrewMessages      RunCrewMessage[]      @relation // Messages authored by this athlete
   runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
@@ -87,7 +87,7 @@ model Athlete {
   runCrewRunRSVPs      RunCrewRunRSVP[]      @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
   runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
   runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
-  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // RunCrews this athlete manages (future)
+  runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // Source of truth for admin/manager roles
 
   // Training Relations
   createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
@@ -154,13 +154,12 @@ model AthleteActivity {
 
 // RunCrew Models
 model RunCrew {
-  id             String  @id @default(cuid())
-  name           String
-  description    String? // Optional crew description/motto
-  joinCode       String  @unique // Unique invite code for joining
-  logo           String? // Optional logo/image URL
-  icon           String? // Optional emoji/icon (alternative to logo)
-  runcrewAdminId String? // Athlete ID of the creator/admin (nullable temporarily for migration)
+  id          String  @id @default(cuid())
+  name        String
+  description String? // Optional crew description/motto
+  joinCode    String  @unique // Unique invite code for joining
+  logo        String? // Optional logo/image URL
+  icon        String? // Optional emoji/icon (alternative to logo)
 
   // Status & Archive
   isArchived Boolean   @default(false) // Soft delete - archive crew instead of deleting
@@ -171,14 +170,14 @@ model RunCrew {
   updatedAt DateTime @updatedAt
 
   // Relations
-  admin              Athlete?              @relation("RunCrewAdmin", fields: [runcrewAdminId], references: [id])
+  // NOTE: Admin is now determined via RunCrewManager with role='admin'
   memberships        RunCrewMembership[] // Junction table for members
   messages           RunCrewMessage[] // Simple chat messages (real-time via socket)
   announcements      RunCrewAnnouncement[] // Admin announcements
   leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats (calculated cache)
   runs               RunCrewRun[] // Runs (MVP1: admin only)
   events             RunCrewEvent[] // General events (future - happy hour, social, etc.)
-  managers           RunCrewManager[] // Delegated managers (future)
+  managers           RunCrewManager[] // Source of truth for admin/manager roles
 
   @@map("run_crews")
 }

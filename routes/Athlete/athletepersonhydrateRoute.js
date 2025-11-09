@@ -120,7 +120,7 @@ async function hydrateAthlete(req, res) {
     
     const prisma = getPrismaClient();
     
-    // Find athlete with RunCrew memberships included
+    // Find athlete with RunCrew memberships and manager roles included
     // ATHLETE-FIRST: Query athlete by firebaseId, then hydrate all relations via athleteId
     let athlete = await prisma.athlete.findFirst({
       where: { firebaseId }, // Find by Firebase ID (auth)
@@ -128,62 +128,61 @@ async function hydrateAthlete(req, res) {
         // ATHLETE-FIRST: RunCrew memberships relation - explicitly included
         runCrewMemberships: {
           include: {
-                  runCrew: {
-                include: {
-                  admin: {
-                    select: {
-                      id: true,
-                      firstName: true,
-                      lastName: true,
-                      email: true,
-                      photoURL: true
-                    }
-                  },
-                  managers: {
-                    // QUERYABLE MODEL - Include ALL managers (admin and manager roles)
-                    // Frontend needs full managers array to check admin status
-                    include: {
-                      athlete: {
-                        select: {
-                          id: true,
-                          firstName: true,
-                          lastName: true,
-                          email: true,
-                          photoURL: true
-                        }
+            runCrew: {
+              include: {
+                managers: {
+                  // QUERYABLE MODEL - Include ALL managers (admin and manager roles)
+                  // Frontend needs full managers array to check admin status
+                  include: {
+                    athlete: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        photoURL: true
                       }
                     }
-                  },
-                  memberships: {
-                    select: {
-                      athleteId: true
-                    }
-                  },
-                  _count: {
-                    select: {
-                      messages: true,
-                      leaderboardEntries: true
-                    }
+                  }
+                },
+                memberships: {
+                  select: {
+                    athleteId: true
+                  }
+                },
+                _count: {
+                  select: {
+                    messages: true,
+                    leaderboardEntries: true
                   }
                 }
               }
+            }
           },
           orderBy: {
             joinedAt: 'desc'
           }
         },
-        adminRunCrews: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            joinCode: true,
-            logo: true,
-            icon: true,
-            createdAt: true
+        runCrewManagers: {
+          include: {
+            runCrew: {
+              include: {
+                managers: true,
+                memberships: {
+                  select: {
+                    athleteId: true
+                  }
+                },
+                _count: {
+                  select: {
+                    messages: true,
+                    leaderboardEntries: true
+                  }
+                }
+              }
+            }
           }
-        },
-        runCrewManagers: true
+        }
       }
     });
     
@@ -339,6 +338,35 @@ async function hydrateAthlete(req, res) {
     
     console.log('✅ ATHLETE PERSON HYDRATE: Successfully hydrated', runCrews.length, 'RunCrews');
     
+    // HYDRATION V2: Flatten all crews with role/managerId for clean frontend context
+    const allCrews = [
+      // Manager/Admin crews (from runCrewManagers)
+      ...(athlete.runCrewManagers || []).map(m => ({
+        runCrewId: m.runCrewId,
+        role: m.role,
+        managerId: m.id,
+        runCrew: m.runCrew || null
+      })),
+      // Member crews (from runCrewMemberships) - only if not already in managers
+      ...(athlete.runCrewMemberships || [])
+        .filter(membership => {
+          // Don't duplicate if already in managers
+          return !(athlete.runCrewManagers || []).some(m => m.runCrewId === membership.runCrewId);
+        })
+        .map(m => ({
+          runCrewId: m.runCrewId,
+          role: 'member',
+          managerId: null,
+          runCrew: m.runCrew || null
+        }))
+    ];
+
+    // MVP1: Single crew per athlete - get the primary crew
+    const MyCrew = allCrews.length === 1 ? allCrews[0].runCrewId : (allCrews[0]?.runCrewId || null);
+    const MyCrewManagerId = allCrews.find(c => c.role === 'admin')?.managerId || null;
+
+    console.log('✅ ATHLETE PERSON HYDRATE: Flattened crews context - MyCrew:', MyCrew, 'MyCrewManagerId:', MyCrewManagerId);
+    
     // Fetch weekly activities (last 7 days) for this athlete
     console.log('🔍 ATHLETE PERSON HYDRATE: Fetching weekly activities for athleteId:', athleteId);
     const now = new Date();
@@ -439,14 +467,15 @@ async function hydrateAthlete(req, res) {
         lastSyncAt: athlete.garmin_last_sync_at || null
       },
       
-      // RunCrew Memberships (hydrated)
+      // RunCrew Memberships (hydrated) - LEGACY
       runCrews: runCrews,
       runCrewCount: runCrews.length,
       runCrewManagers: athlete.runCrewManagers || [],
       
-      // Admin RunCrews (crews this athlete created)
-      adminRunCrews: athlete.adminRunCrews || [],
-      adminRunCrewCount: athlete.adminRunCrews?.length || 0,
+      // HYDRATION V2: Clean crew context for frontend
+      crews: allCrews, // Flattened array with role/managerId
+      MyCrew: MyCrew, // Primary crew ID for MVP1
+      MyCrewManagerId: MyCrewManagerId, // Manager record ID if admin
       
       // Weekly Activities (last 7 days)
       weeklyActivities: weeklyActivities || [],
