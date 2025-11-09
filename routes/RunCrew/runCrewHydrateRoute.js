@@ -17,7 +17,7 @@ const router = express.Router();
 router.post('/hydrate', async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { runCrewId } = req.body || {};
+    const { runCrewId, athleteId } = req.body || {};
 
     if (!runCrewId) {
       return res.status(400).json({
@@ -95,9 +95,22 @@ router.post('/hydrate', async (req, res) => {
       });
     }
 
+    const managerRecord = athleteId
+      ? (runCrew.managers || []).find(
+          (manager) => manager.athleteId === athleteId && manager.role === 'admin'
+        )
+      : null;
+    const isAdmin = Boolean(managerRecord) || runCrew.runcrewAdminId === athleteId;
+
+    const runCrewForResponse = {
+      ...runCrew,
+      isAdmin,
+      currentManagerId: managerRecord?.id || null
+    };
+
     res.json({
       success: true,
-      runCrew
+      runCrew: runCrewForResponse
     });
   } catch (error) {
     console.error('❌ RUNCREW HYDRATE (LOCAL-FIRST):', error);

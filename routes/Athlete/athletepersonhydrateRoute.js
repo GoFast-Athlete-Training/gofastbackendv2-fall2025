@@ -182,7 +182,8 @@ async function hydrateAthlete(req, res) {
             icon: true,
             createdAt: true
           }
-        }
+        },
+        runCrewManagers: true
       }
     });
     
@@ -264,7 +265,8 @@ async function hydrateAthlete(req, res) {
               icon: true,
               createdAt: true
             }
-          }
+          },
+          runCrewManagers: true
         }
       });
       console.log('✅ ATHLETE PERSON HYDRATE: photoURL updated from Firebase');
@@ -291,6 +293,7 @@ async function hydrateAthlete(req, res) {
       
       // Transform managers to include athleteId and role directly (not nested in athlete relation)
       const managers = allManagers.map(m => ({
+        id: m.id,
         athleteId: m.athleteId, // Direct field from RunCrewManager
         role: m.role, // Direct field from RunCrewManager
         athlete: m.athlete // Include athlete details for display
@@ -439,6 +442,9 @@ async function hydrateAthlete(req, res) {
       // RunCrew Memberships (hydrated)
       runCrews: runCrews,
       runCrewCount: runCrews.length,
+      primaryRunCrew,
+      runCrewManagers,
+      primaryRunCrewManagerId: primaryRunCrewManager?.id || null,
       
       // Admin RunCrews (crews this athlete created)
       adminRunCrews: athlete.adminRunCrews || [],
@@ -466,6 +472,7 @@ async function hydrateAthlete(req, res) {
     console.log('🎯 ATHLETE PERSON HYDRATE: RunCrews count:', runCrews.length);
     console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from runCrews.isAdmin):', adminCrewsFromRunCrews.length);
     console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from adminRunCrews relation):', athlete.adminRunCrews?.length || 0);
+    console.log('🎯 ATHLETE PERSON HYDRATE: primaryRunCrew:', primaryRunCrew?.id || 'none');
     
     // Log each crew's admin status
     runCrews.forEach((crew, index) => {
@@ -500,6 +507,7 @@ async function hydrateAthlete(req, res) {
 // Mirror of Ignite's /api/owner/hydrate pattern
 // Uses Firebase middleware to verify token and get firebaseId from req.user.uid
 router.get('/hydrate', verifyFirebaseToken, hydrateAthlete);
+router.post('/hydrate', verifyFirebaseToken, hydrateAthlete);
 
 // Legacy route - kept for backward compatibility
 router.get('/athletepersonhydrate', verifyFirebaseToken, hydrateAthlete);

@@ -153,6 +153,19 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
               }
             }
           }
+        },
+        managers: {
+          include: {
+            athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                photoURL: true
+              }
+            }
+          }
         }
       }
     });
