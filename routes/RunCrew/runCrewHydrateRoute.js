@@ -9,6 +9,107 @@ import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 const router = express.Router();
 
 /**
+ * Hydrate RunCrew by ID (local-context driven)
+ * POST /api/runcrew/hydrate
+ * Body: { runCrewId }
+ * Returns: Fully hydrated RunCrew without requiring Firebase token.
+ */
+router.post('/hydrate', async (req, res) => {
+  try {
+    const prisma = getPrismaClient();
+    const { runCrewId } = req.body || {};
+
+    if (!runCrewId) {
+      return res.status(400).json({
+        success: false,
+        error: 'runCrewId is required from localStorage context'
+      });
+    }
+
+    console.log('🚀 RUNCREW HYDRATE (LOCAL-FIRST):', runCrewId);
+
+    const runCrew = await prisma.runCrew.findUnique({
+      where: { id: runCrewId },
+      include: {
+        admin: true,
+        managers: {
+          include: {
+            athlete: true
+          }
+        },
+        memberships: {
+          include: {
+            athlete: true
+          },
+          orderBy: {
+            joinedAt: 'desc'
+          }
+        },
+        messages: {
+          include: {
+            athlete: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 50
+        },
+        announcements: {
+          include: {
+            author: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: 10
+        },
+        leaderboardEntries: {
+          include: {
+            athlete: true
+          },
+          orderBy: [
+            { period: 'asc' },
+            { totalMiles: 'desc' }
+          ]
+        },
+        runs: {
+          include: {
+            createdBy: true,
+            rsvps: {
+              include: {
+                athlete: true
+              }
+            }
+          },
+          orderBy: {
+            date: 'asc'
+          }
+        }
+      }
+    });
+
+    if (!runCrew) {
+      return res.status(404).json({
+        success: false,
+        error: 'RunCrew not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      runCrew
+    });
+  } catch (error) {
+    console.error('❌ RUNCREW HYDRATE (LOCAL-FIRST):', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to hydrate RunCrew',
+      message: error.message
+    });
+  }
+});
+
+/**
  * Get My RunCrews
  * GET /api/runcrew/mine
  * Returns: All crews the authenticated athlete belongs to
@@ -293,90 +394,6 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to hydrate RunCrew',
-      message: error.message
-    });
-  }
-});
-
-/**
- * RunCrew context verification
- * GET /api/runcrew/:runCrewId/context/:athleteId
- * Confirms that the athlete belongs to the crew and returns a lightweight payload.
- */
-router.get('/:runCrewId/context/:athleteId', verifyFirebaseToken, async (req, res) => {
-  try {
-    const prisma = getPrismaClient();
-    const { runCrewId, athleteId } = req.params;
-    const firebaseId = req.user?.uid;
-
-    console.log('🔍 RUNCREW CONTEXT: crew', runCrewId, 'athlete', athleteId);
-
-    // Verify athlete via firebase
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-
-    if (!athlete || athlete.id !== athleteId) {
-      console.log('❌ RUNCREW CONTEXT: Athlete mismatch or not found');
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized',
-        message: 'Athlete mismatch'
-      });
-    }
-
-    const membership = await prisma.runCrewMembership.findFirst({
-      where: {
-        athleteId,
-        runCrewId
-      },
-      include: {
-        runCrew: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            runcrewAdminId: true,
-            managers: {
-              select: {
-                athleteId: true,
-                role: true
-              }
-            }
-          }
-        }
-      }
-    });
-
-    if (!membership) {
-      console.log('❌ RUNCREW CONTEXT: Membership not found');
-      return res.status(404).json({
-        success: false,
-        error: 'Not Found',
-        message: 'Athlete is not a member of this crew'
-      });
-    }
-
-    const runCrew = membership.runCrew;
-    const isAdmin =
-      runCrew.runcrewAdminId === athleteId ||
-      (runCrew.managers || []).some(manager => manager.athleteId === athleteId && manager.role === 'admin');
-
-    res.json({
-      success: true,
-      runCrew: {
-        id: runCrew.id,
-        name: runCrew.name,
-        description: runCrew.description,
-        runcrewAdminId: runCrew.runcrewAdminId,
-        isAdmin
-      }
-    });
-  } catch (error) {
-    console.error('❌ RUNCREW CONTEXT: Error', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to verify crew context',
       message: error.message
     });
   }

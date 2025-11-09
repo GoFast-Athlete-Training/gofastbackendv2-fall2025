@@ -23,7 +23,7 @@ RunCrew Admin behaves like a **Facebook Page admin center** or **Eventbrite orga
 ## Hydration Flow (Current Implementation)
 
 - Admin surfaces fetch fresh data per module via backend routes scoped to the active `runCrewId` (no localStorage cache).
-- Entry point: `/crew/crewadmin` (no URL params). Page reads `athleteId`, `runCrewId`, and `runCrewAdminId` from `LocalStorageAPI` (`src/config/LocalStorageConfig.js`), then calls `GET /api/runcrew/:runCrewId/context/:athleteId` to validate and hydrate server truth.
+- Entry point: `/crew/crewadmin` (no URL params). Page reads `athleteId`, `runCrewId`, and `runCrewAdminId` from `LocalStorageAPI` (`src/config/LocalStorageConfig.js`). When the admin wants fresh data it posts to `POST /api/runcrew/hydrate` with `{ runCrewId }`, caches the response, and then renders.
 - Uses `useHydratedAthlete()` to pull the cached athlete profile and elevate the first `runCrews[0]` entry into `runCrewId`/`runCrewAdminId`. That keeps the backend response athlete-first while the frontend derives the single-crew context it needs for routing.
 - `verifyFirebaseToken` only validates the Firebase token; each route enforces membership/admin rights with Prisma before returning data.
 
