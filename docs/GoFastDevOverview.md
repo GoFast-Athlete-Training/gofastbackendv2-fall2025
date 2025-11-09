@@ -366,13 +366,52 @@ GET    /api/athlete/admin/hydrate       → Admin: Hydrate all athletes
 ```
 POST   /api/runcrew/create              → Create RunCrew (creates membership for creator)
 POST   /api/runcrew/join                → Join RunCrew via joinCode
+POST   /api/runcrew/hydrate             → Hydrate single crew (local-first, no auth required)
 GET    /api/runcrew/:id                 → Hydrate single crew (members, posts, leaderboard)
 GET    /api/runcrew/mine                → Get all crews for authenticated athlete
 DELETE /api/runcrew/:id/leave           → Leave a crew (TODO)
 DELETE /api/runcrew/:id/members/:athleteId → Remove member (admin only, TODO)
 ```
 
+**RunCrew Run Management**:
+```
+POST   /api/runcrew/:runCrewId/runs     → Create run (admin/manager/member)
+GET    /api/runcrew/:runCrewId/runs     → Get all runs for crew
+PATCH  /api/runcrew/runs/:runId         → Update run (admin/manager/creator)
+DELETE /api/runcrew/runs/:runId         → Delete run (admin/manager/creator)
+POST   /api/runcrew/runs/:runId/rsvp    → RSVP to run (going/maybe/not-going)
+```
+
 **Complete Documentation**: See `docs/RunCrewArchitecture.md` for full API documentation.
+
+### RunCrew Admin Dashboard
+
+**Location**: `gofastfrontend-mvp1/src/Pages/RunCrew/RunCrewCentralAdmin.jsx`
+
+**Purpose**: Single-page admin dashboard for managing a RunCrew (announcements, runs, members, messages)
+
+**Features**:
+- ✅ **Local-First Rendering** - Loads from `LocalStorageAPI`, renders instantly
+- ✅ **Announcement Creator** - Post announcements with author attribution
+- ✅ **Run Creator** - Full form with all model fields:
+  - Required: Title, Date, Start Time, Meet-Up Point
+  - Optional: Address, Total Miles, Pace, Strava URL, Description
+- ✅ **Run Management** - Edit/delete runs with inline expandable details
+- ✅ **RSVP Display** - Shows accurate "X going" counts
+- ✅ **Member Roster** - Grid view with admin badges
+- ✅ **Message Feed** - Recent crew messages
+- ✅ **Re-sync Button** - Explicit refresh from backend
+
+**Run Details (Inline Expansion)**:
+- Distance & Pace
+- Full Address
+- Strava Map Link
+- Description
+- Map Placeholder (if coordinates exist)
+- RSVP List with avatars
+
+**Form Alignment**:
+The Create Run form is fully aligned with the `RunCrewRun` Prisma model and backend `POST /api/runcrew/:runCrewId/runs` route, supporting all fields including recurrence (future-ready).
 
 ### Garmin Routes
 ```
@@ -412,6 +451,200 @@ POST   /api/admin/upsert/founder        → Upsert Founder model (universal upse
 3. Backend finds/creates Athlete record
 4. Frontend stores `athleteId` in localStorage
 5. For hydration: `GET /api/athlete/:id/hydrate` with Bearer token
+
+---
+
+## Hydration Architecture (V2)
+
+### Core Principle
+**Athlete-First, Context-Based Hydration** - Welcome hydrates athlete only. Feature pages hydrate their specific context on-demand and cache locally.
+
+### Hydration Strategy
+
+#### 1. Athlete Hydration (Welcome Flow)
+**Endpoint**: `POST /api/athlete/hydrate`
+
+**Purpose**: Initial hydration at welcome/login - loads athlete profile and basic context
+
+**Backend Response**:
+```javascript
+{
+  success: true,
+  athlete: {
+    // Full Prisma athlete object
+    id, firebaseId, email, firstName, lastName, ...
+    
+    // HYDRATION V2: Clean crew context
+    crews: [
+      {
+        runCrewId: "crew-id",
+        role: "admin" | "manager" | "member",
+        managerId: "manager-record-id" | null,
+        runCrew: { /* full crew object */ }
+      }
+    ],
+    MyCrew: "primary-crew-id",  // MVP1: Single crew per athlete
+    MyCrewManagerId: "manager-record-id"  // If admin/manager
+  },
+  weeklyActivities: [...],
+  weeklyTotals: { totalMiles, totalRuns, ... }
+}
+```
+
+**Key Changes (V2)**:
+- ✅ Removed deprecated `runcrewAdminId` field
+- ✅ Admin status determined via `RunCrewManager` junction table
+- ✅ Flattened `crews` array with role/managerId for clean frontend context
+- ✅ `MyCrew` and `MyCrewManagerId` for direct access (MVP1: one crew per athlete)
+
+**Frontend Storage** (`LocalStorageAPI`):
+```javascript
+{
+  athleteProfile: { /* full athlete object */ },
+  athleteId: "athlete-id",
+  MyCrew: "crew-id",
+  MyCrewManagerId: "manager-id",
+  weeklyActivities: [...],
+  weeklyTotals: {...},
+  hydrationVersion: "hydration-v2"
+}
+```
+
+#### 2. RunCrew Hydration (Feature Context)
+**Endpoint**: `POST /api/runcrew/hydrate`
+
+**Purpose**: Hydrate full crew context when entering RunCrew features (admin dashboard, member view)
+
+**Request**:
+```javascript
+{
+  runCrewId: "crew-id",
+  athleteId: "athlete-id"  // Optional, for isAdmin computation
+}
+```
+
+**Backend Response**:
+```javascript
+{
+  success: true,
+  runCrew: {
+    // Full crew with all relations
+    id, name, description, joinCode, logo, icon,
+    managers: [
+      { id, athleteId, role, athlete: {...} }
+    ],
+    memberships: [
+      { id, athleteId, joinedAt, athlete: {...} }
+    ],
+    runs: [
+      {
+        id, title, date, startTime, meetUpPoint, meetUpAddress,
+        totalMiles, pace, stravaMapUrl, description,
+        createdBy: {...},
+        rsvps: [{ id, athleteId, status, athlete: {...} }]
+      }
+    ],
+    announcements: [
+      { id, content, createdAt, author: {...} }
+    ],
+    messages: [
+      { id, content, createdAt, athlete: {...} }
+    ],
+    leaderboardEntries: [...],
+    isAdmin: true,  // Computed from managers table
+    currentManagerId: "manager-id"
+  }
+}
+```
+
+**Frontend Storage**:
+```javascript
+LocalStorageAPI.setRunCrewData(runCrew);  // Cache full crew object
+```
+
+### Local-First Pattern
+
+**Principle**: Frontend renders immediately from `localStorage`, backend calls only on explicit user action.
+
+**Flow**:
+1. **Welcome** → Hydrate athlete → Store in `LocalStorageAPI`
+2. **Athlete Home** → Read from `LocalStorageAPI` → Render immediately
+3. **"Go to RunCrew" click** → Call `POST /runcrew/hydrate` → Cache crew → Navigate
+4. **RunCrew Admin** → Read from `LocalStorageAPI` → Render immediately
+5. **"Re-sync" button** → Call `POST /runcrew/hydrate` → Update cache
+
+**Benefits**:
+- ✅ Instant UI rendering (no loading spinners)
+- ✅ Reduced backend calls
+- ✅ Offline-capable (cached data)
+- ✅ Explicit refresh (user-controlled)
+
+### LocalStorageAPI
+
+**Location**: `gofastfrontend-mvp1/src/config/LocalStorageConfig.js`
+
+**Purpose**: Centralized localStorage management with consistent keys and helpers
+
+**Key Methods**:
+```javascript
+// Athlete context
+LocalStorageAPI.getAthleteProfile()
+LocalStorageAPI.getAthleteId()
+LocalStorageAPI.getMyCrew()
+LocalStorageAPI.getMyCrewManagerId()
+
+// Full model hydration
+LocalStorageAPI.setFullHydrationModel({ athlete, weeklyActivities, weeklyTotals })
+LocalStorageAPI.getFullHydrationModel()
+
+// RunCrew context
+LocalStorageAPI.setRunCrewData(runCrew)
+LocalStorageAPI.getRunCrewData()
+LocalStorageAPI.setRunCrewId(id)
+LocalStorageAPI.getRunCrewId()
+
+// Clear all
+LocalStorageAPI.clearAll()
+```
+
+### useHydratedAthlete Hook
+
+**Location**: `gofastfrontend-mvp1/src/hooks/useHydratedAthlete.js`
+
+**Purpose**: Local-only context reader - pulls athlete and crew context from `LocalStorageAPI`
+
+**Usage**:
+```javascript
+const { athlete, athleteId, runCrewId, runCrewManagerId, runCrew } = useHydratedAthlete();
+```
+
+**Returns**:
+- `athlete` - Full athlete profile object
+- `athleteId` - Athlete ID string
+- `runCrewId` - Primary crew ID (from `MyCrew`)
+- `runCrewManagerId` - Manager record ID (from `MyCrewManagerId`)
+- `runCrew` - Cached crew data (from `runCrewData`)
+
+### Migration from V1 to V2
+
+**Key Changes**:
+1. **Removed**: `runcrewAdminId` field from `RunCrew` model
+2. **Removed**: `adminRunCrews` relation from `Athlete` model
+3. **Added**: `RunCrewManager` junction table as source of truth for roles
+4. **Added**: `MyCrew` and `MyCrewManagerId` in athlete hydration response
+5. **Updated**: All backend routes to use `managers` table for admin checks
+6. **Updated**: Frontend to use `LocalStorageAPI` for all context access
+
+**Admin Status Check (V2)**:
+```javascript
+// OLD (V1):
+const isAdmin = runCrew.runcrewAdminId === athlete.id;
+
+// NEW (V2):
+const isAdmin = (runCrew.managers || []).some(
+  m => m.athleteId === athlete.id && m.role === 'admin'
+);
+```
 
 ---
 
@@ -599,15 +832,19 @@ Body: {
 ## Platform Roadmap
 
 ### Phase 1: RunCrew (MVP1) - Current Focus ✅
-**Status**: Core routes implemented, member management in progress
+**Status**: Core routes implemented, admin dashboard operational
 
 **Features**:
 - ✅ Create and join RunCrews
 - ✅ Hydrate crews with members, posts, leaderboards
+- ✅ Admin dashboard (RunCrewCentralAdmin) with full CRUD
+- ✅ Run management (create, edit, delete with inline details)
+- ✅ Announcement system
+- ✅ Member roster display
+- ✅ RSVP tracking
 - 🚧 Member management (leave, remove)
-- 🚧 Admin operations (update, delegate, broadcast)
+- 🚧 Admin operations (delegate, broadcast)
 - 🚧 Leaderboard calculation service
-- 🚧 Events & RSVP (schema addition needed)
 
 ### Phase 2: Training Plans (Future)
 **Features**:
