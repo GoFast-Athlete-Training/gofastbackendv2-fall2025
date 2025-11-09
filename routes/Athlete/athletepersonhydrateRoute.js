@@ -442,9 +442,7 @@ async function hydrateAthlete(req, res) {
       // RunCrew Memberships (hydrated)
       runCrews: runCrews,
       runCrewCount: runCrews.length,
-      primaryRunCrew,
-      runCrewManagers,
-      primaryRunCrewManagerId: primaryRunCrewManager?.id || null,
+      runCrewManagers: athlete.runCrewManagers || [],
       
       // Admin RunCrews (crews this athlete created)
       adminRunCrews: athlete.adminRunCrews || [],
@@ -472,7 +470,6 @@ async function hydrateAthlete(req, res) {
     console.log('🎯 ATHLETE PERSON HYDRATE: RunCrews count:', runCrews.length);
     console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from runCrews.isAdmin):', adminCrewsFromRunCrews.length);
     console.log('🎯 ATHLETE PERSON HYDRATE: Admin crews (from adminRunCrews relation):', athlete.adminRunCrews?.length || 0);
-    console.log('🎯 ATHLETE PERSON HYDRATE: primaryRunCrew:', primaryRunCrew?.id || 'none');
     
     // Log each crew's admin status
     runCrews.forEach((crew, index) => {
