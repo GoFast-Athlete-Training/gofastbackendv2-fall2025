@@ -186,7 +186,6 @@ router.get('/hydrate', async (req, res) => {
                   }
                 },
                 messages: true,
-                leaderboardEntries: true,
                 runs: true,
                 events: true
               },

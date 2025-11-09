@@ -82,7 +82,6 @@ model Athlete {
   runCrewMemberships   RunCrewMembership[]   @relation("AthleteRunCrewMemberships") // Crew memberships (junction table - athlete can be in multiple crews)
   runCrewMessages      RunCrewMessage[]      @relation // Messages authored by this athlete
   runCrewAnnouncements RunCrewAnnouncement[] @relation("RunCrewAnnouncementAuthor") // Announcements authored by this athlete
-  runCrewLeaderboards  RunCrewLeaderboard[] // Leaderboard entries for this athlete
   runCrewRuns          RunCrewRun[]          @relation("RunCrewRunCreator") // Runs created by this athlete
   runCrewRunRSVPs      RunCrewRunRSVP[]      @relation("RunCrewRunRSVP") // RSVPs to runs by this athlete
   runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
@@ -174,7 +173,6 @@ model RunCrew {
   memberships        RunCrewMembership[] // Junction table for members
   messages           RunCrewMessage[] // Simple chat messages (real-time via socket)
   announcements      RunCrewAnnouncement[] // Admin announcements
-  leaderboardEntries RunCrewLeaderboard[] // Leaderboard stats (calculated cache)
   runs               RunCrewRun[] // Runs (MVP1: admin only)
   events             RunCrewEvent[] // General events (future - happy hour, social, etc.)
   managers           RunCrewManager[] // Source of truth for admin/manager roles
@@ -234,37 +232,6 @@ model RunCrewAnnouncement {
   author  Athlete @relation("RunCrewAnnouncementAuthor", fields: [authorId], references: [id], onDelete: Cascade)
 
   @@map("run_crew_announcements")
-}
-
-// RunCrew Leaderboard - Aggregated stats for competition
-model RunCrewLeaderboard {
-  id        String @id @default(cuid())
-  runCrewId String
-  athleteId String
-
-  // Time period
-  period      String // 'week', 'month', 'allTime'
-  periodStart DateTime // Start of period
-  periodEnd   DateTime // End of period
-
-  // Stats
-  totalMiles     Float   @default(0)
-  totalRuns      Int     @default(0)
-  bestPace       String? // Best pace achieved (e.g., "6:25/mi")
-  totalCalories  Int     @default(0)
-  totalElevation Float   @default(0) // In meters
-
-  // Timestamps
-  calculatedAt DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  runCrew RunCrew @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-
-  @@unique([runCrewId, athleteId, period, periodStart]) // Prevent duplicate entries for same period
-  @@map("run_crew_leaderboards")
 }
 
 // RunCrew Runs - MVP1

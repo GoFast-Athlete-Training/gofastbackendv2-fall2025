@@ -152,8 +152,7 @@ async function hydrateAthlete(req, res) {
                 },
                 _count: {
                   select: {
-                    messages: true,
-                    leaderboardEntries: true
+                    messages: true
                   }
                 }
               }
@@ -175,8 +174,7 @@ async function hydrateAthlete(req, res) {
                 },
                 _count: {
                   select: {
-                    messages: true,
-                    leaderboardEntries: true
+                    messages: true
                   }
                 }
               }
@@ -243,8 +241,7 @@ async function hydrateAthlete(req, res) {
                   },
                   _count: {
                     select: {
-                      messages: true,
-                      leaderboardEntries: true
+                    messages: true
                     }
                   }
                 }
@@ -331,8 +328,7 @@ async function hydrateAthlete(req, res) {
         runcrewAdminId: runcrewAdminId, // Backward compatibility
         managers: managers, // QUERYABLE MODEL: Include ALL managers array with athleteId and role for frontend
         joinedAt: membership.joinedAt,
-        messageCount: membership.runCrew._count?.messages || 0,
-        leaderboardCount: membership.runCrew._count?.leaderboardEntries || 0
+        messageCount: membership.runCrew._count?.messages || 0
       };
     }).filter(Boolean); // Remove null entries
     

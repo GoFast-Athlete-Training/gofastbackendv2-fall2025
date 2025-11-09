@@ -5,6 +5,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { computeCrewLeaderboard } from '../../services/crewLeaderboard.js';
 
 const router = express.Router();
 
@@ -62,15 +63,6 @@ router.post('/hydrate', async (req, res) => {
           },
           take: 10
         },
-        leaderboardEntries: {
-          include: {
-            athlete: true
-          },
-          orderBy: [
-            { period: 'asc' },
-            { totalMiles: 'desc' }
-          ]
-        },
         runs: {
           include: {
             createdBy: true,
@@ -102,10 +94,13 @@ router.post('/hydrate', async (req, res) => {
       : null;
     const isAdmin = Boolean(managerRecord);
 
+    const leaderboardDynamic = await computeCrewLeaderboard(runCrewId);
+
     const runCrewForResponse = {
       ...runCrew,
       isAdmin,
-      currentManagerId: managerRecord?.id || null
+      currentManagerId: managerRecord?.id || null,
+      leaderboardDynamic
     };
 
     res.json({
@@ -186,8 +181,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
             },
             _count: {
               select: {
-                messages: true,
-                leaderboardEntries: true
+                messages: true
               }
             }
           }
@@ -209,8 +203,7 @@ router.get('/mine', verifyFirebaseToken, async (req, res) => {
         memberCount: membership.runCrew.memberships.length,
         isAdmin,
         joinedAt: membership.joinedAt,
-        messageCount: membership.runCrew._count.messages,
-        leaderboardCount: membership.runCrew._count.leaderboardEntries
+        messageCount: membership.runCrew._count?.messages ?? 0
       };
     });
     
@@ -333,22 +326,6 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
             createdAt: 'desc'
           }
         },
-        leaderboardEntries: {
-          include: {
-            athlete: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                photoURL: true
-              }
-            }
-          },
-          orderBy: [
-            { period: 'asc' },
-            { totalMiles: 'desc' }
-          ]
-        },
         runs: {
           include: {
             createdBy: {
@@ -408,13 +385,20 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
     }
     
     console.log('✅ RUNCREW HYDRATE: Successfully hydrated crew');
+
+    const leaderboardDynamic = await computeCrewLeaderboard(id);
+    const managerRecord = (runCrew.managers || []).find(
+      (manager) => manager.athleteId === athlete.id && manager.role === 'admin'
+    );
     
     res.json({
       success: true,
       runCrew: {
         ...runCrew,
         memberCount: runCrew.memberships.length,
-        isAdmin: isAdmin
+        isAdmin: isAdmin,
+        currentManagerId: managerRecord?.id || null,
+        leaderboardDynamic
       }
     });
     
