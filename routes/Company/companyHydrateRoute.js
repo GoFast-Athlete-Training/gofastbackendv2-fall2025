@@ -92,9 +92,60 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     }
     
     // Company can be null - staff might not have company yet
-    // Return staff info even if company doesn't exist (frontend will redirect to company settings)
-    if (!staff.company) {
-      console.log('⚠️ COMPANY HYDRATE: Company not found for staff');
+    // But if staff has companyId, try to fetch company directly
+    let company = staff.company;
+    
+    if (!company && staff.companyId) {
+      console.log('⚠️ COMPANY HYDRATE: Staff has companyId but relation not loaded, fetching directly...');
+      company = await prisma.goFastCompany.findUnique({
+        where: { id: staff.companyId },
+        include: {
+          roadmapItems: {
+            orderBy: [
+              { orderNumber: 'asc' },
+              { createdAt: 'desc' }
+            ]
+          },
+          contacts: {
+            orderBy: { createdAt: 'desc' },
+            take: 100
+          },
+          tasks: {
+            where: {
+              companyId: { not: null }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+          },
+          productPipelineItems: {
+            orderBy: { createdAt: 'desc' },
+            take: 100
+          },
+          financialSpends: {
+            orderBy: { date: 'desc' },
+            take: 100
+          },
+          financialProjections: {
+            orderBy: { periodStart: 'desc' },
+            take: 50
+          },
+          staff: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true,
+              photoURL: true
+            }
+          }
+        }
+      });
+    }
+    
+    // If still no company, return staff info (frontend will redirect to company settings)
+    if (!company) {
+      console.log('⚠️ COMPANY HYDRATE: Company not found for staff (companyId:', staff.companyId || 'null', ')');
       return res.status(200).json({
         success: true,
         company: null, // No company yet
@@ -106,38 +157,38 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
           email: staff.email,
           photoURL: staff.photoURL,
           role: staff.role,
-          companyId: null
+          companyId: staff.companyId || null
         },
         message: 'Company not found. Please create company first.'
       });
     }
     
-    console.log('✅ COMPANY HYDRATE: Company found:', staff.company.id);
-    console.log('✅ COMPANY HYDRATE: Company Name:', staff.company.companyName);
-    console.log('✅ COMPANY HYDRATE: Roadmap Items:', staff.company.roadmapItems?.length || 0);
-    console.log('✅ COMPANY HYDRATE: Contacts:', staff.company.contacts?.length || 0);
+    console.log('✅ COMPANY HYDRATE: Company found:', company.id);
+    console.log('✅ COMPANY HYDRATE: Company Name:', company.companyName);
+    console.log('✅ COMPANY HYDRATE: Roadmap Items:', company.roadmapItems?.length || 0);
+    console.log('✅ COMPANY HYDRATE: Contacts:', company.contacts?.length || 0);
     
     // Format response
     const response = {
       success: true,
       company: {
-        id: staff.company.id,
-        containerId: staff.company.containerId,
-        companyName: staff.company.companyName,
-        address: staff.company.address,
-        city: staff.company.city,
-        state: staff.company.state,
-        website: staff.company.website,
-        description: staff.company.description,
-        createdAt: staff.company.createdAt,
-        updatedAt: staff.company.updatedAt,
-        roadmapItems: staff.company.roadmapItems || [],
-        contacts: staff.company.contacts || [],
-        tasks: staff.company.tasks || [],
-        productPipelineItems: staff.company.productPipelineItems || [],
-        financialSpends: staff.company.financialSpends || [],
-        financialProjections: staff.company.financialProjections || [],
-        staff: staff.company.staff || []
+        id: company.id,
+        containerId: company.containerId,
+        companyName: company.companyName,
+        address: company.address,
+        city: company.city,
+        state: company.state,
+        website: company.website,
+        description: company.description,
+        createdAt: company.createdAt,
+        updatedAt: company.updatedAt,
+        roadmapItems: company.roadmapItems || [],
+        contacts: company.contacts || [],
+        tasks: company.tasks || [],
+        productPipelineItems: company.productPipelineItems || [],
+        financialSpends: company.financialSpends || [],
+        financialProjections: company.financialProjections || [],
+        staff: company.staff || []
       },
       staff: {
         id: staff.id,
