@@ -14,40 +14,56 @@ router.options('*', (req, res) => {
 });
 
 // GET /api/event -> List events (filter by athleteId and isActive)
+// Axios automatically sends Firebase token, athleteId comes from frontend localStorage (sent as query param)
 router.get('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
-  const { isActive, athleteId } = req.query;
-  const firebaseId = req.user?.uid;
+  const { isActive, athleteId: queryAthleteId } = req.query;
+  const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it)
 
   try {
-    // Get athlete from Firebase ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
+    let athleteId;
 
-    if (!athlete) {
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found'
+    // If athleteId is provided in query, verify it matches authenticated Firebase user
+    if (queryAthleteId) {
+      const athlete = await prisma.athlete.findFirst({
+        where: {
+          id: queryAthleteId,
+          firebaseId: firebaseId // Verify athleteId belongs to authenticated user
+        }
       });
+
+      if (!athlete) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized',
+          message: 'Athlete ID does not match authenticated user'
+        });
+      }
+
+      athleteId = queryAthleteId;
+    } else {
+      // No athleteId provided - find athlete by Firebase ID
+      const athlete = await prisma.athlete.findFirst({
+        where: { firebaseId }
+      });
+
+      if (!athlete) {
+        return res.status(404).json({
+          success: false,
+          error: 'Athlete not found'
+        });
+      }
+
+      athleteId = athlete.id;
     }
 
-    // Build where clause
+    // Build where clause - filter by athleteId
     const where = {
-      athleteId: athlete.id // Only show events created by this athlete
+      athleteId: athleteId // Only show events created by this athlete
     };
 
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
-    }
-
-    // If athleteId query param is provided, verify it matches authenticated athlete
-    if (athleteId && athleteId !== athlete.id) {
-      return res.status(403).json({
-        success: false,
-        error: 'Unauthorized',
-        message: 'Cannot access events for another athlete'
-      });
     }
 
     const events = await prisma.event.findMany({
@@ -80,30 +96,25 @@ router.get('/', verifyFirebaseToken, async (req, res) => {
 });
 
 // GET /api/event/:id -> Get single event by ID
+// Axios automatically sends Firebase token
 router.get('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
-  const firebaseId = req.user?.uid;
+  const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it)
 
   try {
-    // Get athlete from Firebase ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-
-    if (!athlete) {
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found'
-      });
-    }
-
     const event = await prisma.event.findUnique({
       where: { id },
       include: {
         volunteers: {
           orderBy: { createdAt: 'desc' },
         },
+        athlete: {
+          select: {
+            id: true,
+            firebaseId: true
+          }
+        }
       },
     });
 
@@ -114,8 +125,15 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Verify event belongs to authenticated athlete
-    if (event.athleteId !== athlete.id) {
+    // Verify event belongs to authenticated athlete (verify athleteId matches firebaseId)
+    const athlete = await prisma.athlete.findFirst({
+      where: {
+        id: event.athleteId,
+        firebaseId: firebaseId
+      }
+    });
+
+    if (!athlete) {
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
@@ -138,6 +156,7 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
 });
 
 // POST /api/event -> Create new event (with upsert support)
+// Axios automatically sends Firebase token, athleteId comes from request body (frontend localStorage)
 router.post('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const {
@@ -151,9 +170,9 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     distance,
     eventType,
     isActive,
-    athleteId, // Optional: if provided, must match authenticated athlete
+    athleteId, // Required: sent from frontend (axios already authenticated)
   } = req.body || {};
-  const firebaseId = req.user?.uid;
+  const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it)
 
   // Basic validation
   if (!title?.trim() || !date) {
@@ -164,21 +183,24 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     });
   }
 
+  if (!athleteId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required field',
+      required: ['athleteId'],
+    });
+  }
+
   try {
-    // Get athlete from Firebase ID
+    // Verify athleteId belongs to authenticated Firebase user (pattern from trainingRaceRoute)
     const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
+      where: {
+        id: athleteId,
+        firebaseId: firebaseId // Verify athleteId matches authenticated user
+      }
     });
 
     if (!athlete) {
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found'
-      });
-    }
-
-    // Verify athleteId matches authenticated athlete (if provided)
-    if (athleteId && athleteId !== athlete.id) {
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
@@ -195,7 +217,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
 
     const existingEvent = await prisma.event.findFirst({
       where: {
-        athleteId: athlete.id,
+        athleteId: athleteId, // Use athleteId from request body
         title: title.trim(),
         date: {
           gte: startOfDay,
@@ -243,7 +265,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
           distance: distance?.trim() || null,
           eventType: eventType?.trim() || null,
           isActive: isActive !== undefined ? isActive : true,
-          athleteId: athlete.id, // Set from authenticated athlete
+          athleteId: athleteId, // Use athleteId from request body (already verified)
         },
       });
 
@@ -265,6 +287,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
 });
 
 // PUT /api/event/:id -> Update event
+// Axios automatically sends Firebase token
 router.put('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
@@ -280,21 +303,9 @@ router.put('/:id', verifyFirebaseToken, async (req, res) => {
     eventType,
     isActive,
   } = req.body || {};
-  const firebaseId = req.user?.uid;
+  const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it)
 
   try {
-    // Get athlete from Firebase ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-
-    if (!athlete) {
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found'
-      });
-    }
-
     // Check if event exists
     const existing = await prisma.event.findUnique({
       where: { id },
@@ -307,8 +318,15 @@ router.put('/:id', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Verify event belongs to authenticated athlete
-    if (existing.athleteId !== athlete.id) {
+    // Verify event belongs to authenticated athlete (verify athleteId matches firebaseId)
+    const athlete = await prisma.athlete.findFirst({
+      where: {
+        id: existing.athleteId,
+        firebaseId: firebaseId
+      }
+    });
+
+    if (!athlete) {
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
@@ -349,24 +367,13 @@ router.put('/:id', verifyFirebaseToken, async (req, res) => {
 });
 
 // DELETE /api/event/:id -> Delete event (soft delete by setting isActive=false)
+// Axios automatically sends Firebase token
 router.delete('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
-  const firebaseId = req.user?.uid;
+  const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it)
 
   try {
-    // Get athlete from Firebase ID
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-
-    if (!athlete) {
-      return res.status(404).json({
-        success: false,
-        error: 'Athlete not found'
-      });
-    }
-
     const event = await prisma.event.findUnique({
       where: { id },
     });
@@ -378,8 +385,15 @@ router.delete('/:id', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Verify event belongs to authenticated athlete
-    if (event.athleteId !== athlete.id) {
+    // Verify event belongs to authenticated athlete (verify athleteId matches firebaseId)
+    const athlete = await prisma.athlete.findFirst({
+      where: {
+        id: event.athleteId,
+        firebaseId: firebaseId
+      }
+    });
+
+    if (!athlete) {
       return res.status(403).json({
         success: false,
         error: 'Unauthorized',
