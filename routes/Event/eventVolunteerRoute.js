@@ -6,7 +6,7 @@ const router = express.Router();
 // POST /api/event-volunteer -> Create a new volunteer signup (PUBLIC - no auth required)
 router.post('/', async (req, res) => {
   const prisma = getPrismaClient();
-  const { eventId, name, email, role, notes } = req.body || {};
+  const { eventId, name, email, phone, role, notes } = req.body || {};
 
   // Basic validation - eventId is required (primary identifier)
   if (!eventId?.trim() || !name?.trim() || !email?.trim() || !role?.trim()) {
@@ -36,6 +36,7 @@ router.post('/', async (req, res) => {
         eventId: eventId.trim(),
         name: name.trim(),
         email: email.trim().toLowerCase(),
+        phone: phone?.trim() || null,
         role: role.trim(),
         notes: notes?.trim() || null,
       },
@@ -243,7 +244,7 @@ router.get('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
-  const { name, email, notes } = req.body || {};
+  const { name, email, phone, notes } = req.body || {};
 
   if (!id?.trim()) {
     return res.status(400).json({
@@ -285,6 +286,7 @@ router.put('/:id', async (req, res) => {
       where: { id: id.trim() },
       data: {
         name: name.trim(),
+        phone: phone?.trim() || null,
         notes: notes?.trim() || null,
         // Note: email is not updated - it's used for verification only
       },

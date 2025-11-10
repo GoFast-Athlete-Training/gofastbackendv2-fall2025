@@ -404,6 +404,7 @@ model EventVolunteer {
   eventId   String   // Links to Event.id (primary identifier)
   name      String
   email     String
+  phone     String?  // Optional phone number for group text communication
   role      String
   notes     String?
   createdAt DateTime @default(now())
