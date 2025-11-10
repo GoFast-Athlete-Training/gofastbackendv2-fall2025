@@ -390,20 +390,60 @@ model RunCrewEventRSVP {
 }
 
 // =====================================================
+// EVENT MODEL - General Events (Races, Community Events, etc.)
+// =====================================================
+
+model Event {
+  id          String   @id @default(cuid())
+  eventSlug   String   @unique // URL-friendly identifier (e.g., "boys-gotta-run-2025")
+  title       String   // "Boys Gotta Run – Discovery 5K (Final Run)"
+  description String?
+  
+  // Event Details
+  date        DateTime
+  startTime   String?  // "7:55 AM"
+  location    String?  // "Discovery Elementary"
+  address     String?  // "5275 N 36th St, Arlington, VA 22207"
+  
+  // Route Information
+  stravaRouteUrl String? // Strava route URL
+  stravaRouteId  String? // Strava route ID
+  
+  // Metadata
+  eventType   String?  // "race", "community-run", "training", etc.
+  isActive    Boolean  @default(true)
+  
+  // System
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  volunteers  EventVolunteer[]
+  
+  @@map("events")
+  @@index([eventSlug])
+}
+
+// =====================================================
 // EVENT VOLUNTEER SIGNUPS - Universal Event Volunteer Model
 // =====================================================
 
 model EventVolunteer {
   id        String   @id @default(cuid())
-  eventSlug String
+  eventId   String   // Links to Event.id (replaces eventSlug)
+  eventSlug String?  // Kept for backward compatibility during migration
   name      String
   email     String
   role      String
   notes     String?
   createdAt DateTime @default(now())
 
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
   @@map("event_volunteers")
-  @@index([eventSlug])
+  @@index([eventId])
+  @@index([eventSlug]) // Keep for migration period
 }
 
 // RunCrew Managers - Future (Delegated managers)

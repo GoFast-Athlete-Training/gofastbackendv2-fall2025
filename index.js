@@ -45,6 +45,7 @@ import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
 import trainingDayRouter from './routes/Training/trainingDayRoute.js';
 // Event routes
+import eventRouter from './routes/Event/eventRoute.js';
 import eventVolunteerRouter from './routes/Event/eventVolunteerRoute.js';
 // Founder routes
 import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
@@ -56,6 +57,7 @@ import founderHydrateRouter from './routes/Founder/founderHydrateRoute.js';
 import adminHydrateRouter from './routes/Admin/adminHydrateRoute.js';
 import adminUpsertRouter from './routes/Admin/adminUpsertRoute.js';
 // Company routes (GoFast Company Stack - ALL company-related routes here)
+import companyHydrateRouter from './routes/Company/companyHydrateRoute.js';
 import companyRoadmapRouter from './routes/Company/companyRoadmapRoute.js';
 import companyCreateRouter from './routes/Company/companyCreateRoute.js';
 import staffCreateRouter from './routes/Company/staffCreateRoute.js';
@@ -149,8 +151,9 @@ app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsv
 app.use('/api/runcrew', runCrewEventRouter); // /:runCrewId/events
 app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
-// Event volunteer routes (public volunteer signups)
-app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /?eventSlug=
+// Event routes (event management and volunteer signups)
+app.use('/api/event', eventRouter); // GET /, GET /:id, POST /, PUT /:id, DELETE /:id
+app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /?eventId=xxx OR ?eventSlug=xxx
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
@@ -166,9 +169,10 @@ app.use('/api/admin', adminHydrateRouter); // /athletes/hydrate, /athletes/:id/h
 app.use('/api/admin', adminUpsertRouter); // /upsert?model=founder, /upsert/founder
 // Legacy admin route compatibility - /api/athlete/admin/hydrate
 app.use('/api/athlete/admin', adminHydrateRouter); // /hydrate (redirects to /api/admin/athletes/hydrate)
-// Company routes
-app.use('/api/company', companyCreateRouter); // /create (FIRST - most specific)
-app.use('/api/company', companyRoadmapRouter); // /:companyId/roadmap, /roadmap/:itemId
+// Company routes (GoFast Company Stack - single-tenant)
+app.use('/api/company', companyHydrateRouter); // /hydrate (FIRST - most specific)
+app.use('/api/company', companyCreateRouter); // /create
+app.use('/api/company', companyRoadmapRouter); // /roadmap, /roadmap/:itemId
 // Staff routes (GoFast Company Stack)
 app.use('/api/staff', staffHydrateRouter); // /hydrate (FIRST - most specific)
 app.use('/api/staff', staffCreateRouter); // /create
