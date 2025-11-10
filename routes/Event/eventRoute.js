@@ -13,29 +13,42 @@ router.options('*', (req, res) => {
   res.status(200).end();
 });
 
-// GET /api/event -> List events (filter by authenticated athlete and isActive)
-// Axios automatically sends Firebase token, backend gets athleteId from Firebase token
+// GET /api/event -> List events (filter by athleteId and isActive)
+// Frontend sends athleteId from localStorage (hydrated from welcome screen)
+// Backend verifies athleteId matches authenticated Firebase user
 router.get('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
-  const { isActive } = req.query;
+  const { isActive, athleteId } = req.query; // athleteId from localStorage (frontend sends it)
   const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it automatically)
 
   try {
-    // Get athlete from Firebase ID (no query params - athleteId comes from authenticated token)
-    const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
-    });
-
-    if (!athlete) {
-      return res.status(404).json({
+    if (!athleteId) {
+      return res.status(400).json({
         success: false,
-        error: 'Athlete not found'
+        error: 'Missing athleteId',
+        message: 'athleteId is required (from localStorage)'
       });
     }
 
-    // Build where clause - filter by authenticated athlete's ID
+    // Verify athleteId belongs to authenticated Firebase user
+    const athlete = await prisma.athlete.findFirst({
+      where: {
+        id: athleteId,
+        firebaseId: firebaseId // Verify athleteId matches authenticated user
+      }
+    });
+
+    if (!athlete) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Athlete ID does not match authenticated user'
+      });
+    }
+
+    // Build where clause - filter by athleteId
     const where = {
-      athleteId: athlete.id // Only show events created by authenticated athlete
+      athleteId: athleteId // Only show events created by this athlete
     };
 
     if (isActive !== undefined) {
@@ -132,7 +145,8 @@ router.get('/:id', verifyFirebaseToken, async (req, res) => {
 });
 
 // POST /api/event -> Create new event (with upsert support)
-// Axios automatically sends Firebase token, backend gets athleteId from Firebase token (middleware)
+// Frontend sends athleteId from localStorage (hydrated from welcome screen)
+// Backend verifies athleteId matches authenticated Firebase user
 router.post('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const {
@@ -146,6 +160,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     distance,
     eventType,
     isActive,
+    athleteId, // From localStorage (frontend sends it)
   } = req.body || {};
   const firebaseId = req.user?.uid; // From verified Firebase token (axios sends it, middleware extracts it)
 
@@ -158,16 +173,28 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
     });
   }
 
+  if (!athleteId) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing athleteId',
+      message: 'athleteId is required (from localStorage)'
+    });
+  }
+
   try {
-    // Get athlete from Firebase ID (middleware already verified token)
+    // Verify athleteId belongs to authenticated Firebase user
     const athlete = await prisma.athlete.findFirst({
-      where: { firebaseId }
+      where: {
+        id: athleteId,
+        firebaseId: firebaseId // Verify athleteId matches authenticated user
+      }
     });
 
     if (!athlete) {
-      return res.status(404).json({
+      return res.status(403).json({
         success: false,
-        error: 'Athlete not found'
+        error: 'Unauthorized',
+        message: 'Athlete ID does not match authenticated user'
       });
     }
 
@@ -180,7 +207,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
 
     const existingEvent = await prisma.event.findFirst({
       where: {
-        athleteId: athlete.id, // Use athleteId from database lookup (from Firebase token)
+        athleteId: athleteId, // Use athleteId from request body (from localStorage)
         title: title.trim(),
         date: {
           gte: startOfDay,
@@ -228,7 +255,7 @@ router.post('/', verifyFirebaseToken, async (req, res) => {
           distance: distance?.trim() || null,
           eventType: eventType?.trim() || null,
           isActive: isActive !== undefined ? isActive : true,
-          athleteId: athlete.id, // Use athleteId from database lookup (from Firebase token)
+          athleteId: athleteId, // Use athleteId from request body (from localStorage, already verified)
         },
       });
 
