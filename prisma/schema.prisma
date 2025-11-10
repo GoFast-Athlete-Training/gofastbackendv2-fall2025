@@ -3,45 +3,6 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-model VolunteerInput {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  role      String
-  note      String?
-  createdAt DateTime @default(now())
-}
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
-
-model VolunteerInput {
-  id        String   @id @default(cuid())
-  name      String
-  email     String
-  role      String
-  note      String?
-  createdAt DateTime @default(now())
-}
-
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
@@ -408,6 +369,10 @@ model Event {
   // Route Information
   stravaRouteUrl String? // Strava route URL
   stravaRouteId  String? // Strava route ID
+  distance       String? // Distance (e.g., "5K", "3.1 miles", "10K")
+  
+  // Future State: Registration
+  registrantId   String? // Future: Links to athleteId for main UX registration (optional)
   
   // Metadata
   eventType   String?  // "race", "community-run", "training", etc.
@@ -418,7 +383,7 @@ model Event {
   updatedAt   DateTime @updatedAt
   
   // Relations
-  volunteers  EventVolunteer[]
+  volunteers  EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
   
   @@map("events")
   @@index([eventSlug])
