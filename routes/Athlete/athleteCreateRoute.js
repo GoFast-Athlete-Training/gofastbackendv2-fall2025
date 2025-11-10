@@ -4,6 +4,8 @@
 import express from 'express';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 import { AthleteFindOrCreateService } from '../../services/AthleteFindOrCreateService.js';
+import { getJoinContext, deleteJoinContext } from '../../utils/redis.js';
+import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
 
@@ -26,12 +28,14 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     const email = req.user?.email;
     const displayName = req.user?.name; // Firebase uses 'name' field for displayName
     const picture = req.user?.picture; // Firebase photo URL
+    const sessionId = req.body?.sessionId || req.query?.sessionId; // Join context session ID
 
     console.log('🔐 ATHLETE CREATE: Firebase token verified');
     console.log('🔐 ATHLETE CREATE: firebaseId:', firebaseId);
     console.log('🔐 ATHLETE CREATE: email:', email);
     console.log('🔐 ATHLETE CREATE: displayName:', displayName);
     console.log('🔐 ATHLETE CREATE: picture:', picture);
+    console.log('🔐 ATHLETE CREATE: sessionId (for join context):', sessionId);
     
     if (!firebaseId || !email) {
       return res.status(400).json({ 
@@ -49,8 +53,67 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
       picture
     });
 
+    // Check for join context if sessionId provided
+    let runCrewId = null;
+    let joinCode = null;
+    
+    if (sessionId) {
+      console.log('🔍 ATHLETE CREATE: Checking for join context...');
+      const joinContext = await getJoinContext(sessionId);
+      
+      if (joinContext) {
+        console.log('✅ ATHLETE CREATE: Join context found:', joinContext);
+        runCrewId = joinContext.runCrewId;
+        joinCode = joinContext.joinCode;
+        
+        // Auto-join the crew
+        const prisma = getPrismaClient();
+        
+        // Check if already a member
+        const existingMembership = await prisma.runCrewMembership.findUnique({
+          where: {
+            runCrewId_athleteId: {
+              runCrewId: runCrewId,
+              athleteId: athlete.id
+            }
+          }
+        });
+        
+        if (!existingMembership) {
+          // Create membership
+          await prisma.runCrewMembership.create({
+            data: {
+              runCrewId: runCrewId,
+              athleteId: athlete.id
+            }
+          });
+          console.log('✅ ATHLETE CREATE: Auto-joined RunCrew:', runCrewId);
+        } else {
+          console.log('ℹ️ ATHLETE CREATE: Already a member of this RunCrew');
+        }
+        
+        // Mark join code as redeemed (optional - if you want to track this)
+        // await prisma.joinCode.update({
+        //   where: { code: joinCode },
+        //   data: { redeemed: true } // If you add this field to schema
+        // });
+        
+        // Clean up join context
+        await deleteJoinContext(sessionId);
+        console.log('✅ ATHLETE CREATE: Join context cleaned up');
+      } else {
+        console.log('ℹ️ ATHLETE CREATE: No join context found (may have expired)');
+      }
+    }
+
     // Format response
     const response = AthleteFindOrCreateService.formatResponse(athlete);
+    
+    // Add runCrewId to response if joined
+    if (runCrewId) {
+      response.runCrewId = runCrewId;
+      response.joinedRunCrew = true;
+    }
 
     // Always return 200 - frontend routes based on gofastHandle, not HTTP status
     res.status(200).json(response);

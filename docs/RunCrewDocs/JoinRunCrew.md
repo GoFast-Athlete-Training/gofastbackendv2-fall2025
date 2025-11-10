@@ -109,55 +109,173 @@ const runCrew = joinCodeRecord?.runCrew;
 
 ## Join Flow
 
-### Current Flow (MVP1)
+There are **TWO DISTINCT PATHS** for joining a RunCrew:
 
-**Step 1: User Receives Invitation**
-- Admin shares join code via:
-  - Text message
-  - Email
-  - Direct link (future state)
-  - Social media
+---
 
-**Step 2: User Navigates to Join**
-- **Option A**: Via Athlete Home
-  - User signs in → Athlete Home
-  - Sees "Run Crew" card/option
-  - Clicks → Goes to "Join or Create" page
-- **Option B**: Direct Link (Future State)
-  - `https://athlete.gofastcrushgoals.com/runcrew/join?code=FAST123`
-  - Pre-fills join code
-  - Direct join flow
+## Path 1: Athlete-First Flow (Existing Organic Flow)
 
-**Step 3: Join or Create Decision**
-- User sees "Join or Create" page (`JoinOrStartCrew.jsx`)
-- Two options:
-  - **Join a Crew** → Enter join code
-  - **Create a Crew** → Create new RunCrew
+**When**: User is already signed up and authenticated, wants to join a crew
 
-**Step 4: Enter Join Code**
-- User enters join code
+**Flow**:
+```
+1. User signs in → Athlete Home
+2. User clicks "Run Crew" → /runcrew/join-or-start
+3. User chooses "Join a Crew" → /runcrew/join (JoinCrewWelcome)
+   OR
+   User goes directly to /runcrew/join
+4. User enters join code → Validates → Joins crew
+5. Navigate to RunCrew Central
+```
+
+**Components**:
+- `JoinOrStartCrew.jsx` - Choice page (`/runcrew/join-or-start`)
+- `JoinCrewWelcome.jsx` - Welcome page with lookup (`/runcrew/join`)
+- `JoinCrew.jsx` - Detailed join form (`/run-crew-join`)
+
+**Authentication**: ✅ User must be authenticated (Firebase token required)
+
+**API Endpoint**: `POST /api/runcrew/join` (requires Firebase auth)
+
+**Key Features**:
+- User already has an athlete account
+- Uses existing Firebase authentication
+- Immediate join (no signup step)
+- Saves to localStorage immediately
+
+---
+
+## Path 2: Join Code-First Flow (New Direct-Invite Flow)
+
+**When**: User receives a join code invitation but hasn't signed up yet
+
+**Flow**:
+```
+1. User receives invite link: /joinruncrewwelcome?code=ABC123
+2. User validates code → Sees crew info
+3. User clicks "Join This Crew" → Stores join context in Redis
+4. Redirects to /athletesignup?hasJoinContext=true&sessionId=xxx
+5. User signs up with Google → Auto-joins crew during signup
+6. Redirects to /precrewpage?crewId=xxx
+7. Hydrates athlete + crew → Navigates to RunCrew Central
+```
+
+**Components**:
+- `JoinRunCrewWelcome.jsx` - Standalone invite page (`/joinruncrewwelcome`)
+- `PreCrewPage.jsx` - Hydration checkpoint (`/precrewpage`)
+- Modified `AthleteSignup.jsx` - Handles join context during signup
+
+**Authentication**: ❌ User is NOT authenticated (public page)
+
+**API Endpoints**:
+- `GET /api/join/validate?code=XXXX` - Validates join code (public)
+- `POST /api/join/temp` - Stores join context in Redis (public)
+- `POST /api/athlete/create` - Modified to check for join context and auto-join
+
+**Key Features**:
+- User doesn't have an account yet
+- Join context stored temporarily in Redis (5-minute TTL)
+- Auto-joins crew during signup process
+- Skips AthleteHome entirely
+- Seamless onboarding experience
+
+---
+
+## Comparison Table
+
+| Feature | Athlete-First Flow | Join Code-First Flow |
+|---------|-------------------|---------------------|
+| **Entry Point** | `/runcrew/join-or-start` or `/runcrew/join` | `/joinruncrewwelcome?code=XXX` |
+| **Authentication** | ✅ Required | ❌ Not required |
+| **User Status** | Existing athlete | New user (no account) |
+| **Join Timing** | Immediate after code entry | During signup process |
+| **Context Storage** | N/A (direct join) | Redis (5-min TTL) |
+| **Navigation** | Direct to RunCrew Central | Signup → PreCrewPage → RunCrew Central |
+| **Components** | JoinCrewWelcome, JoinCrew | JoinRunCrewWelcome, PreCrewPage |
+
+---
+
+## Step-by-Step: Athlete-First Flow
+
+**Step 1: User Navigates to Join**
+- User signs in → Athlete Home
+- Clicks "Run Crew" → Goes to `/runcrew/join-or-start` (choice page)
+- OR goes directly to `/runcrew/join`
+
+**Step 2: Enter Join Code**
+- User enters join code in `JoinCrewWelcome.jsx`
 - Code is normalized (uppercase)
-- Validated against existing RunCrews
+- Calls `POST /api/runcrew/lookup` to validate
 
-**Step 5: Join RunCrew**
-- API call: `POST /api/runcrew/join`
+**Step 3: Preview Crew**
+- Shows crew preview (name, description, member count)
+- User confirms they want to join
+
+**Step 4: Join RunCrew**
+- API call: `POST /api/runcrew/join` (with Firebase token)
 - Creates `RunCrewMembership` (junction table)
 - Returns hydrated RunCrew with members
 
-**Step 6: Success & Navigation**
-- User sees success message
-- RunCrew added to their account
+**Step 5: Success & Navigation**
+- RunCrew saved to localStorage
 - Navigate to RunCrew Central (member or admin view)
+
+---
+
+## Step-by-Step: Join Code-First Flow
+
+**Step 1: User Receives Invitation**
+- Admin shares join code via:
+  - Direct link: `https://athlete.gofastcrushgoals.com/joinruncrewwelcome?code=ABC123`
+  - Text message with code
+  - Email with link
+
+**Step 2: Validate Join Code**
+- User lands on `/joinruncrewwelcome` (`JoinRunCrewWelcome.jsx`)
+- Code auto-validated if in URL, or user enters code manually
+- Calls `GET /api/join/validate?code=XXXX` (public, no auth)
+- Shows crew info: name, manager name, member count
+
+**Step 3: Store Join Context**
+- User clicks "Join This Crew"
+- Calls `POST /api/join/temp` with join code
+- Stores join context in Redis with sessionId (5-minute TTL)
+- Returns sessionId
+
+**Step 4: Sign Up**
+- Redirects to `/athletesignup?hasJoinContext=true&sessionId=xxx`
+- User signs up with Google OAuth
+- Modified signup flow passes sessionId to `/api/athlete/create`
+
+**Step 5: Auto-Join During Signup**
+- `POST /api/athlete/create` checks for join context using sessionId
+- If found, automatically creates `RunCrewMembership`
+- Returns athlete data with `runCrewId` included
+- Cleans up join context from Redis
+
+**Step 6: Hydration Checkpoint**
+- Redirects to `/precrewpage?crewId=xxx`
+- `PreCrewPage.jsx` hydrates athlete and crew data in parallel
+- Saves to localStorage
+- Navigates to `/runcrew/:id` (RunCrew Central)
+
+**Step 7: Success**
+- User lands directly in RunCrew Central
+- Skipped AthleteHome entirely
+- Seamless onboarding experience
 
 ---
 
 ## API Endpoints
 
-### Join RunCrew
+### Athlete-First Flow Endpoints
+
+#### Join RunCrew
 
 **Route**: `POST /api/runcrew/join`  
 **File**: `routes/RunCrew/runCrewJoinRoute.js`  
-**Auth**: `verifyFirebaseToken` middleware
+**Auth**: `verifyFirebaseToken` middleware  
+**Flow**: Athlete-First
 
 **Request Body**:
 ```json
@@ -228,22 +346,147 @@ const runCrew = joinCodeRecord?.runCrew;
 
 ---
 
+### Join Code-First Flow Endpoints
+
+#### Validate Join Code
+
+**Route**: `GET /api/join/validate?code=XXXX`  
+**File**: `routes/Join/joinValidateRoute.js`  
+**Auth**: ❌ Public (no auth required)  
+**Flow**: Join Code-First
+
+**Purpose**: Validates a join code and returns crew info for invite card
+
+**Response** (Success):
+```json
+{
+  "success": true,
+  "crewName": "Morning Warriors",
+  "managerName": "John Doe",
+  "memberCount": 5,
+  "description": "Early morning running crew",
+  "runCrewId": "runcrew_cuid",
+  "joinCode": "FAST123"
+}
+```
+
+**Response** (Error):
+```json
+{
+  "success": false,
+  "error": "Invalid or expired join code",
+  "message": "Invalid or expired join code"
+}
+```
+
+#### Store Join Context Temporarily
+
+**Route**: `POST /api/join/temp`  
+**File**: `routes/Join/joinTempRoute.js`  
+**Auth**: ❌ Public (no auth required)  
+**Flow**: Join Code-First
+
+**Purpose**: Stores join context in Redis for later use during signup
+
+**Request Body**:
+```json
+{
+  "joinCode": "FAST123",
+  "sessionId": "optional-session-id"
+}
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "sessionId": "uuid-session-id",
+  "message": "Join context stored successfully"
+}
+```
+
+**Storage**: Redis key `joinctx:{sessionId}` with 5-minute TTL
+
+#### Modified: Create Athlete (with Join Context)
+
+**Route**: `POST /api/athlete/create`  
+**File**: `routes/Athlete/athleteCreateRoute.js`  
+**Auth**: `verifyFirebaseToken` middleware  
+**Flow**: Join Code-First (modified)
+
+**Modifications**:
+- ✅ Accepts optional `sessionId` in request body
+- ✅ Checks Redis for join context using sessionId
+- ✅ If join context found:
+  - Auto-creates `RunCrewMembership`
+  - Returns `runCrewId` in response
+  - Cleans up join context from Redis
+- ✅ Returns normal athlete response with optional `runCrewId` field
+
+**Request Body** (with join context):
+```json
+{
+  "sessionId": "uuid-session-id"
+}
+```
+
+**Response** (with join context):
+```json
+{
+  "success": true,
+  "athleteId": "athlete_cuid",
+  "data": { ... },
+  "runCrewId": "runcrew_cuid",
+  "joinedRunCrew": true
+}
+```
+
+---
+
 ## Frontend Components
 
-### JoinOrStartCrew.jsx
+### Athlete-First Flow Components
 
-**Purpose**: Entry point for joining or creating RunCrew  
-**Route**: `/runcrew/join`
+#### JoinCrewWelcome.jsx
+
+**Purpose**: Welcome page for authenticated users joining a RunCrew  
+**Route**: `/runcrew/join`  
+**Flow**: Athlete-First (existing organic flow)
+
+**Features**:
+- ✅ Welcome message and join code input
+- ✅ Join code lookup via `POST /api/runcrew/lookup`
+- ✅ Crew preview after lookup (name, description, member count)
+- ✅ Auto sign-in with Google if not authenticated
+- ✅ Direct join flow (no preview step)
+- ✅ Saves RunCrew to localStorage on success
+- ✅ Navigates to `/runcrew/central` on success
+
+**Flow**:
+1. User enters join code
+2. Clicks "Find My Crew" → Calls `/api/runcrew/lookup`
+3. Shows crew preview (name, description, members)
+4. Clicks "Join Crew" → Calls `/api/runcrew/join` (with Firebase token)
+5. Auto-signs in if needed (Google OAuth)
+6. Saves to localStorage → Navigates to RunCrew Central
+
+#### JoinOrStartCrew.jsx
+
+**Purpose**: Entry point for choosing to join or create RunCrew  
+**Route**: `/runcrew/join-or-start`  
+**Flow**: Athlete-First (existing organic flow)
 
 **Features**:
 - Two-button layout:
-  - "Join a Crew" → Navigate to join form
-  - "Create a Crew" → Navigate to create form
+  - "Enter Invite Code" → Navigate to `/run-crew-join`
+  - "Start Your Crew" → Navigate to `/form-run-crew`
+- URL parameter support (`?code=XXX`) → redirects to `/run-crew-join?code=XXX`
 
-### JoinCrew.jsx
+#### JoinCrew.jsx
 
-**Purpose**: Join form for entering join code  
-**Route**: `/run-crew-join`
+**Purpose**: Detailed join form with preview functionality  
+**Route**: `/run-crew-join`  
+**Flow**: Athlete-First (existing organic flow)
 
 **Features**:
 - ✅ Join code input field with validation
@@ -296,6 +539,68 @@ POST /api/runcrew/join {
    - Not already a member
 7. On success → Save to localStorage → Navigate to RunCrew Central
 8. On error → Show error message
+
+---
+
+### Join Code-First Flow Components
+
+#### JoinRunCrewWelcome.jsx
+
+**Purpose**: Standalone invite page for unauthenticated users  
+**Route**: `/joinruncrewwelcome?code=ABC123`  
+**Flow**: Join Code-First (new direct-invite flow)
+
+**Features**:
+- ✅ Public page (no authentication required)
+- ✅ Validates join code via `GET /api/join/validate?code=XXXX`
+- ✅ Shows crew info: name, manager name, member count, description
+- ✅ Stores join context in Redis via `POST /api/join/temp`
+- ✅ Redirects to signup with join context flag
+- ✅ Auto-validates code if present in URL
+
+**Flow**:
+1. User lands on page (with or without code in URL)
+2. If code in URL → Auto-validates
+3. If no code → User enters join code → Validates
+4. Shows crew invitation card with details
+5. User clicks "Join This Crew"
+6. Stores join context in Redis (5-minute TTL)
+7. Redirects to `/athletesignup?hasJoinContext=true&sessionId=xxx`
+
+#### PreCrewPage.jsx
+
+**Purpose**: Hydration checkpoint before RunCrew Central  
+**Route**: `/precrewpage?crewId=xxx`  
+**Flow**: Join Code-First (new direct-invite flow)
+
+**Features**:
+- ✅ Lightweight hydration checkpoint
+- ✅ Fetches athlete and crew data in parallel
+- ✅ Saves to localStorage
+- ✅ Shows loading spinner during hydration
+- ✅ Redirects to RunCrew Central on success
+- ✅ Error handling with fallback to AthleteHome
+
+**Flow**:
+1. Receives crewId from URL or localStorage
+2. Parallel fetch: `/api/athlete/create` + `/api/runcrew/:id`
+3. Saves athlete and crew data to localStorage
+4. Updates athlete profile with crew info
+5. Navigates to `/runcrew/:id` (RunCrew Central)
+
+#### Modified AthleteSignup.jsx
+
+**Purpose**: Signup page with join context support  
+**Route**: `/athletesignup?hasJoinContext=true&sessionId=xxx`  
+**Flow**: Join Code-First (new direct-invite flow)
+
+**Modifications**:
+- ✅ Checks for `hasJoinContext` query param
+- ✅ Retrieves `sessionId` from URL or localStorage
+- ✅ Passes `sessionId` to `POST /api/athlete/create`
+- ✅ Checks response for `runCrewId` (indicates auto-join)
+- ✅ Redirects to `/precrewpage?crewId=xxx` if joined crew
+- ✅ Otherwise follows normal signup flow
 
 ---
 
@@ -489,18 +794,34 @@ const validateJoinCode = (code) => {
 ## Implementation Status
 
 ### ✅ Completed
+
+#### Athlete-First Flow
 - Join code creation on RunCrew creation
 - Join code normalization (uppercase)
 - Join API endpoint (`POST /api/runcrew/join`)
 - Duplicate membership prevention
-- Frontend join form (`JoinCrew.jsx`) with validation
+- Frontend join components:
+  - `JoinCrewWelcome.jsx` - Welcome page (`/runcrew/join`)
+  - `JoinCrew.jsx` - Detailed join form (`/run-crew-join`)
+  - `JoinOrStartCrew.jsx` - Choice page (`/runcrew/join-or-start`)
 - Join code client-side validation (format, length)
 - athleteId from localStorage (validated)
 - Firebase token authentication
 - Error handling and user feedback
 - Success navigation (admin vs member view)
-- Join or Create page (`JoinOrStartCrew.jsx`)
 - URL parameter support (`?code=XXX`)
+
+#### Join Code-First Flow
+- Join code validation endpoint (`GET /api/join/validate`)
+- Join context storage endpoint (`POST /api/join/temp`)
+- Redis join context storage (5-minute TTL)
+- Modified athlete create endpoint (auto-join support)
+- Frontend components:
+  - `JoinRunCrewWelcome.jsx` - Standalone invite page (`/joinruncrewwelcome`)
+  - `PreCrewPage.jsx` - Hydration checkpoint (`/precrewpage`)
+  - Modified `AthleteSignup.jsx` - Join context support
+- Direct-invite flow (signup → auto-join → RunCrew Central)
+- Skip AthleteHome for invite signups
 
 ### 🚧 Future
 - **RunCrewJoinCode Model**: Separate model for join code lookup (array of codes per crew)

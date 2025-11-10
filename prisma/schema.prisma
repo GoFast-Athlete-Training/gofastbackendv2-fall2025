@@ -389,6 +389,7 @@ model Event {
   // Relations
   athlete     Athlete  @relation("EventCreator", fields: [athleteId], references: [id], onDelete: Cascade)
   volunteers  EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
+  registrations EventRegistration[] @relation("EventRegistrations") // Race participants
   
   @@map("events")
   @@index([athleteId])
@@ -414,6 +415,27 @@ model EventVolunteer {
 
   @@map("event_volunteers")
   @@index([eventId])
+}
+
+// =====================================================
+// EVENT REGISTRATION - Race Participants
+// =====================================================
+
+model EventRegistration {
+  id        String   @id @default(cuid())
+  eventId   String   // Links to Event.id (primary identifier)
+  name      String
+  email     String
+  phone     String?  // Optional phone number for communication
+  notes     String?  // Optional notes (e.g., emergency contact, t-shirt size, etc.)
+  createdAt DateTime @default(now())
+
+  // Relations
+  event Event @relation("EventRegistrations", fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_registrations")
+  @@index([eventId])
+  @@unique([eventId, email]) // One registration per email per event
 }
 
 // RunCrew Managers - Future (Delegated managers)

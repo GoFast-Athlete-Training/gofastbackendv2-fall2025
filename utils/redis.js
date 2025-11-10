@@ -133,4 +133,64 @@ export const deleteCodeVerifier = async (athleteId) => {
   }
 };
 
+// Join Context Storage (for direct-invite join flow)
+export const storeJoinContext = async (sessionId, joinContext, ttlSeconds = 300) => {
+  try {
+    const redisClient = createRedisClient();
+    const contextJson = JSON.stringify(joinContext);
+    
+    if (redisClient && isConnected && redisClient.isOpen) {
+      await redisClient.setEx(`joinctx:${sessionId}`, ttlSeconds, contextJson);
+      console.log(`✅ Join context stored in Redis for sessionId: ${sessionId}`);
+    } else {
+      // Fallback to in-memory store
+      fallbackStore.set(`joinctx:${sessionId}`, contextJson);
+      console.log(`⚠️ Join context stored in memory fallback for sessionId: ${sessionId}`);
+    }
+  } catch (error) {
+    console.error('❌ Failed to store join context:', error);
+    // Fallback to in-memory store
+    fallbackStore.set(`joinctx:${sessionId}`, JSON.stringify(joinContext));
+  }
+};
+
+export const getJoinContext = async (sessionId) => {
+  try {
+    const redisClient = createRedisClient();
+    
+    if (redisClient && isConnected && redisClient.isOpen) {
+      const contextJson = await redisClient.get(`joinctx:${sessionId}`);
+      if (contextJson) {
+        console.log(`✅ Join context retrieved from Redis for sessionId: ${sessionId}`);
+        return JSON.parse(contextJson);
+      }
+    }
+    
+    // Fallback to in-memory store
+    const fallbackValue = fallbackStore.get(`joinctx:${sessionId}`);
+    if (fallbackValue) {
+      console.log(`⚠️ Join context retrieved from memory fallback for sessionId: ${sessionId}`);
+      return typeof fallbackValue === 'string' ? JSON.parse(fallbackValue) : fallbackValue;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Failed to get join context:', error);
+    return null;
+  }
+};
+
+export const deleteJoinContext = async (sessionId) => {
+  try {
+    const redisClient = createRedisClient();
+    if (redisClient && isConnected && redisClient.isOpen) {
+      await redisClient.del(`joinctx:${sessionId}`);
+    }
+    fallbackStore.delete(`joinctx:${sessionId}`);
+    console.log(`✅ Join context deleted for sessionId: ${sessionId}`);
+  } catch (error) {
+    console.error('❌ Failed to delete join context:', error);
+  }
+};
+
 export default createRedisClient;

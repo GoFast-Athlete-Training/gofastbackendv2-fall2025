@@ -44,9 +44,13 @@ import runCrewManagerRouter from './routes/RunCrew/runCrewManagerRoute.js';
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
 import trainingDayRouter from './routes/Training/trainingDayRoute.js';
+// Join routes (direct-invite join flow)
+import joinValidateRouter from './routes/Join/joinValidateRoute.js';
+import joinTempRouter from './routes/Join/joinTempRoute.js';
 // Event routes
 import eventRouter from './routes/Event/eventRoute.js';
 import eventVolunteerRouter from './routes/Event/eventVolunteerRoute.js';
+import eventRegistrationRouter from './routes/Event/eventRegistrationRoute.js';
 // Founder routes
 import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
 import founderCrmRouter from './routes/Founder/founderCrmRoute.js';
@@ -152,9 +156,13 @@ app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsv
 app.use('/api/runcrew', runCrewEventRouter); // /:runCrewId/events
 app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
+// Join routes (direct-invite join flow - NEW)
+app.use('/api/join', joinValidateRouter); // GET /validate?code=XXXX
+app.use('/api/join', joinTempRouter); // POST /temp (stores join context)
 // Event routes (event management and volunteer signups)
 app.use('/api/event', eventRouter); // GET /, GET /:id, POST /, PUT /:id, DELETE /:id
 app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /page-hydrate (public), GET /admin-hydrate (admin), DELETE /:id
+app.use('/api/event-registration', eventRegistrationRouter); // POST /, GET /page-hydrate (public), GET /admin-hydrate (admin), DELETE /:id
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
