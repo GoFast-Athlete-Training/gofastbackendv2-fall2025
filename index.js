@@ -40,6 +40,7 @@ import runCrewAnnouncementRouter from './routes/RunCrew/runCrewAnnouncementRoute
 import runCrewRunRouter from './routes/RunCrew/runCrewRunRoute.js';
 import runCrewEventRouter from './routes/RunCrew/runCrewEventRoute.js';
 import runCrewManagerRouter from './routes/RunCrew/runCrewManagerRoute.js';
+import runCrewDeleteRouter from './routes/RunCrew/runCrewDeleteRoute.js';
 // Training routes
 import trainingRaceRouter from './routes/Training/trainingRaceRoute.js';
 import trainingPlanRouter from './routes/Training/trainingPlanRoute.js';
@@ -166,6 +167,7 @@ app.use('/api/runcrew', runCrewAnnouncementRouter); // /:runCrewId/announcements
 app.use('/api/runcrew', runCrewRunRouter); // /:runCrewId/runs, /runs/:runId/rsvp
 app.use('/api/runcrew', runCrewEventRouter); // /:runCrewId/events
 app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
+app.use('/api/runcrew', runCrewDeleteRouter); // DELETE /:id (BEFORE /:id hydrate route)
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
 // Join routes (direct-invite join flow - NEW)
 app.use('/api/join', joinValidateRouter); // GET /validate?code=XXXX
