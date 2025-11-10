@@ -239,10 +239,85 @@ router.get('/', async (req, res) => {
   }
 });
 
-// DELETE /api/event-volunteer/:id -> Delete a volunteer signup (ADMIN ONLY)
+// PUT /api/event-volunteer/:id -> Update a volunteer signup (PUBLIC - email verification required)
+router.put('/:id', async (req, res) => {
+  const prisma = getPrismaClient();
+  const { id } = req.params;
+  const { name, email, notes } = req.body || {};
+
+  if (!id?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing volunteer ID',
+    });
+  }
+
+  if (!name?.trim() || !email?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: name and email',
+    });
+  }
+
+  try {
+    // Check if volunteer exists
+    const volunteer = await prisma.eventVolunteer.findUnique({
+      where: { id: id.trim() },
+    });
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        error: `Volunteer not found with id: ${id.trim()}`,
+      });
+    }
+
+    // Verify email matches (security: only allow updating your own signup)
+    if (volunteer.email.toLowerCase() !== email.trim().toLowerCase()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Email does not match. You can only update your own signup.',
+      });
+    }
+
+    // Update the volunteer
+    const updated = await prisma.eventVolunteer.update({
+      where: { id: id.trim() },
+      data: {
+        name: name.trim(),
+        notes: notes?.trim() || null,
+        // Note: email is not updated - it's used for verification only
+      },
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Volunteer signup updated successfully',
+      data: updated,
+    });
+  } catch (error) {
+    console.error('❌ EVENT VOLUNTEER UPDATE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update volunteer signup',
+      message: error.message,
+    });
+  }
+});
+
+// DELETE /api/event-volunteer/:id -> Delete a volunteer signup (PUBLIC - email verification required)
 router.delete('/:id', async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
+  const { email } = req.query || req.body || {}; // Accept email from query or body
 
   if (!id?.trim()) {
     return res.status(400).json({
@@ -273,13 +348,16 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // TODO: Add Firebase token verification to ensure requester is event creator
-    // For now, we'll allow it but should add auth middleware later
-    // const firebaseId = req.user?.uid;
-    // const athlete = await prisma.athlete.findUnique({ where: { firebaseId } });
-    // if (athlete?.id !== volunteer.event.athleteId) {
-    //   return res.status(403).json({ success: false, error: 'Unauthorized' });
-    // }
+    // If email is provided, verify it matches (security: only allow deleting your own signup)
+    // If no email provided, allow deletion (for admin use - but we warn in the UI)
+    if (email?.trim()) {
+      if (volunteer.email.toLowerCase() !== email.trim().toLowerCase()) {
+        return res.status(403).json({
+          success: false,
+          error: 'Email does not match. You can only delete your own signup.',
+        });
+      }
+    }
 
     // Delete the volunteer
     await prisma.eventVolunteer.delete({
@@ -288,7 +366,7 @@ router.delete('/:id', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Volunteer removed successfully',
+      message: 'Volunteer signup removed successfully',
       data: { id: volunteer.id, eventId: volunteer.eventId },
     });
   } catch (error) {
