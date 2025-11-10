@@ -1,75 +1,65 @@
 // RunCrew Join Route
 // POST /api/runcrew/join
-// Allows an athlete to join a RunCrew using an invite code
+// Allows an athlete to join a RunCrew using an invite code via JoinCode registry
 
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { AthleteFindOrCreateService } from '../../services/AthleteFindOrCreateService.js';
 
 const router = express.Router();
 
 /**
  * Join RunCrew
  * POST /api/runcrew/join
- * Body: { joinCode: string, athleteId: string }
+ * Body: { joinCode: string, athleteProfile?: object }
  * 
  * Flow:
- * 1. Verify athleteId is provided
- * 2. Verify Firebase token matches athleteId (security)
- * 3. Verify athlete exists
- * 4. Find RunCrew by joinCode
- * 5. Check if athlete is already a member
- * 6. Create RunCrewMembership
+ * 1. Verify joinCode via JoinCode registry
+ * 2. Verify Firebase token (user must be authenticated)
+ * 3. Upsert athlete (auto-create if new)
+ * 4. Check if athlete is already a member
+ * 5. Create RunCrewMembership
+ * 6. Return full hydrated runCrew
  */
 router.post('/join', verifyFirebaseToken, async (req, res) => {
   try {
     const prisma = getPrismaClient();
-    const { joinCode, athleteId } = req.body;
-    const firebaseId = req.user?.uid; // From verified Firebase token
+    const { joinCode, athleteProfile } = req.body;
+    const userId = req.user?.uid; // From verified Firebase token
+    const email = req.user?.email;
+    const displayName = req.user?.name;
+    const picture = req.user?.picture;
     
     console.log('🚀 RUNCREW JOIN: ===== JOINING RUNCREW =====');
     console.log('🚀 RUNCREW JOIN: Join Code:', joinCode);
-    console.log('🚀 RUNCREW JOIN: Athlete ID:', athleteId);
-    console.log('🚀 RUNCREW JOIN: Firebase ID:', firebaseId);
+    console.log('🚀 RUNCREW JOIN: Firebase ID:', userId);
     
     // Validation
-    if (!joinCode || !athleteId) {
-      console.log('❌ RUNCREW JOIN: Missing required fields');
+    if (!joinCode) {
+      console.log('❌ RUNCREW JOIN: Missing join code');
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
-        required: ['joinCode', 'athleteId'],
+        required: ['joinCode'],
         received: {
-          joinCode: !!joinCode,
-          athleteId: !!athleteId
+          joinCode: !!joinCode
         }
       });
     }
     
-    // Verify athlete exists and matches Firebase user
-    console.log('🔍 RUNCREW JOIN: Verifying athlete...');
-    const athlete = await prisma.athlete.findFirst({
-      where: {
-        id: athleteId,
-        firebaseId: firebaseId
-      }
-    });
-    
-    if (!athlete) {
-      console.log('❌ RUNCREW JOIN: Athlete not found or does not match Firebase user');
-      return res.status(403).json({
+    if (!userId || !email) {
+      console.log('❌ RUNCREW JOIN: Missing Firebase authentication');
+      return res.status(401).json({
         success: false,
         error: 'Unauthorized',
-        message: 'Athlete ID does not match authenticated user'
+        message: 'Firebase authentication required'
       });
     }
     
-    console.log('✅ RUNCREW JOIN: Athlete verified:', athlete.email);
-    
-    // Normalize joinCode to uppercase and trim (matches how it's stored)
+    // Normalize joinCode to uppercase and trim
     const normalizedJoinCode = joinCode.toUpperCase().trim();
     
-    // Validate joinCode is not empty after normalization
     if (!normalizedJoinCode) {
       console.log('❌ RUNCREW JOIN: Join code is empty after normalization');
       return res.status(400).json({
@@ -79,68 +69,95 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
       });
     }
     
-    // Find RunCrew by joinCode (using findUnique since joinCode is unique in schema)
-    console.log('🔍 RUNCREW JOIN: Finding RunCrew by joinCode:', normalizedJoinCode);
-    const runCrew = await prisma.runCrew.findUnique({
-      where: { joinCode: normalizedJoinCode } // joinCode is @unique in schema
+    // Find JoinCode record in registry
+    console.log('🔍 RUNCREW JOIN: Looking up join code in registry:', normalizedJoinCode);
+    const joinCodeRecord = await prisma.joinCode.findUnique({
+      where: { code: normalizedJoinCode },
+      include: { runCrew: true }
     });
     
-    if (!runCrew) {
-      console.log('❌ RUNCREW JOIN: RunCrew not found with joinCode:', normalizedJoinCode);
-      return res.status(404).json({
+    if (!joinCodeRecord) {
+      console.log('❌ RUNCREW JOIN: Join code not found in registry:', normalizedJoinCode);
+      return res.status(400).json({
         success: false,
-        error: 'RunCrew not found',
-        message: 'Invalid join code. Please check the code and try again.'
+        error: 'Invalid join code',
+        message: 'Invalid or expired join code'
       });
     }
     
-    console.log('✅ RUNCREW JOIN: RunCrew found:', runCrew.name, runCrew.id);
+    // Check if code is active
+    if (!joinCodeRecord.isActive) {
+      console.log('❌ RUNCREW JOIN: Join code is inactive:', normalizedJoinCode);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid join code',
+        message: 'Invalid or expired join code'
+      });
+    }
     
-    // Check if athlete is already a member (check junction table)
+    // Check if code is expired
+    if (joinCodeRecord.expiresAt && new Date(joinCodeRecord.expiresAt) < new Date()) {
+      console.log('❌ RUNCREW JOIN: Join code has expired:', normalizedJoinCode);
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid join code',
+        message: 'Invalid or expired join code'
+      });
+    }
+    
+    const { runCrewId } = joinCodeRecord;
+    console.log('✅ RUNCREW JOIN: Join code validated, runCrewId:', runCrewId);
+    
+    // Upsert athlete (auto-create if new)
+    console.log('🔍 RUNCREW JOIN: Upserting athlete...');
+    const athlete = await AthleteFindOrCreateService.findOrCreate({
+      firebaseId: userId,
+      email,
+      displayName,
+      picture
+    });
+    
+    // Update athlete profile if provided
+    if (athleteProfile && Object.keys(athleteProfile).length > 0) {
+      await prisma.athlete.update({
+        where: { id: athlete.id },
+        data: athleteProfile
+      });
+    }
+    
+    console.log('✅ RUNCREW JOIN: Athlete upserted:', athlete.id);
+    
+    // Check if athlete is already a member
     console.log('🔍 RUNCREW JOIN: Checking for existing membership...');
     const existingMembership = await prisma.runCrewMembership.findUnique({
       where: {
         runCrewId_athleteId: {
-          runCrewId: runCrew.id,
-          athleteId: athleteId
+          runCrewId: runCrewId,
+          athleteId: athlete.id
         }
       }
     });
     
     if (existingMembership) {
       console.log('⚠️ RUNCREW JOIN: Athlete already a member of this crew');
-      return res.status(409).json({
-        success: false,
-        error: 'Already a member',
-        message: 'You are already a member of this RunCrew'
+      // Still return success with hydrated crew
+    } else {
+      // Create membership
+      console.log('📝 RUNCREW JOIN: Creating membership...');
+      await prisma.runCrewMembership.create({
+        data: {
+          runCrewId: runCrewId,
+          athleteId: athlete.id
+        }
       });
+      console.log('✅ RUNCREW JOIN: Membership created');
     }
     
-    // Add athlete to crew via junction table (athlete can be in multiple crews)
-    console.log('📝 RUNCREW JOIN: Creating membership via junction table...');
-    const membership = await prisma.runCrewMembership.create({
-      data: {
-        runCrewId: runCrew.id,
-        athleteId: athleteId
-      }
-    });
-    
-    console.log('✅ RUNCREW JOIN: Membership created:', membership.id);
-    console.log('✅ RUNCREW JOIN: ===== JOINED RUNCREW SUCCESSFULLY =====');
-    
-    // Return RunCrew with members
-    const runCrewWithMembers = await prisma.runCrew.findUnique({
-      where: { id: runCrew.id },
+    // Return full hydrated RunCrew
+    console.log('🔍 RUNCREW JOIN: Hydrating RunCrew...');
+    const runCrew = await prisma.runCrew.findUnique({
+      where: { id: runCrewId },
       include: {
-        admin: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
-            photoURL: true
-          }
-        },
         memberships: {
           include: {
             athlete: {
@@ -166,14 +183,45 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
               }
             }
           }
+        },
+        runs: true,
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 50,
+          include: {
+            athlete: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoURL: true
+              }
+            }
+          }
+        },
+        announcements: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: {
+            author: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                photoURL: true
+              }
+            }
+          }
         }
       }
     });
     
+    console.log('✅ RUNCREW JOIN: ===== JOINED RUNCREW SUCCESSFULLY =====');
+    
     res.status(201).json({
       success: true,
-      message: 'Joined RunCrew successfully',
-      runCrew: runCrewWithMembers
+      athleteId: athlete.id,
+      runCrew
     });
     
   } catch (error) {

@@ -32,6 +32,7 @@ import stravaTokenRoute from './routes/Strava/stravaTokenRoute.js';
 import stravaAthleteRoute from './routes/Strava/stravaAthleteRoute.js';
 // RunCrew routes
 import runCrewCreateRouter from './routes/RunCrew/runCrewCreateRoute.js';
+import runCrewLookupRouter from './routes/RunCrew/runCrewLookupRoute.js';
 import runCrewJoinRouter from './routes/RunCrew/runCrewJoinRoute.js';
 import runCrewHydrateRouter from './routes/RunCrew/runCrewHydrateRoute.js';
 import runCrewMessageRouter from './routes/RunCrew/runCrewMessageRoute.js';
@@ -140,6 +141,7 @@ app.use('/api/strava', stravaTokenRoute); // /token
 app.use('/api/strava', stravaAthleteRoute); // /activities
 // RunCrew routes
 app.use('/api/runcrew', runCrewCreateRouter); // /create
+app.use('/api/runcrew', runCrewLookupRouter); // /lookup (BEFORE /join)
 app.use('/api/runcrew', runCrewJoinRouter); // /join
 app.use('/api/runcrew', runCrewMessageRouter); // /:runCrewId/messages
 app.use('/api/runcrew', runCrewAnnouncementRouter); // /:runCrewId/announcements

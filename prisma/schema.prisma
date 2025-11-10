@@ -1,3 +1,39 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model VolunteerInput {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  role      String
+  note      String?
+  createdAt DateTime @default(now())
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model VolunteerInput {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  role      String
+  note      String?
+  createdAt DateTime @default(now())
+}
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -156,7 +192,7 @@ model RunCrew {
   id          String  @id @default(cuid())
   name        String
   description String? // Optional crew description/motto
-  joinCode    String  @unique // Unique invite code for joining
+  joinCode    String  @unique // Unique invite code for joining (backward compatibility)
   logo        String? // Optional logo/image URL
   icon        String? // Optional emoji/icon (alternative to logo)
 
@@ -176,8 +212,22 @@ model RunCrew {
   runs               RunCrewRun[] // Runs (MVP1: admin only)
   events             RunCrewEvent[] // General events (future - happy hour, social, etc.)
   managers           RunCrewManager[] // Source of truth for admin/manager roles
+  joinCodes          JoinCode[] // JoinCode registry (authoritative source for invites)
 
   @@map("run_crews")
+}
+
+// JoinCode Registry - Authoritative source for crew invites
+model JoinCode {
+  id         String   @id @default(cuid())
+  code       String   @unique
+  runCrewId  String
+  runCrew    RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+  isActive   Boolean  @default(true)
+
+  @@map("join_codes")
 }
 
 model RunCrewMembership {
