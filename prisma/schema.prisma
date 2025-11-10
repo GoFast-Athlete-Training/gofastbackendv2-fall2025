@@ -356,7 +356,6 @@ model RunCrewEventRSVP {
 
 model Event {
   id          String   @id @default(cuid())
-  eventSlug   String   @unique // URL-friendly identifier (e.g., "boys-gotta-run-2025")
   title       String   // "Boys Gotta Run – Discovery 5K (Final Run)"
   description String?
   
@@ -386,7 +385,6 @@ model Event {
   volunteers  EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
   
   @@map("events")
-  @@index([eventSlug])
 }
 
 // =====================================================
@@ -395,8 +393,7 @@ model Event {
 
 model EventVolunteer {
   id        String   @id @default(cuid())
-  eventId   String   // Links to Event.id (replaces eventSlug)
-  eventSlug String?  // Kept for backward compatibility during migration
+  eventId   String   // Links to Event.id (primary identifier)
   name      String
   email     String
   role      String
@@ -408,7 +405,6 @@ model EventVolunteer {
 
   @@map("event_volunteers")
   @@index([eventId])
-  @@index([eventSlug]) // Keep for migration period
 }
 
 // RunCrew Managers - Future (Delegated managers)

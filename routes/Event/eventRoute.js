@@ -3,16 +3,13 @@ import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
 
-// GET /api/event -> List all events (or filter by eventSlug)
+// GET /api/event -> List all events (filter by isActive)
 router.get('/', async (req, res) => {
   const prisma = getPrismaClient();
-  const { eventSlug, isActive } = req.query;
+  const { isActive } = req.query;
 
   try {
     const where = {};
-    if (eventSlug?.trim()) {
-      where.eventSlug = eventSlug.trim();
-    }
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
     }
@@ -86,7 +83,6 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const prisma = getPrismaClient();
   const {
-    eventSlug,
     title,
     description,
     date,
@@ -100,19 +96,18 @@ router.post('/', async (req, res) => {
     isActive,
   } = req.body || {};
 
-  // Basic validation
-  if (!eventSlug?.trim() || !title?.trim() || !date) {
+  // Basic validation - eventId is primary identifier (auto-generated)
+  if (!title?.trim() || !date) {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields',
-      required: ['eventSlug', 'title', 'date'],
+      required: ['title', 'date'],
     });
   }
 
   try {
     const event = await prisma.event.create({
       data: {
-        eventSlug: eventSlug.trim(),
         title: title.trim(),
         description: description?.trim() || null,
         date: new Date(date),
@@ -134,16 +129,6 @@ router.post('/', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ EVENT CREATE ERROR:', error);
-    
-    // Handle unique constraint violation
-    if (error.code === 'P2002') {
-      return res.status(409).json({
-        success: false,
-        error: 'Event with this slug already exists',
-        field: 'eventSlug',
-      });
-    }
-
     res.status(500).json({
       success: false,
       error: 'Failed to create event',

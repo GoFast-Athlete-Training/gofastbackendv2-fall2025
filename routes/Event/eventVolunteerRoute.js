@@ -6,57 +6,34 @@ const router = express.Router();
 // POST /api/event-volunteer -> Create a new volunteer signup
 router.post('/', async (req, res) => {
   const prisma = getPrismaClient();
-  const { eventId, eventSlug, name, email, role, notes } = req.body || {};
+  const { eventId, name, email, role, notes } = req.body || {};
 
-  // Basic validation
-  if ((!eventId?.trim() && !eventSlug?.trim()) || !name?.trim() || !email?.trim() || !role?.trim()) {
+  // Basic validation - eventId is required (primary identifier)
+  if (!eventId?.trim() || !name?.trim() || !email?.trim() || !role?.trim()) {
     return res.status(400).json({
       success: false,
       error: 'Missing required fields',
-      required: ['eventId or eventSlug', 'name', 'email', 'role'],
+      required: ['eventId', 'name', 'email', 'role'],
     });
   }
 
   try {
-    let finalEventId = eventId?.trim();
-    let finalEventSlug = eventSlug?.trim();
+    // Verify event exists
+    const event = await prisma.event.findUnique({
+      where: { id: eventId.trim() },
+      select: { id: true, title: true },
+    });
 
-    // If eventSlug provided, look up event to get eventId
-    if (!finalEventId && finalEventSlug) {
-      const event = await prisma.event.findUnique({
-        where: { eventSlug: finalEventSlug },
-        select: { id: true },
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: `Event not found with id: ${eventId.trim()}`,
       });
-
-      if (!event) {
-        return res.status(404).json({
-          success: false,
-          error: `Event not found with slug: ${finalEventSlug}`,
-        });
-      }
-
-      finalEventId = event.id;
-    } else if (finalEventId && !finalEventSlug) {
-      // If eventId provided, get eventSlug for backward compatibility
-      const event = await prisma.event.findUnique({
-        where: { id: finalEventId },
-        select: { eventSlug: true },
-      });
-
-      if (!event) {
-        return res.status(404).json({
-          success: false,
-          error: `Event not found with id: ${finalEventId}`,
-        });
-      }
-
-      finalEventSlug = event.eventSlug;
     }
 
     const signup = await prisma.eventVolunteer.create({
       data: {
-        eventId: finalEventId,
-        eventSlug: finalEventSlug, // Keep for backward compatibility
+        eventId: eventId.trim(),
         name: name.trim(),
         email: email.trim().toLowerCase(),
         role: role.trim(),
@@ -66,7 +43,6 @@ router.post('/', async (req, res) => {
         event: {
           select: {
             id: true,
-            eventSlug: true,
             title: true,
           },
         },
@@ -88,48 +64,39 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/event-volunteer?eventId=xyz OR ?eventSlug=xyz -> List signups for an event
+// GET /api/event-volunteer?eventId=xyz -> List signups for an event
 router.get('/', async (req, res) => {
   const prisma = getPrismaClient();
-  const { eventId, eventSlug } = req.query;
+  const { eventId } = req.query;
 
-  if (!eventId?.trim() && !eventSlug?.trim()) {
+  if (!eventId?.trim()) {
     return res.status(400).json({
       success: false,
-      error: 'Missing required query param: eventId or eventSlug',
+      error: 'Missing required query param: eventId',
     });
   }
 
   try {
-    let whereClause = {};
+    // Verify event exists
+    const event = await prisma.event.findUnique({
+      where: { id: eventId.trim() },
+      select: { id: true },
+    });
 
-    if (eventId?.trim()) {
-      whereClause = { eventId: eventId.trim() };
-    } else if (eventSlug?.trim()) {
-      // Look up event by slug to get eventId
-      const event = await prisma.event.findUnique({
-        where: { eventSlug: eventSlug.trim() },
-        select: { id: true },
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: `Event not found with id: ${eventId.trim()}`,
       });
-
-      if (!event) {
-        return res.status(404).json({
-          success: false,
-          error: `Event not found with slug: ${eventSlug.trim()}`,
-        });
-      }
-
-      whereClause = { eventId: event.id };
     }
 
     const volunteers = await prisma.eventVolunteer.findMany({
-      where: whereClause,
+      where: { eventId: eventId.trim() },
       orderBy: { createdAt: 'desc' },
       include: {
         event: {
           select: {
             id: true,
-            eventSlug: true,
             title: true,
           },
         },
