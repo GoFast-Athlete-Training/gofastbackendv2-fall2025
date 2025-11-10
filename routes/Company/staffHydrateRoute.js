@@ -28,6 +28,15 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     const prisma = getPrismaClient();
     const firebaseId = req.user?.uid; // From verified Firebase token
     
+    if (!firebaseId) {
+      console.log('❌ STAFF HYDRATE: No Firebase ID in token');
+      return res.status(401).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Firebase token missing or invalid'
+      });
+    }
+    
     console.log('🚀 STAFF HYDRATE: ===== HYDRATING STAFF =====');
     console.log('🚀 STAFF HYDRATE: Firebase ID:', firebaseId);
     

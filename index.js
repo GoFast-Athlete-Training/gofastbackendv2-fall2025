@@ -121,6 +121,17 @@ app.use(cors({
 // Handle preflight requests explicitly BEFORE routes
 app.options('*', cors());
 
+// Add CORS headers to all responses (in case route fails before CORS middleware)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  }
+  next();
+});
+
 app.use(express.json({ limit: '10mb' })); // Increased limit for Garmin activity details
 // Serve uploaded files statically
 app.use('/uploads', express.static(uploadDir));                                                                        
