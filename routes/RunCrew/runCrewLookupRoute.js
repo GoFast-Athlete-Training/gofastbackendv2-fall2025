@@ -45,7 +45,7 @@ router.post('/lookup', async (req, res) => {
     }
 
     // Find JoinCode record in registry
-    const joinCodeRecord = await prisma.joinCode.findUnique({
+    let joinCodeRecord = await prisma.joinCode.findUnique({
       where: { code: normalizedJoinCode },
       include: {
         runCrew: {
@@ -58,13 +58,54 @@ router.post('/lookup', async (req, res) => {
       }
     });
 
+    // If not in registry, check RunCrew.joinCode (backward compatibility) and upsert
     if (!joinCodeRecord) {
-      console.log('❌ RUNCREW LOOKUP: Join code not found:', normalizedJoinCode);
-      return res.status(404).json({
-        success: false,
-        error: 'Invalid or expired join code',
-        message: 'Invalid or expired join code'
+      console.log('⚠️ RUNCREW LOOKUP: Join code not in registry, checking RunCrew.joinCode...');
+      
+      const runCrew = await prisma.runCrew.findUnique({
+        where: { joinCode: normalizedJoinCode },
+        include: {
+          _count: {
+            select: { memberships: true }
+          }
+        }
       });
+
+      if (runCrew) {
+        console.log('✅ RUNCREW LOOKUP: Found RunCrew by joinCode, creating JoinCode record...');
+        
+        // Upsert JoinCode record for this crew
+        joinCodeRecord = await prisma.joinCode.upsert({
+          where: { code: normalizedJoinCode },
+          update: {
+            isActive: true, // Reactivate if it was deactivated
+            expiresAt: null // Remove expiration if it was set
+          },
+          create: {
+            code: normalizedJoinCode,
+            runCrewId: runCrew.id,
+            isActive: true
+          },
+          include: {
+            runCrew: {
+              include: {
+                _count: {
+                  select: { memberships: true }
+                }
+              }
+            }
+          }
+        });
+        
+        console.log('✅ RUNCREW LOOKUP: JoinCode record created/updated:', joinCodeRecord.id);
+      } else {
+        console.log('❌ RUNCREW LOOKUP: Join code not found in registry or RunCrew:', normalizedJoinCode);
+        return res.status(404).json({
+          success: false,
+          error: 'Invalid or expired join code',
+          message: 'Invalid or expired join code'
+        });
+      }
     }
 
     // Check if code is active
