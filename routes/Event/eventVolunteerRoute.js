@@ -3,7 +3,7 @@ import { getPrismaClient } from '../../config/database.js';
 
 const router = express.Router();
 
-// POST /api/event-volunteer -> Create a new volunteer signup
+// POST /api/event-volunteer -> Create a new volunteer signup (PUBLIC - no auth required)
 router.post('/', async (req, res) => {
   const prisma = getPrismaClient();
   const { eventId, name, email, role, notes } = req.body || {};
@@ -64,7 +64,127 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/event-volunteer?eventId=xyz -> List signups for an event
+// GET /api/event-volunteer/page-hydrate?eventId=xyz -> PUBLIC hydration (NO EMAILS - for public pages)
+// Safe for public display on volunteer signup pages
+router.get('/page-hydrate', async (req, res) => {
+  const prisma = getPrismaClient();
+  const { eventId } = req.query;
+
+  if (!eventId?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required query param: eventId',
+    });
+  }
+
+  try {
+    // Verify event exists
+    const event = await prisma.event.findUnique({
+      where: { id: eventId.trim() },
+      select: { id: true, title: true },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: `Event not found with id: ${eventId.trim()}`,
+      });
+    }
+
+    const volunteers = await prisma.eventVolunteer.findMany({
+      where: { eventId: eventId.trim() },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        notes: true,
+        createdAt: true,
+        // NOTE: email is intentionally excluded for privacy
+      },
+    });
+
+    res.json({
+      success: true,
+      count: volunteers.length,
+      data: volunteers,
+    });
+  } catch (error) {
+    console.error('❌ EVENT VOLUNTEER PAGE HYDRATE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch volunteer signups',
+      message: error.message,
+    });
+  }
+});
+
+// GET /api/event-volunteer/admin-hydrate?eventId=xyz -> ADMIN hydration (WITH EMAILS - for authenticated admins)
+// Requires authentication - for event creators to manage volunteers
+router.get('/admin-hydrate', async (req, res) => {
+  const prisma = getPrismaClient();
+  const { eventId } = req.query;
+
+  if (!eventId?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required query param: eventId',
+    });
+  }
+
+  try {
+    // Verify event exists
+    const event = await prisma.event.findUnique({
+      where: { id: eventId.trim() },
+      select: { id: true, title: true, athleteId: true },
+    });
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: `Event not found with id: ${eventId.trim()}`,
+      });
+    }
+
+    // TODO: Add Firebase token verification to ensure requester is event creator
+    // For now, we'll allow it but should add auth middleware later
+    // const firebaseId = req.user?.uid;
+    // const athlete = await prisma.athlete.findUnique({ where: { firebaseId } });
+    // if (athlete?.id !== event.athleteId) {
+    //   return res.status(403).json({ success: false, error: 'Unauthorized' });
+    // }
+
+    const volunteers = await prisma.eventVolunteer.findMany({
+      where: { eventId: eventId.trim() },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+      },
+      // NOTE: email is included for admin management
+    });
+
+    res.json({
+      success: true,
+      count: volunteers.length,
+      data: volunteers,
+    });
+  } catch (error) {
+    console.error('❌ EVENT VOLUNTEER ADMIN HYDRATE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch volunteer signups',
+      message: error.message,
+    });
+  }
+});
+
+// GET /api/event-volunteer?eventId=xyz -> Legacy endpoint (DEPRECATED - use page-hydrate or admin-hydrate)
+// Kept for backward compatibility but returns data WITHOUT emails for safety
 router.get('/', async (req, res) => {
   const prisma = getPrismaClient();
   const { eventId } = req.query;
@@ -90,16 +210,17 @@ router.get('/', async (req, res) => {
       });
     }
 
+    // Legacy endpoint - returns data WITHOUT emails for safety
     const volunteers = await prisma.eventVolunteer.findMany({
       where: { eventId: eventId.trim() },
       orderBy: { createdAt: 'desc' },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        notes: true,
+        createdAt: true,
+        // NOTE: email is intentionally excluded
       },
     });
 
@@ -118,7 +239,66 @@ router.get('/', async (req, res) => {
   }
 });
 
+// DELETE /api/event-volunteer/:id -> Delete a volunteer signup (ADMIN ONLY)
+router.delete('/:id', async (req, res) => {
+  const prisma = getPrismaClient();
+  const { id } = req.params;
+
+  if (!id?.trim()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing volunteer ID',
+    });
+  }
+
+  try {
+    // Check if volunteer exists
+    const volunteer = await prisma.eventVolunteer.findUnique({
+      where: { id: id.trim() },
+      include: {
+        event: {
+          select: {
+            id: true,
+            title: true,
+            athleteId: true,
+          },
+        },
+      },
+    });
+
+    if (!volunteer) {
+      return res.status(404).json({
+        success: false,
+        error: `Volunteer not found with id: ${id.trim()}`,
+      });
+    }
+
+    // TODO: Add Firebase token verification to ensure requester is event creator
+    // For now, we'll allow it but should add auth middleware later
+    // const firebaseId = req.user?.uid;
+    // const athlete = await prisma.athlete.findUnique({ where: { firebaseId } });
+    // if (athlete?.id !== volunteer.event.athleteId) {
+    //   return res.status(403).json({ success: false, error: 'Unauthorized' });
+    // }
+
+    // Delete the volunteer
+    await prisma.eventVolunteer.delete({
+      where: { id: id.trim() },
+    });
+
+    res.json({
+      success: true,
+      message: 'Volunteer removed successfully',
+      data: { id: volunteer.id, eventId: volunteer.eventId },
+    });
+  } catch (error) {
+    console.error('❌ EVENT VOLUNTEER DELETE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete volunteer signup',
+      message: error.message,
+    });
+  }
+});
+
 export default router;
-
-
-

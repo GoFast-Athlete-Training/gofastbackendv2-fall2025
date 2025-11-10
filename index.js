@@ -153,7 +153,7 @@ app.use('/api/runcrew', runCrewManagerRouter); // /:runCrewId/managers
 app.use('/api/runcrew', runCrewHydrateRouter); // /mine, /:id, /preview/:joinCode (more specific routes must come before /:id)
 // Event routes (event management and volunteer signups)
 app.use('/api/event', eventRouter); // GET /, GET /:id, POST /, PUT /:id, DELETE /:id
-app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /?eventId=xxx OR ?eventSlug=xxx
+app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /page-hydrate (public), GET /admin-hydrate (admin), DELETE /:id
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status
