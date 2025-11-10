@@ -1,17 +1,53 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
+import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 
 const router = express.Router();
 
-// GET /api/event -> List all events (filter by isActive)
-router.get('/', async (req, res) => {
+// CORS preflight handling for event routes
+router.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Max-Age', '86400');
+  res.status(200).end();
+});
+
+// GET /api/event -> List events (filter by athleteId and isActive)
+router.get('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
-  const { isActive } = req.query;
+  const { isActive, athleteId } = req.query;
+  const firebaseId = req.user?.uid;
 
   try {
-    const where = {};
+    // Get athlete from Firebase ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
+    // Build where clause
+    const where = {
+      athleteId: athlete.id // Only show events created by this athlete
+    };
+
     if (isActive !== undefined) {
       where.isActive = isActive === 'true';
+    }
+
+    // If athleteId query param is provided, verify it matches authenticated athlete
+    if (athleteId && athleteId !== athlete.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Cannot access events for another athlete'
+      });
     }
 
     const events = await prisma.event.findMany({
@@ -44,11 +80,24 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/event/:id -> Get single event by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
+  const firebaseId = req.user?.uid;
 
   try {
+    // Get athlete from Firebase ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
     const event = await prisma.event.findUnique({
       where: { id },
       include: {
@@ -62,6 +111,15 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: `Event not found with id: ${id}`,
+      });
+    }
+
+    // Verify event belongs to authenticated athlete
+    if (event.athleteId !== athlete.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Cannot access event created by another athlete'
       });
     }
 
@@ -79,8 +137,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/event -> Create new event
-router.post('/', async (req, res) => {
+// POST /api/event -> Create new event (with upsert support)
+router.post('/', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const {
     title,
@@ -93,9 +151,11 @@ router.post('/', async (req, res) => {
     distance,
     eventType,
     isActive,
+    athleteId, // Optional: if provided, must match authenticated athlete
   } = req.body || {};
+  const firebaseId = req.user?.uid;
 
-  // Basic validation - eventId is primary identifier (auto-generated)
+  // Basic validation
   if (!title?.trim() || !date) {
     return res.status(400).json({
       success: false,
@@ -105,26 +165,95 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const event = await prisma.event.create({
-      data: {
+    // Get athlete from Firebase ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
+    // Verify athleteId matches authenticated athlete (if provided)
+    if (athleteId && athleteId !== athlete.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Athlete ID does not match authenticated user'
+      });
+    }
+
+    // UPSERT: Check if event exists with same athleteId + title + date
+    const eventDate = new Date(date);
+    const startOfDay = new Date(eventDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(eventDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingEvent = await prisma.event.findFirst({
+      where: {
+        athleteId: athlete.id,
         title: title.trim(),
+        date: {
+          gte: startOfDay,
+          lte: endOfDay
+        }
+      }
+    });
+
+    if (existingEvent) {
+      // UPDATE existing event
+      const updateData = {
         description: description?.trim() || null,
-        date: new Date(date),
         startTime: startTime?.trim() || null,
         location: location?.trim() || null,
         address: address?.trim() || null,
         stravaRouteUrl: stravaRouteUrl?.trim() || null,
         distance: distance?.trim() || null,
         eventType: eventType?.trim() || null,
-        isActive: isActive !== undefined ? isActive : true,
-      },
-    });
+        isActive: isActive !== undefined ? isActive : existingEvent.isActive,
+        updatedAt: new Date()
+      };
 
-    res.status(201).json({
-      success: true,
-      message: 'Event created successfully',
-      data: event,
-    });
+      const event = await prisma.event.update({
+        where: { id: existingEvent.id },
+        data: updateData,
+      });
+
+      return res.json({
+        success: true,
+        message: 'Event updated successfully (upsert)',
+        data: event,
+        wasUpdated: true
+      });
+    } else {
+      // CREATE new event
+      const event = await prisma.event.create({
+        data: {
+          title: title.trim(),
+          description: description?.trim() || null,
+          date: eventDate,
+          startTime: startTime?.trim() || null,
+          location: location?.trim() || null,
+          address: address?.trim() || null,
+          stravaRouteUrl: stravaRouteUrl?.trim() || null,
+          distance: distance?.trim() || null,
+          eventType: eventType?.trim() || null,
+          isActive: isActive !== undefined ? isActive : true,
+          athleteId: athlete.id, // Set from authenticated athlete
+        },
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Event created successfully',
+        data: event,
+        wasUpdated: false
+      });
+    }
   } catch (error) {
     console.error('❌ EVENT CREATE ERROR:', error);
     res.status(500).json({
@@ -136,7 +265,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/event/:id -> Update event
-router.put('/:id', async (req, res) => {
+router.put('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
   const {
@@ -151,8 +280,21 @@ router.put('/:id', async (req, res) => {
     eventType,
     isActive,
   } = req.body || {};
+  const firebaseId = req.user?.uid;
 
   try {
+    // Get athlete from Firebase ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
     // Check if event exists
     const existing = await prisma.event.findUnique({
       where: { id },
@@ -162,6 +304,15 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: `Event not found with id: ${id}`,
+      });
+    }
+
+    // Verify event belongs to authenticated athlete
+    if (existing.athleteId !== athlete.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Cannot update event created by another athlete'
       });
     }
 
@@ -198,11 +349,24 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/event/:id -> Delete event (soft delete by setting isActive=false)
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verifyFirebaseToken, async (req, res) => {
   const prisma = getPrismaClient();
   const { id } = req.params;
+  const firebaseId = req.user?.uid;
 
   try {
+    // Get athlete from Firebase ID
+    const athlete = await prisma.athlete.findFirst({
+      where: { firebaseId }
+    });
+
+    if (!athlete) {
+      return res.status(404).json({
+        success: false,
+        error: 'Athlete not found'
+      });
+    }
+
     const event = await prisma.event.findUnique({
       where: { id },
     });
@@ -211,6 +375,15 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({
         success: false,
         error: `Event not found with id: ${id}`,
+      });
+    }
+
+    // Verify event belongs to authenticated athlete
+    if (event.athleteId !== athlete.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Cannot delete event created by another athlete'
       });
     }
 
@@ -236,4 +409,3 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
-

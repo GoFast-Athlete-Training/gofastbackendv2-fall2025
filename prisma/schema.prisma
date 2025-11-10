@@ -91,6 +91,9 @@ model Athlete {
   plannedDays   TrainingDayPlanned[]
   executedDays  TrainingDayExecuted[]
 
+  // Event Relations
+  events        Event[]               @relation("EventCreator") // Events created by this athlete
+
   // Founder Relations
   founder Founder?
 
@@ -369,6 +372,9 @@ model Event {
   stravaRouteUrl String? // Strava route URL (users just paste the URL)
   distance       String? // Distance (e.g., "5K", "3.1 miles", "10K")
   
+  // Athlete Relationship - Events are created by athletes
+  athleteId   String   // Links to Athlete.id (creator of the event)
+  
   // Future State: Registration
   registrantId   String? // Future: Links to athleteId for main UX registration (optional)
   
@@ -381,9 +387,12 @@ model Event {
   updatedAt   DateTime @updatedAt
   
   // Relations
+  athlete     Athlete  @relation("EventCreator", fields: [athleteId], references: [id], onDelete: Cascade)
   volunteers  EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
   
   @@map("events")
+  @@index([athleteId])
+  @@index([athleteId, title, date]) // For upsert lookup
 }
 
 // =====================================================
