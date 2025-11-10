@@ -145,11 +145,11 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
       // Create membership
       console.log('📝 RUNCREW JOIN: Creating membership...');
       await prisma.runCrewMembership.create({
-        data: {
+      data: {
           runCrewId: runCrewId,
           athleteId: athlete.id
-        }
-      });
+      }
+    });
       console.log('✅ RUNCREW JOIN: Membership created');
     }
     

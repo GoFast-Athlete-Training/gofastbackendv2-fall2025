@@ -32,7 +32,7 @@ export class CompanyStaffFindOrCreateService {
 
     const finalRole = role || 'Founder';
     if (finalRole) {
-      validateRole(finalRole);
+    validateRole(finalRole);
     }
 
     // Check if staff already exists
@@ -45,8 +45,9 @@ export class CompanyStaffFindOrCreateService {
       return { staff, created: false };
     }
 
-    // Staff doesn't exist - create without companyId (company will be created separately)
-    // companyId is now optional - staff can exist without company initially
+    // Staff doesn't exist - create without companyId initially
+    // CompanyId is optional - staff can exist without company initially
+    // Company will be linked when created/upserted via /api/company/create
     staff = await prisma.companyStaff.create({
       data: {
         firebaseId,
@@ -54,7 +55,7 @@ export class CompanyStaffFindOrCreateService {
         firstName,
         lastName,
         photoURL,
-        companyId: null, // Allow staff without company - company created via /api/company/create
+        companyId: null, // Allow staff without company - company created separately
         role: finalRole,
         startDate: startDate ? new Date(startDate) : null,
         salary: salary !== null && salary !== undefined ? Number(salary) : null,

@@ -6,6 +6,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { getGoFastCompanyId } from '../../config/goFastCompanyConfig.js';
 
 const router = express.Router();
 
@@ -32,54 +33,9 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     console.log('🚀 COMPANY HYDRATE: ===== HYDRATING COMPANY =====');
     console.log('🚀 COMPANY HYDRATE: Firebase ID:', firebaseId);
     
-    // Find CompanyStaff first
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: {
-        company: {
-          include: {
-            roadmapItems: {
-              orderBy: [
-                { orderNumber: 'asc' },
-                { createdAt: 'desc' }
-              ]
-            },
-            contacts: {
-              orderBy: { createdAt: 'desc' },
-              take: 100 // Limit to recent contacts
-            },
-            tasks: {
-              where: {
-                companyId: { not: null } // Company-wide tasks only
-              },
-              orderBy: { createdAt: 'desc' },
-              take: 100
-            },
-            productPipelineItems: {
-              orderBy: { createdAt: 'desc' },
-              take: 100
-            },
-            financialSpends: {
-              orderBy: { date: 'desc' },
-              take: 100
-            },
-            financialProjections: {
-              orderBy: { periodStart: 'desc' },
-              take: 50
-            },
-            staff: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                email: true,
-                role: true,
-                photoURL: true
-              }
-            }
-          }
-        }
-      }
+      where: { firebaseId }
     });
     
     if (!staff) {
@@ -91,64 +47,64 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
       });
     }
     
-    // Company can be null - staff might not have company yet
-    // But if staff has companyId, try to fetch company directly
-    let company = staff.company;
+    console.log('✅ COMPANY HYDRATE: Staff found:', staff.id);
+    console.log('✅ COMPANY HYDRATE: Staff role:', staff.role);
     
-    if (!company && staff.companyId) {
-      console.log('⚠️ COMPANY HYDRATE: Staff has companyId but relation not loaded, fetching directly...');
-      company = await prisma.goFastCompany.findUnique({
-        where: { id: staff.companyId },
-        include: {
-          roadmapItems: {
-            orderBy: [
-              { orderNumber: 'asc' },
-              { createdAt: 'desc' }
-            ]
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
+    
+    // Get company by hardcoded ID
+    const company = await prisma.goFastCompany.findUnique({
+      where: { id: goFastCompanyId },
+      include: {
+        roadmapItems: {
+          orderBy: [
+            { orderNumber: 'asc' },
+            { createdAt: 'desc' }
+          ]
+        },
+        contacts: {
+          orderBy: { createdAt: 'desc' },
+          take: 100
+        },
+        tasks: {
+          where: {
+            companyId: { not: null }
           },
-          contacts: {
-            orderBy: { createdAt: 'desc' },
-            take: 100
-          },
-          tasks: {
-            where: {
-              companyId: { not: null }
-            },
-            orderBy: { createdAt: 'desc' },
-            take: 100
-          },
-          productPipelineItems: {
-            orderBy: { createdAt: 'desc' },
-            take: 100
-          },
-          financialSpends: {
-            orderBy: { date: 'desc' },
-            take: 100
-          },
-          financialProjections: {
-            orderBy: { periodStart: 'desc' },
-            take: 50
-          },
-          staff: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              role: true,
-              photoURL: true
-            }
+          orderBy: { createdAt: 'desc' },
+          take: 100
+        },
+        productPipelineItems: {
+          orderBy: { createdAt: 'desc' },
+          take: 100
+        },
+        financialSpends: {
+          orderBy: { date: 'desc' },
+          take: 100
+        },
+        financialProjections: {
+          orderBy: { periodStart: 'desc' },
+          take: 50
+        },
+        staff: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            role: true,
+            photoURL: true
           }
         }
-      });
-    }
+      }
+    });
     
-    // If still no company, return staff info (frontend will redirect to company settings)
+    // Company might not exist yet (first-time setup)
     if (!company) {
-      console.log('⚠️ COMPANY HYDRATE: Company not found for staff (companyId:', staff.companyId || 'null', ')');
+      console.log('⚠️ COMPANY HYDRATE: Company not found (not created yet)');
       return res.status(200).json({
         success: true,
-        company: null, // No company yet
+        company: null,
         staff: {
           id: staff.id,
           firebaseId: staff.firebaseId,
@@ -165,16 +121,14 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     
     console.log('✅ COMPANY HYDRATE: Company found:', company.id);
     console.log('✅ COMPANY HYDRATE: Company Name:', company.companyName);
-    console.log('✅ COMPANY HYDRATE: Company Container ID:', company.containerId);
     console.log('✅ COMPANY HYDRATE: Roadmap Items:', company.roadmapItems?.length || 0);
     console.log('✅ COMPANY HYDRATE: Contacts:', company.contacts?.length || 0);
     
-    // Format response
+    // Format response (removed containerId - not needed)
     const response = {
       success: true,
       company: {
         id: company.id,
-        containerId: company.containerId,
         companyName: company.companyName,
         address: company.address,
         city: company.city,
@@ -199,7 +153,7 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
         email: staff.email,
         photoURL: staff.photoURL,
         role: staff.role,
-        companyId: staff.companyId
+        companyId: staff.companyId || company.id
       }
     };
     

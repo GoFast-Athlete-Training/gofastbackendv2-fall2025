@@ -978,10 +978,9 @@ model Message {
 // =====================================================
 
 model GoFastCompany {
-  id          String @id @default(cuid())
-  containerId String @unique // Unique container identifier for GoFast operations
+  id          String @id @default(cuid()) // Single tenant - hardcoded ID in config (cmhpqe7kl0000nw1uvcfhf2hs)
 
-  // Company Details (Upserted by founder during onboarding)
+  // Company Details (Upserted by any authenticated staff)
   companyName String // "GoFast Inc"
   address     String? // "2604 N. George Mason Dr."
   city        String? // "Arlington"
@@ -1037,7 +1036,7 @@ model CompanyStaff {
 
 model Contact {
   id        String @id @default(cuid())
-  companyId String // Links to GoFastCompany.id (containerId)
+  companyId String // Links to GoFastCompany.id (single tenant - hardcoded in config)
 
   // Core person data (aligned with Ignite pattern)
   firstName String?
@@ -1069,7 +1068,7 @@ model Contact {
 
 model ProductPipelineItem {
   id        String @id @default(cuid())
-  companyId String // Links to GoFastCompany.id (containerId)
+  companyId String // Links to GoFastCompany.id (single tenant - hardcoded in config)
 
   // User-Driven Product Module Fields
   name        String // Product feature/module name (user input)

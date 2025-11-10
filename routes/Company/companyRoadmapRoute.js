@@ -4,6 +4,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { getGoFastCompanyId } from '../../config/goFastCompanyConfig.js';
 
 const router = express.Router();
 
@@ -19,22 +20,24 @@ router.get('/roadmap', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid; // From verified Firebase token
     const { status, roadmapType, parentArchitecture, itemType } = req.query;
 
-    // Find staff to get company
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: { company: true }
+      where: { firebaseId }
     });
 
-    if (!staff || !staff.company) {
+    if (!staff) {
       return res.status(404).json({
         success: false,
-        error: 'Company not found',
-        message: 'GoFastCompany record not found. Please create company first.'
+        error: 'Staff not found',
+        message: 'CompanyStaff record not found.'
       });
     }
 
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
+
     // Build where clause - use goFastCompanyId for GoFastCompany
-    const where = { goFastCompanyId: staff.company.id };
+    const where = { goFastCompanyId };
     if (status) where.status = status;
     if (roadmapType) where.roadmapType = roadmapType;
     if (parentArchitecture) where.parentArchitecture = parentArchitecture;
@@ -73,23 +76,25 @@ router.get('/roadmap/:itemId', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const { itemId } = req.params;
 
-    // Verify staff and company
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: { company: true }
+      where: { firebaseId }
     });
 
-    if (!staff || !staff.company) {
+    if (!staff) {
       return res.status(404).json({
         success: false,
-        error: 'Company not found'
+        error: 'Staff not found'
       });
     }
+
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
 
     const item = await prisma.companyRoadmapItem.findFirst({
       where: { 
         id: itemId,
-        goFastCompanyId: staff.company.id // Ensure it belongs to this company
+        goFastCompanyId // Ensure it belongs to this company
       }
     });
 
@@ -148,23 +153,25 @@ router.post('/roadmap', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Find staff to get company (single-tenant)
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: { company: true }
+      where: { firebaseId }
     });
 
-    if (!staff || !staff.company) {
+    if (!staff) {
       return res.status(404).json({
         success: false,
-        error: 'Company not found',
-        message: 'GoFastCompany record not found. Please create company first.'
+        error: 'Staff not found',
+        message: 'CompanyStaff record not found.'
       });
     }
 
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
+
     // Auto-assign orderNumber if not provided
     const lastItem = await prisma.companyRoadmapItem.findFirst({
-      where: { goFastCompanyId: staff.company.id },
+      where: { goFastCompanyId },
       orderBy: { orderNumber: 'desc' }
     });
 
@@ -172,7 +179,7 @@ router.post('/roadmap', verifyFirebaseToken, async (req, res) => {
 
     const roadmapItem = await prisma.companyRoadmapItem.create({
       data: {
-        goFastCompanyId: staff.company.id, // Use goFastCompanyId for GoFastCompany
+        goFastCompanyId, // Use hardcoded companyId from config
         title,
         itemType,
         parentArchitecture,
@@ -221,24 +228,26 @@ router.put('/roadmap/:itemId', verifyFirebaseToken, async (req, res) => {
     const { itemId } = req.params;
     const updateData = req.body;
 
-    // Verify staff and company
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: { company: true }
+      where: { firebaseId }
     });
 
-    if (!staff || !staff.company) {
+    if (!staff) {
       return res.status(404).json({
         success: false,
-        error: 'Company not found'
+        error: 'Staff not found'
       });
     }
+
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
 
     // Verify item belongs to this company
     const existingItem = await prisma.companyRoadmapItem.findFirst({
       where: {
         id: itemId,
-        goFastCompanyId: staff.company.id
+        goFastCompanyId
       }
     });
 
@@ -286,24 +295,26 @@ router.delete('/roadmap/:itemId', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const { itemId } = req.params;
 
-    // Verify staff and company
+    // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
-      where: { firebaseId },
-      include: { company: true }
+      where: { firebaseId }
     });
 
-    if (!staff || !staff.company) {
+    if (!staff) {
       return res.status(404).json({
         success: false,
-        error: 'Company not found'
+        error: 'Staff not found'
       });
     }
+
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
 
     // Verify item belongs to this company
     const existingItem = await prisma.companyRoadmapItem.findFirst({
       where: {
         id: itemId,
-        goFastCompanyId: staff.company.id
+        goFastCompanyId
       }
     });
 

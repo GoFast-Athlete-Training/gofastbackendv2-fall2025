@@ -78,7 +78,6 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
         salary: staff.salary,
         company: staff.company ? {
           id: staff.company.id,
-          containerId: staff.company.containerId,
           companyName: staff.company.companyName,
           address: staff.company.address,
           city: staff.company.city,

@@ -6,6 +6,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { getGoFastCompanyId } from '../../config/goFastCompanyConfig.js';
 
 const router = express.Router();
 
@@ -58,35 +59,41 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     console.log('✅ COMPANY UPSERT: Staff role:', staff.role || 'No role');
     console.log('✅ COMPANY UPSERT: Staff companyId:', staff.companyId || 'None');
     
-    // SINGLE TENANT: Find existing GoFastCompany (should only be one)
-    const existingCompany = await prisma.goFastCompany.findFirst();
-    const isNewCompany = !existingCompany;
+    // SINGLE TENANT: Use hardcoded companyId from config
+    const goFastCompanyId = getGoFastCompanyId();
+    console.log('✅ COMPANY UPSERT: Using hardcoded companyId from config:', goFastCompanyId);
+    
+    // Find or create company using hardcoded ID
+    let company = await prisma.goFastCompany.findUnique({
+      where: { id: goFastCompanyId }
+    });
     
     // Prepare company data
     const companyData = {
-      companyName: companyName || (existingCompany?.companyName || 'GoFast Inc'),
-      address: address !== undefined ? address : (existingCompany?.address || '2604 N. George Mason Dr.'),
-      city: city !== undefined ? city : (existingCompany?.city || 'Arlington'),
-      state: state !== undefined ? state : (existingCompany?.state || 'VA'),
-      website: website !== undefined ? website : (existingCompany?.website || 'gofastcrushgoals.com'),
-      description: description !== undefined ? description : (existingCompany?.description || null)
+      companyName: companyName || (company?.companyName || 'GoFast Inc'),
+      address: address !== undefined ? address : (company?.address || '2604 N. George Mason Dr.'),
+      city: city !== undefined ? city : (company?.city || 'Arlington'),
+      state: state !== undefined ? state : (company?.state || 'VA'),
+      website: website !== undefined ? website : (company?.website || 'gofastcrushgoals.com'),
+      description: description !== undefined ? description : (company?.description || null)
     };
     
-    let company;
-    if (existingCompany) {
+    const isNewCompany = !company;
+    
+    if (company) {
       // Update existing company (single tenant - company lives forever)
-      console.log('📝 COMPANY UPSERT: Updating existing company:', existingCompany.id);
+      console.log('📝 COMPANY UPSERT: Updating existing company:', company.id);
       company = await prisma.goFastCompany.update({
-        where: { id: existingCompany.id },
+        where: { id: goFastCompanyId },
         data: companyData
       });
       console.log('✅ COMPANY UPSERT: Company updated');
     } else {
-      // Create company (first-time setup - only happens once, then lives forever)
-      console.log('📝 COMPANY UPSERT: Creating company (FIRST TIME SETUP - will exist forever)...');
+      // Create company with hardcoded ID (first-time setup - only happens once)
+      console.log('📝 COMPANY UPSERT: Creating company with hardcoded ID (FIRST TIME SETUP)...');
       company = await prisma.goFastCompany.create({
         data: {
-          containerId: `gofast-${Date.now()}`, // Unique containerId
+          id: goFastCompanyId, // Use hardcoded ID from config
           ...companyData
         }
       });
@@ -94,14 +101,14 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
     }
     
     // Ensure staff.companyId is set and link staff to company
-    // Auto-assign "Founder" role if this is the first staff member creating the company
+    // Auto-assign "Founder" role if this is the first staff member
     if (!staff.companyId || staff.companyId !== company.id) {
       console.log('📝 COMPANY UPSERT: Linking staff to company:', company.id);
       const updateData = { companyId: company.id };
       
       // If staff has no role and this is a new company creation, assign Founder role
       if (!staff.role && isNewCompany) {
-        console.log('📝 COMPANY UPSERT: Auto-assigning Founder role (first staff member creating company)');
+        console.log('📝 COMPANY UPSERT: Auto-assigning Founder role (first staff member)');
         updateData.role = 'Founder';
       }
       
@@ -121,7 +128,6 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         : 'Company updated successfully',
       company: {
         id: company.id,
-        containerId: company.containerId,
         companyName: company.companyName,
         address: company.address,
         city: company.city,
