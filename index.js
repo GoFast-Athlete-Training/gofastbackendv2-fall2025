@@ -88,6 +88,7 @@ const allowedOrigins = [
   'https://dashboard.gofastcrushgoals.com',
   'https://athlete.gofastcrushgoals.com',
   'https://company.gofastcrushgoals.com', // GoFast Company Stack production domain
+  'https://bgrdiscovery5k.gofastcrushgoals.com', // GoFast Events - BGR Discovery 5K
   'http://localhost:3000', // Local dev
   'http://localhost:5173', // Vite dev server
   'http://localhost:5174', // Alternative Vite port
