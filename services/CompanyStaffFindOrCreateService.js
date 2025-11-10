@@ -31,22 +31,11 @@ export class CompanyStaffFindOrCreateService {
     }
 
     const finalRole = role || 'Founder';
-    validateRole(finalRole);
-
-    let company = await prisma.goFastCompany.findFirst();
-    if (!company) {
-      company = await prisma.goFastCompany.create({
-        data: {
-          containerId: `gofast-${Date.now()}`,
-          companyName: 'GoFast Inc',
-          address: '2604 N. George Mason Dr.',
-          city: 'Arlington',
-          state: 'VA',
-          website: 'gofastcrushgoals.com',
-        },
-      });
+    if (finalRole) {
+      validateRole(finalRole);
     }
 
+    // Check if staff already exists
     let staff = await prisma.companyStaff.findUnique({
       where: { firebaseId },
       include: { company: true },
@@ -56,6 +45,8 @@ export class CompanyStaffFindOrCreateService {
       return { staff, created: false };
     }
 
+    // Staff doesn't exist - create without companyId (company will be created separately)
+    // companyId is now optional - staff can exist without company initially
     staff = await prisma.companyStaff.create({
       data: {
         firebaseId,
@@ -63,7 +54,7 @@ export class CompanyStaffFindOrCreateService {
         firstName,
         lastName,
         photoURL,
-        companyId: company.id,
+        companyId: null, // Allow staff without company - company created via /api/company/create
         role: finalRole,
         startDate: startDate ? new Date(startDate) : null,
         salary: salary !== null && salary !== undefined ? Number(salary) : null,

@@ -91,18 +91,24 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
       });
     }
     
+    // Company can be null - staff might not have company yet
+    // Return staff info even if company doesn't exist (frontend will redirect to company settings)
     if (!staff.company) {
       console.log('⚠️ COMPANY HYDRATE: Company not found for staff');
-      return res.status(404).json({
-        success: false,
-        error: 'Company not found',
-        message: 'GoFastCompany record not found. Please create company first.',
+      return res.status(200).json({
+        success: true,
+        company: null, // No company yet
         staff: {
           id: staff.id,
           firebaseId: staff.firebaseId,
+          firstName: staff.firstName,
+          lastName: staff.lastName,
           email: staff.email,
-          role: staff.role
-        }
+          photoURL: staff.photoURL,
+          role: staff.role,
+          companyId: null
+        },
+        message: 'Company not found. Please create company first.'
       });
     }
     

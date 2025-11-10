@@ -51,8 +51,9 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     console.log('✅ STAFF HYDRATE: Staff found:', staff.id);
     console.log('✅ STAFF HYDRATE: Role:', staff.role);
     console.log('✅ STAFF HYDRATE: Company:', staff.company?.companyName || 'None');
+    console.log('✅ STAFF HYDRATE: CompanyId:', staff.companyId || 'None');
     
-    // Format response
+    // Format response - company can be null if staff doesn't have company yet
     const response = {
       success: true,
       staff: {
@@ -62,7 +63,7 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
         lastName: staff.lastName,
         email: staff.email,
         photoURL: staff.photoURL,
-        companyId: staff.companyId,
+        companyId: staff.companyId || null, // Can be null
         role: staff.role,
         startDate: staff.startDate,
         salary: staff.salary,
@@ -77,7 +78,7 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
           description: staff.company.description,
           createdAt: staff.company.createdAt,
           updatedAt: staff.company.updatedAt
-        } : null,
+        } : null, // Company can be null
         createdAt: staff.createdAt,
         updatedAt: staff.updatedAt
       }

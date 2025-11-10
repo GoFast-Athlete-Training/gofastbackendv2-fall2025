@@ -1016,7 +1016,7 @@ model CompanyStaff {
   photoURL  String? // Profile photo URL (from Firebase - stored for quick access)
 
   // Company and Role (direct fields - single-tenant, no junction needed)
-  companyId String // Links to GoFastCompany.id (single company)
+  companyId String? // Links to GoFastCompany.id (single company) - nullable to allow staff creation before company
   role      String // "Founder", "CFO", "Sales", "Marketing", "Community Manager" (from roleConfig.js - enum-like)
 
   // Employment details (founder/CEO can fill in)
@@ -1027,7 +1027,7 @@ model CompanyStaff {
   verificationCode String? // Unique code for employee onboarding (future: can be changed)
 
   // Relations
-  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company GoFastCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
