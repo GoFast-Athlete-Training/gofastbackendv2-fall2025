@@ -165,6 +165,7 @@ router.get('/hydrate', verifyFirebaseToken, async (req, res) => {
     
     console.log('✅ COMPANY HYDRATE: Company found:', company.id);
     console.log('✅ COMPANY HYDRATE: Company Name:', company.companyName);
+    console.log('✅ COMPANY HYDRATE: Company Container ID:', company.containerId);
     console.log('✅ COMPANY HYDRATE: Roadmap Items:', company.roadmapItems?.length || 0);
     console.log('✅ COMPANY HYDRATE: Contacts:', company.contacts?.length || 0);
     
