@@ -90,7 +90,6 @@ router.post('/', async (req, res) => {
     location,
     address,
     stravaRouteUrl,
-    stravaRouteId,
     distance,
     eventType,
     isActive,
@@ -115,7 +114,6 @@ router.post('/', async (req, res) => {
         location: location?.trim() || null,
         address: address?.trim() || null,
         stravaRouteUrl: stravaRouteUrl?.trim() || null,
-        stravaRouteId: stravaRouteId?.trim() || null,
         distance: distance?.trim() || null,
         eventType: eventType?.trim() || null,
         isActive: isActive !== undefined ? isActive : true,
@@ -149,7 +147,6 @@ router.put('/:id', async (req, res) => {
     location,
     address,
     stravaRouteUrl,
-    stravaRouteId,
     distance,
     eventType,
     isActive,
@@ -176,7 +173,6 @@ router.put('/:id', async (req, res) => {
     if (location !== undefined) updateData.location = location?.trim() || null;
     if (address !== undefined) updateData.address = address?.trim() || null;
     if (stravaRouteUrl !== undefined) updateData.stravaRouteUrl = stravaRouteUrl?.trim() || null;
-    if (stravaRouteId !== undefined) updateData.stravaRouteId = stravaRouteId?.trim() || null;
     if (distance !== undefined) updateData.distance = distance?.trim() || null;
     if (eventType !== undefined) updateData.eventType = eventType?.trim() || null;
     if (isActive !== undefined) updateData.isActive = isActive;

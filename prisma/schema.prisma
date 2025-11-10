@@ -366,8 +366,7 @@ model Event {
   address     String?  // "5275 N 36th St, Arlington, VA 22207"
   
   // Route Information
-  stravaRouteUrl String? // Strava route URL
-  stravaRouteId  String? // Strava route ID
+  stravaRouteUrl String? // Strava route URL (users just paste the URL)
   distance       String? // Distance (e.g., "5K", "3.1 miles", "10K")
   
   // Future State: Registration
