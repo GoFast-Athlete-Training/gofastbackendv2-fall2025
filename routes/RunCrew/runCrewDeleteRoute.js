@@ -1,5 +1,5 @@
 // RunCrew Delete Route
-// DELETE /api/runcrew/:id - Soft delete (archive) RunCrew (admin only)
+// DELETE /api/runcrew/:id - Hard delete RunCrew and all related records (admin only)
 
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
@@ -17,7 +17,7 @@ const router = express.Router();
  * 2. Find athlete by firebaseId
  * 3. Find RunCrew by id
  * 4. Check if athlete is admin (via RunCrewManager or runcrewAdminId)
- * 5. Soft delete: Set isArchived = true, archivedAt = now
+ * 5. Hard delete: Delete RunCrew (cascades to all related records via Prisma)
  * 6. Return success
  */
 router.delete('/:id', verifyFirebaseToken, async (req, res) => {
@@ -68,15 +68,6 @@ router.delete('/:id', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Check if already archived
-    if (runCrew.isArchived) {
-      return res.status(400).json({
-        success: false,
-        error: 'Already archived',
-        message: 'This RunCrew has already been deleted'
-      });
-    }
-
     // Check if athlete is admin
     const isAdmin = isAthleteAdmin(runCrew, athlete.id);
 
@@ -88,16 +79,22 @@ router.delete('/:id', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Soft delete: Archive the RunCrew
-    await prisma.runCrew.update({
-      where: { id: runCrewId },
-      data: {
-        isArchived: true,
-        archivedAt: new Date()
-      }
+    // Hard delete: Delete the RunCrew (Prisma will cascade delete all related records)
+    // This will delete:
+    // - RunCrewRun (runs)
+    // - RunCrewRunRSVP (RSVPs)
+    // - RunCrewAnnouncement (announcements)
+    // - RunCrewEvent (events)
+    // - RunCrewEventRSVP (event RSVPs)
+    // - RunCrewMessage (messages)
+    // - RunCrewMembership (memberships)
+    // - RunCrewManager (managers)
+    // - JoinCode (join codes)
+    await prisma.runCrew.delete({
+      where: { id: runCrewId }
     });
 
-    console.log('✅ RUNCREW DELETE: RunCrew archived successfully:', runCrewId);
+    console.log('✅ RUNCREW DELETE: RunCrew and all related records deleted successfully:', runCrewId);
 
     res.json({
       success: true,
