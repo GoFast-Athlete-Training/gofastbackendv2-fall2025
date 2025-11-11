@@ -52,6 +52,20 @@ router.post('/lookup', async (req, res) => {
           include: {
             _count: {
               select: { memberships: true }
+            },
+            managers: {
+              where: { role: 'admin' },
+              take: 1,
+              include: {
+                athlete: {
+                  select: {
+                    id: true,
+                    firstName: true,
+                    lastName: true,
+                    photoURL: true
+                  }
+                }
+              }
             }
           }
         }
@@ -67,6 +81,20 @@ router.post('/lookup', async (req, res) => {
         include: {
           _count: {
             select: { memberships: true }
+          },
+          managers: {
+            where: { role: 'admin' },
+            take: 1,
+            include: {
+              athlete: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  photoURL: true
+                }
+              }
+            }
           }
         }
       });
@@ -91,6 +119,20 @@ router.post('/lookup', async (req, res) => {
               include: {
                 _count: {
                   select: { memberships: true }
+                },
+                managers: {
+                  where: { role: 'admin' },
+                  take: 1,
+                  include: {
+                    athlete: {
+                      select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        photoURL: true
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -129,6 +171,7 @@ router.post('/lookup', async (req, res) => {
     }
 
     const crew = joinCodeRecord.runCrew;
+    const adminManager = crew.managers?.[0]; // Get first admin manager
 
     // Return crew preview
     res.json({
@@ -136,8 +179,15 @@ router.post('/lookup', async (req, res) => {
       id: crew.id,
       name: crew.name,
       description: crew.description || null,
+      icon: crew.icon || null,
+      logo: crew.logo || null,
       memberCount: crew._count.memberships,
-      joinCode: joinCodeRecord.code
+      joinCode: joinCodeRecord.code,
+      admin: adminManager ? {
+        firstName: adminManager.athlete.firstName,
+        lastName: adminManager.athlete.lastName,
+        photoURL: adminManager.athlete.photoURL
+      } : null
     });
 
   } catch (error) {
