@@ -62,15 +62,14 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
   try {
     // Create RunCrew and upsert membership in a transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Create RunCrew (keep runcrewAdminId for backward compatibility, but use RunCrewManager as primary)
+      // Create RunCrew (admin status determined via RunCrewManager, not runcrewAdminId field)
       const runCrew = await tx.runCrew.create({
         data: {
           name: name.trim(),
           joinCode: normalizedJoinCode,
           description: req.body.description?.trim() || null,
           logo: req.body.logo?.trim() || null,
-          icon: req.body.icon?.trim() || null,
-          runcrewAdminId: athleteId // Backward compatibility - but RunCrewManager is the source of truth
+          icon: req.body.icon?.trim() || null
         }
       });
       
@@ -100,21 +99,11 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         }
       });
       
-      // Return hydrated RunCrew with creator admin and members
+      // Return hydrated RunCrew with creator admin (via RunCrewManager) and members
       const hydratedCrew = await tx.runCrew.findUnique({
         where: { id: runCrew.id },
         include: {
-          admin: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              photoURL: true
-            }
-          },
           managers: {
-            where: { role: 'admin' }, // Include admin managers
             include: {
               athlete: {
                 select: {
