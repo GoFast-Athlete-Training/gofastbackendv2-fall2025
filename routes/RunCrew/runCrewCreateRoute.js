@@ -67,9 +67,9 @@ router.post('/create', verifyFirebaseToken, async (req, res) => {
         data: {
           name: name.trim(),
           joinCode: normalizedJoinCode,
-          description: req.body.description?.trim(),
-          logo: req.body.logo,
-          icon: req.body.icon,
+          description: req.body.description?.trim() || null,
+          logo: req.body.logo?.trim() || null,
+          icon: req.body.icon?.trim() || null,
           runcrewAdminId: athleteId // Backward compatibility - but RunCrewManager is the source of truth
         }
       });
