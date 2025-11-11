@@ -25,7 +25,7 @@ router.patch('/:id', verifyFirebaseToken, async (req, res) => {
     const prisma = getPrismaClient();
     const { id: runCrewId } = req.params;
     const firebaseId = req.user?.uid;
-    const { name, description } = req.body;
+    const { name, description, logo, icon } = req.body;
 
     console.log('✏️ RUNCREW UPDATE: Updating RunCrew:', runCrewId);
 
@@ -101,6 +101,12 @@ router.patch('/:id', verifyFirebaseToken, async (req, res) => {
     }
     if (description !== undefined) {
       updateData.description = description?.trim() || null;
+    }
+    if (logo !== undefined) {
+      updateData.logo = logo?.trim() || null;
+    }
+    if (icon !== undefined) {
+      updateData.icon = icon?.trim() || null;
     }
 
     // If no fields to update, return error
