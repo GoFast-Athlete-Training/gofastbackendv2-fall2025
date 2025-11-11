@@ -14,7 +14,7 @@
 - **Financial Management** - Track spending, projections, and financial health
 - **Roadmap Planning** - Product, GTM, and operations roadmaps
 
-**Core Value**: **Single-tenant company operations** - This is GoFast's internal tool (NOT multi-tenant like Ignite). Everything centers around a single `GoFastCompany` record with a unique containerId. Built on GoFast backend for easier athlete conversion and future security separation.
+**Core Value**: **Single-tenant company operations** - This is GoFast's internal tool (NOT multi-tenant like Ignite). Everything centers around a single `GoFastCompany` record with a hardcoded ID (`cmhpqe7kl0000nw1uvcfhf2hs`). Built on GoFast backend for easier athlete conversion and future security separation.
 
 **Key Difference from Ignite**: 
 - **Ignite** = Multi-tenant (multiple CompanyHQs, each with their own data)
@@ -24,9 +24,9 @@
 
 ## Core Philosophy: Single-Company Architecture
 
-GoFast Company Stack is built for **one company** (GoFast). The `GoFastCompany` model represents GoFast company itself with a single unique `containerId`. All other models and features link back to this single company.
+GoFast Company Stack is built for **one company** (GoFast). The `GoFastCompany` model represents GoFast company itself with a **hardcoded ID** (`cmhpqe7kl0000nw1uvcfhf2hs`) stored in `config/goFastCompanyConfig.js`. All other models and features link back to this single company.
 
-**Single-Tenant Design**: Unlike Ignite (multi-tenant), this is GoFast's internal tool. No need for multi-tenant containers or tenant isolation - it's all one company.
+**Single-Tenant Design**: Unlike Ignite (multi-tenant), this is GoFast's internal tool. No need for multi-tenant containers or tenant isolation - it's all one company. The company ID is hardcoded in config, and any authenticated `CompanyStaff` can upsert the company.
 
 **Key Principle**: **Separate auth from athlete identity** - The `CompanyStaff` model handles authentication (Firebase), completely separate from `Athlete` model. This enables:
 - Company operations without requiring athlete signup
@@ -36,16 +36,16 @@ GoFast Company Stack is built for **one company** (GoFast). The `GoFastCompany` 
 ### GoFastCompany as Central Container
 
 ```
-GoFastCompany (Single Record - containerId)
+GoFastCompany (Single Record - Hardcoded ID: cmhpqe7kl0000nw1uvcfhf2hs)
   ├── Staff (Firebase Auth - Direct companyId + role, universal personhood)
   ├── Contacts (CRM - Universal personhood, config-driven pipeline: audienceType + pipelineStage)
   ├── Financial Data (Spends, Projections)
-  ├── Roadmap Items (Product, GTM, Ops)
+  ├── Roadmap Items (Product, GTM, Ops) - CompanyRoadmapItem with full fields
   ├── Tasks (Company-wide)
   └── [Future: Products, Deals, Integrations]
 ```
 
-**Note**: `CompanyStaff` is universal personhood for the company - separate from `Athlete` identity. Direct `companyId` and `role` fields (no junction table needed - single-tenant).
+**Note**: `CompanyStaff` is universal personhood for the company - separate from `Athlete` identity. Direct `companyId` and `role` fields (no junction table needed - single-tenant). Company ID is hardcoded in `config/goFastCompanyConfig.js`.
 
 ---
 
@@ -55,39 +55,39 @@ GoFastCompany (Single Record - containerId)
 
 ```prisma
 model GoFastCompany {
-  id          String   @id @default(cuid())  // This is containerId - the root container
-  containerId String   @unique  // Unique container identifier for GoFast operations
-  
-  // Company Details (Upserted by founder during onboarding)
-  companyName String   // "GoFast Inc"
-  address     String?  // "2604 N. George Mason Dr."
-  city        String?  // "Arlington"
-  state       String?  // "VA"
-  website     String?  // "gofastcrushgoals.com"
-  description String?  // Company description
-  
+  id          String @id @default(cuid()) // Single tenant - hardcoded ID in config (cmhpqe7kl0000nw1uvcfhf2hs)
+
+  // Company Details (Upserted by any authenticated staff)
+  companyName String // "GoFast Inc"
+  address     String? // "2604 N. George Mason Dr."
+  city        String? // "Arlington"
+  state       String? // "VA"
+  website     String? // "gofastcrushgoals.com"
+  description String? // Company description
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations - All scoped to this single company
-  staff       CompanyStaff[]  // Direct relation to staff (single-tenant, no junction needed)
-  contacts    Contact[]            // CRM contacts (config-driven pipeline: audienceType + pipelineStage)
-  productPipelineItems ProductPipelineItem[]  // Product Pipeline (product module, user-driven)
-  financialSpends CompanyFinancialSpend[]
+  staff                CompanyStaff[] // Direct relation to staff (single-tenant, no junction needed)
+  contacts             Contact[] // CRM contacts (config-driven pipeline stages)
+  productPipelineItems ProductPipelineItem[] // Product Pipeline (product module, user-driven)
+  financialSpends      CompanyFinancialSpend[]
   financialProjections CompanyFinancialProjection[]
-  roadmapItems CompanyRoadmapItem[]
-  tasks       Task[]
-  
+  roadmapItems         CompanyRoadmapItem[]
+  tasks                Task[]
+
   @@map("gofast_company")
 }
 ```
 
 **Key Architecture Point**: Single company record
 - **One GoFastCompany record** - Not multiple companies
-- **containerId** = Unique identifier for all GoFast operations (GoFastCRM, GoFastFinance, etc.)
-- **All data scoped to containerId** - No multi-tenancy, just one company
-- **Company details upserted by founder** during onboarding flow
+- **Hardcoded ID** = `cmhpqe7kl0000nw1uvcfhf2hs` stored in `config/goFastCompanyConfig.js`
+- **No containerId** - Removed, using hardcoded ID instead
+- **All data scoped to hardcoded ID** - No multi-tenancy, just one company
+- **Any authenticated staff can upsert** - No founder-only restriction
 
 ### CompanyStaff Model (Company Auth - Firebase - Universal Personhood)
 
@@ -103,7 +103,7 @@ model CompanyStaff {
   photoURL   String? // Profile photo URL (from Firebase - stored for quick access)
 
   // Company and Role (direct fields - single-tenant, no junction needed)
-  companyId  String // Links to GoFastCompany.id (single company)
+  companyId  String? // Links to GoFastCompany.id (nullable to allow staff creation before company)
   role       String // "Founder", "CFO", "Sales", "Marketing", "Community Manager" (from roleConfig.js - enum-like)
   
   // Employment details (founder/CEO can fill in)
@@ -114,7 +114,7 @@ model CompanyStaff {
   verificationCode String? // Unique code for employee onboarding (future: can be changed)
 
   // Relations
-  company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company GoFastCompany? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -367,26 +367,62 @@ model ProductPipelineItem {
 - **Different from BD Pipeline** - BD Pipeline = contact-driven, config-based. Product Pipeline = product module, user-driven
 - **Product development focus** - Track product features/modules being built
 
-### CompanyRoadmapItem
+### CompanyRoadmapItem (Product Roadmap - Full Implementation)
 
 ```prisma
 model CompanyRoadmapItem {
-  id          String @id @default(cuid())
-  companyId   String  // Links to GoFastCompany.id (containerId)
+  id        String @id @default(cuid())
+  companyId String // Links to Company, not Founder (legacy field - kept for compatibility)
   
-  roadmapType String // "product", "gtm", "operations"
-  quarter     String? // "Q4 2025"
-  title       String
-  description String?
-  status      String @default("pending") // pending, in_progress, completed, cancelled
+  // Item Classification
+  itemType           String  @default("Feature") // "Feature" or "Milestone"
+  parentArchitecture String? // Group related features (e.g., "RunCrew", "Profile")
+  roadmapType        String // "Product", "GTM", "Operations", "Infrastructure", "UX/Design"
+  category           String  @default("Frontend Demo") // "Frontend Demo", "API Integration", "Backend Scaffolding", "User Testing", "Release"
+  
+  // Core Details
+  title      String
+  whatItDoes String? // User value proposition
+  howItHelps String? // How it helps overall build
+  
+  // Data & Integration
+  fieldsData    String? // What fields/data needed
+  howToGet      String? // APIs, routes, data sources
+  prerequisites String? // Setup, research, account creation, auth
+  
+  // Visual & Planning
+  visual      String @default("List") // "List", "Timeline", "Kanban"
+  orderNumber Int? // Order in sequence (1, 2, 3...)
+  
+  // Time Tracking
+  hoursEstimated Int? // Initial estimate
+  hoursSpent     Int? // Actual time spent
+  
+  // Dates & Status
+  targetDate  DateTime?
   dueDate     DateTime?
+  status      String    @default("Not Started") // Not Started, In Progress, Done
+  priority    String    @default("P1") // P0, P1, P2
   completedAt DateTime?
   
-  company     GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // System
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
+  goFastCompanyId String? // Links to GoFastCompany.id (single tenant - hardcoded in config)
   
   @@map("company_roadmap_items")
 }
 ```
+
+**Key Architecture Point**: Product roadmap with full field support
+- **Full field set** - Supports all roadmap fields (whatItDoes, howItHelps, fieldsData, howToGet, prerequisites, etc.)
+- **Time tracking** - hoursEstimated, hoursSpent for critical path tracking
+- **Priority system** - P0 (critical), P1 (important), P2 (nice to have)
+- **Uses hardcoded company ID** - Routes use `getGoFastCompanyId()` from config
+- **Config-driven** - Field options defined in `config/roadmapConfig.js` and `config/roadmapMapper.js`
 
 ### Task (Unified - CompanyStaff OR Company)
 
@@ -484,12 +520,20 @@ POST   /api/staff/verify-code         → Verify verification code (for onboardi
 
 ### GoFastCompany Routes
 
+**File**: `routes/Company/companyCreateRoute.js`, `companyHydrateRoute.js`  
+**Auth**: `verifyFirebaseToken` middleware required  
+**Company ID**: Uses hardcoded ID from `config/goFastCompanyConfig.js`
+
 ```
 GET    /api/company/hydrate           → Hydrate GoFastCompany + all relations (single company)
-GET    /api/company                   → Get GoFastCompany details
-POST   /api/company/create            → Create GoFastCompany (founder only - during onboarding)
-PUT    /api/company                   → Update GoFastCompany (founder only)
+POST   /api/company/create            → Upsert GoFastCompany (any authenticated staff can upsert)
 ```
+
+**Key Points**:
+- ✅ **Uses hardcoded company ID** - Routes automatically use `getGoFastCompanyId()` from config
+- ✅ **Any staff can upsert** - No founder-only restriction (removed)
+- ✅ **Auto-assigns Founder role** - If staff creating company doesn't have a role, auto-assigns 'Founder'
+- ✅ **Single-tenant** - Only one company exists, identified by hardcoded ID
 
 ### Contact Routes (CRM - Aligned with Ignite Pattern)
 
@@ -552,14 +596,40 @@ PUT    /api/company/financial/projections/:projectionId  // Update projection
 DELETE /api/company/financial/projections/:projectionId  // Delete projection
 ```
 
-### Roadmap Routes
+### Roadmap Routes (Product Roadmap)
+
+**File**: `routes/Company/companyRoadmapRoute.js`  
+**Auth**: `verifyFirebaseToken` middleware required  
+**Company ID**: Uses hardcoded ID from `config/goFastCompanyConfig.js`
 
 ```
-GET    /api/company/roadmap                          // Get roadmap items
-POST   /api/company/roadmap                          // Create roadmap item
+GET    /api/company/roadmap                          // Get all roadmap items (filtered by roadmapType, status, parentArchitecture)
+GET    /api/company/roadmap/:itemId                  // Get single roadmap item
+POST   /api/company/roadmap                          // Create roadmap item (title required, all other fields optional)
 PUT    /api/company/roadmap/:itemId                  // Update roadmap item
 DELETE /api/company/roadmap/:itemId                  // Delete roadmap item
 ```
+
+**Query Parameters** (GET `/api/company/roadmap`):
+- `?roadmapType=Product|GTM|Operations` - Filter by roadmap type
+- `?status=Not Started|In Progress|Done` - Filter by status
+- `?parentArchitecture=RunCrew|Profile|Messaging` - Filter by parent architecture
+- `?itemType=Feature|Milestone` - Filter by item type
+
+**Request Body** (POST `/api/company/roadmap`):
+- `title` (required) - Feature or milestone name
+- `roadmapType` (default: "Product") - Type of roadmap
+- `priority` (default: "P1") - P0, P1, or P2
+- `status` (default: "Not Started") - Not Started, In Progress, Done
+- `hoursEstimated` - Initial estimate of work hours
+- `whatItDoes` - User value proposition
+- `howItHelps` - How it helps overall build
+- All other fields optional (see `config/roadmapMapper.js` for full field list)
+
+**Key Points**:
+- ✅ **Uses hardcoded company ID** - Routes automatically use `getGoFastCompanyId()` from config
+- ✅ **Auto-assigns orderNumber** - If not provided, assigns next sequential number
+- ✅ **Config-driven** - Field options and validation via `config/roadmapConfig.js`
 
 ### Task Routes
 
@@ -686,8 +756,10 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 
 1. **Single-Tenant Architecture**
    - `GoFastCompany` is a single record (not multiple companies)
-   - `containerId` = Unique identifier for all GoFast operations
+   - **Hardcoded ID** = `cmhpqe7kl0000nw1uvcfhf2hs` stored in `config/goFastCompanyConfig.js`
+   - **No containerId** - Removed, using hardcoded ID instead
    - No multi-tenancy - just GoFast company
+   - Any authenticated `CompanyStaff` can upsert the company
    - Built on GoFast backend for easier athlete conversion
 
 2. **Separate Auth from Athlete Identity**
@@ -753,23 +825,25 @@ DELETE /api/company/tasks/:taskId                    // Delete task
 ## Key Takeaways
 
 1. ✅ **Single-Tenant** - GoFastCompany is a single record (not multiple companies)
-2. ✅ **containerId** = Unique identifier for all GoFast operations (GoFastCRM, GoFastFinance)
-3. ✅ **CompanyStaff = Company Auth** - Separate from Athlete identity
-4. ✅ **Contacts = Universal Personhood** - Aligned with Ignite pattern, may become athletes
-5. ✅ **Config-Driven Contact Pipeline** - Direct `audienceType` and `pipelineStage` fields on Contact, validated against `config/pipelineConfig.js` (no relational models)
-6. ✅ **Two Pipeline Systems** - Contact Pipeline (config-driven: audienceType + pipelineStage) vs Product Pipeline (product module, user-driven with name, description, timeItTakes)
-7. ✅ **Product Pipeline Focus** - Founder wants product pipeline module and display (main focus now)
-7. ✅ **Role Hardcoded** - For now, hardcode role as "founder" (config will follow)
-8. ✅ **Onboarding Flow** - GF Splash → Code verify → Company upsert → Profile setup → Platform
-9. ✅ **Built on GoFast Backend** - Easier athlete conversion, future security separation
+2. ✅ **Hardcoded Company ID** = `cmhpqe7kl0000nw1uvcfhf2hs` stored in `config/goFastCompanyConfig.js`
+3. ✅ **No containerId** - Removed, using hardcoded ID instead
+4. ✅ **CompanyStaff = Company Auth** - Separate from Athlete identity, nullable companyId allows staff creation before company
+5. ✅ **Any Staff Can Upsert** - No founder-only restriction, any authenticated staff can create/update company
+6. ✅ **Contacts = Universal Personhood** - Aligned with Ignite pattern, may become athletes
+7. ✅ **Config-Driven Contact Pipeline** - Direct `audienceType` and `pipelineStage` fields on Contact, validated against `config/pipelineConfig.js` (no relational models)
+8. ✅ **Product Roadmap** - Full implementation with all fields (whatItDoes, howItHelps, hoursEstimated, priority P0/P1/P2, etc.)
+9. ✅ **Config-Driven Roadmap** - Field options defined in `config/roadmapConfig.js` and `config/roadmapMapper.js`
+10. ✅ **Built on GoFast Backend** - Easier athlete conversion, future security separation
 
 ---
 
 **Last Updated**: January 2025  
 **Architecture Pattern**: Single-Tenant Company-First with Separate Auth & Config-Based Pipeline  
-**Container**: GoFastCompany (single record with containerId)  
-**Auth Model**: CompanyStaff (Firebase) - separate from Athlete identity  
-**Access Control**: Role-based via direct `role` field on `CompanyStaff` (hardcoded "founder" for now, config-based in future)  
+**Company ID**: Hardcoded `cmhpqe7kl0000nw1uvcfhf2hs` in `config/goFastCompanyConfig.js`  
+**Auth Model**: CompanyStaff (Firebase) - separate from Athlete identity, nullable companyId  
+**Access Control**: Role-based via direct `role` field on `CompanyStaff` (config-driven via `config/roleConfig.js`)  
+**Company Upsert**: Any authenticated `CompanyStaff` can upsert the company (no founder-only restriction)  
 **CRM Pattern**: Contacts with config-driven pipeline (`audienceType` + `pipelineStage` fields, validated against `config/pipelineConfig.js`)  
-**Product Pipeline**: User-driven product module tracking (name, description, timeItTakes)  
-**Current Focus**: Product Pipeline Module (user-driven, NOT contact-driven)
+**Product Roadmap**: Full implementation with time tracking, priority (P0/P1/P2), and all roadmap fields  
+**Roadmap Config**: Field options and validation via `config/roadmapConfig.js` and `config/roadmapMapper.js`  
+**Current Focus**: Product Roadmap with critical path tracking (hoursEstimated, priority P0/P1/P2)
