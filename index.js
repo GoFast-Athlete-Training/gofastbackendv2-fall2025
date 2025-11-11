@@ -53,6 +53,9 @@ import joinTempRouter from './routes/Join/joinTempRoute.js';
 import eventRouter from './routes/Event/eventRoute.js';
 import eventVolunteerRouter from './routes/Event/eventVolunteerRoute.js';
 import eventRegistrationRouter from './routes/Event/eventRegistrationRoute.js';
+// Young Athlete routes
+import youngAthleteRouter from './routes/YoungAthlete/youngAthleteRoute.js';
+import eventResultRouter from './routes/EventResult/eventResultRoute.js';
 // Founder routes
 import founderTaskRouter from './routes/Founder/founderTaskRoute.js';
 import founderCrmRouter from './routes/Founder/founderCrmRoute.js';
@@ -178,6 +181,10 @@ app.use('/api/join', joinTempRouter); // POST /temp (stores join context)
 app.use('/api/event', eventRouter); // GET /, GET /:id, POST /, PUT /:id, DELETE /:id
 app.use('/api/event-volunteer', eventVolunteerRouter); // POST /, GET /page-hydrate (public), GET /admin-hydrate (admin), DELETE /:id
 app.use('/api/event-registration', eventRegistrationRouter); // POST /, GET /page-hydrate (public), GET /admin-hydrate (admin), DELETE /:id
+// Young Athlete routes
+app.use('/api/young-athlete', youngAthleteRouter); // POST /register, POST /:id/goal, GET /:id
+app.use('/api/event-result', eventResultRouter); // POST /claim
+app.use('/api/events', eventResultRouter); // GET /:eventCode/leaderboard (must come after /api/event routes)
 // Training routes
 app.use('/api/training/race', trainingRaceRouter); // /create, /all, /:raceId
 app.use('/api/training/plan', trainingPlanRouter); // /race/:raceId, /active, /:planId, /:planId/status

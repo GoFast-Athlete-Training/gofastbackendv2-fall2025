@@ -94,6 +94,9 @@ model Athlete {
   // Event Relations
   events        Event[]               @relation("EventCreator") // Events created by this athlete
 
+  // Young Athlete Relations
+  youngAthletes YoungAthlete[] // Parent's young athletes
+
   // Founder Relations
   founder Founder?
 
@@ -147,6 +150,7 @@ model AthleteActivity {
 
   // Relations
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  eventResults EventResult[] @relation("EventResultActivity") // Event results that claim this activity
 
   @@map("athlete_activities")
 }
@@ -1090,4 +1094,65 @@ model ProductPipelineItem {
   company GoFastCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("product_pipeline_items")
+}
+
+// =====================================================
+// YOUNG ATHLETE MODELS - Youth Participation System
+// =====================================================
+
+model YoungAthlete {
+  id             String   @id @default(cuid())
+  athleteId      String   // Parent athlete ID
+  eventCode      String   // e.g., 'BGR5K2025'
+  firstName      String
+  lastName       String
+  grade          String?
+  school         String?
+  profilePicUrl  String?
+  createdAt      DateTime @default(now())
+
+  // Relations
+  athlete Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  goals   EventGoal[]
+  results EventResult[]
+
+  @@index([athleteId])
+  @@index([eventCode])
+  @@map("young_athletes")
+}
+
+model EventGoal {
+  id              String   @id @default(cuid())
+  youngAthleteId  String
+  eventCode       String
+  targetDistance  String?
+  targetPace      String?
+  motivation      String?
+  feeling         String?
+  createdAt       DateTime @default(now())
+
+  // Relations
+  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+
+  @@unique([youngAthleteId, eventCode]) // One goal per young athlete per event
+  @@index([eventCode])
+  @@map("event_goals")
+}
+
+model EventResult {
+  id                String   @id @default(cuid())
+  eventCode         String
+  youngAthleteId    String
+  authorAthleteId   String   // Parent Garmin-linked athlete
+  activityId        String   // Links to AthleteActivity.id
+  createdAt         DateTime @default(now())
+
+  // Relations
+  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  activity     AthleteActivity @relation("EventResultActivity", fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([youngAthleteId, eventCode]) // One result per young athlete per event
+  @@index([eventCode])
+  @@index([activityId])
+  @@map("event_results")
 }
