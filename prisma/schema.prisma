@@ -784,10 +784,9 @@ model CompanyRoadmapItem {
   companyId String // Links to Company, not Founder
 
   // Item Classification
-  itemType           String  @default("Feature") // "Feature" or "Milestone"
-  parentArchitecture String? // Group related features (e.g., "RunCrew", "Profile")
-  roadmapType        String // "Product", "GTM", "Operations", "Infrastructure", "UX/Design"
-  category           String  @default("Frontend Demo") // "Frontend Demo", "API Integration", "Backend Scaffolding", "User Testing", "Release"
+  itemType         String  @default("Dev Work") // "Dev Work" or "Product Milestone"
+  primaryRepo      String? // Primary repository (e.g., "mvp1", "eventslanding", "companystack")
+  category         String  @default("Core Feature") // "Core Feature", "Frontend Demo", "API Integration", "Backend Scaffolding"
 
   // Core Details
   title      String
@@ -795,12 +794,12 @@ model CompanyRoadmapItem {
   howItHelps String? // How it helps overall build
 
   // Data & Integration
-  fieldsData    String? // What fields/data needed
-  howToGet      String? // APIs, routes, data sources
-  prerequisites String? // Setup, research, account creation, auth
+  quickModelScaffolding String? // Quick model scaffolding - how does this fit into the architecture
+  relationalMapping     String? // Does this bolt on to athleteId? What's the relational mapping?
+  apiIntegration        String? // API-specific integration (e.g., "hit garmin backend with a token")
+  prerequisites         String? // Setup, research, account creation, auth (can include links)
 
-  // Visual & Planning
-  visual      String @default("List") // "List", "Timeline", "Kanban"
+  // Planning
   orderNumber Int? // Order in sequence (1, 2, 3...)
 
   // Time Tracking
@@ -811,7 +810,7 @@ model CompanyRoadmapItem {
   targetDate  DateTime?
   dueDate     DateTime?
   status      String    @default("Not Started") // Not Started, In Progress, Done
-  priority    String    @default("P1") // P0, P1, P2
+  priority    String    @default("Enhanced User Feature") // Critical Path, Enhanced User Feature, Future Release, Revenue Builder
   completedAt DateTime?
 
   // System

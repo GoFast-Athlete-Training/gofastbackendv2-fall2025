@@ -10,10 +10,9 @@
 import {
   priorityConfig,
   statusConfig,
-  roadmapTypeConfig,
   itemTypeConfig,
   categoryConfig,
-  visualConfig
+  primaryRepoSuggestions
 } from './roadmapConfig.js';
 
 /**
@@ -23,34 +22,27 @@ export const fieldMappings = {
   // Item Classification
   itemType: {
     label: "Item Type",
-    description: "Whether this is a Feature or Milestone",
+    description: "Whether this is Dev Work or Product Milestone",
     fieldType: "select",
     options: itemTypeConfig,
     required: false,
-    default: "Feature"
+    default: "Dev Work"
   },
-  parentArchitecture: {
-    label: "Parent Architecture",
-    description: "Group related features (e.g., 'RunCrew', 'Profile', 'Messaging')",
+  primaryRepo: {
+    label: "Primary Repo",
+    description: "Primary repository where this work lives (e.g., 'mvp1', 'eventslanding', 'companystack')",
     fieldType: "text",
-    placeholder: "RunCrew",
+    placeholder: "mvp1",
+    suggestions: primaryRepoSuggestions,
     required: false
-  },
-  roadmapType: {
-    label: "Roadmap Type",
-    description: "Type of roadmap (Product, GTM, Operations, etc.)",
-    fieldType: "select",
-    options: roadmapTypeConfig,
-    required: true,
-    default: "Product"
   },
   category: {
     label: "Category",
-    description: "Category of work (Frontend Demo, API Integration, etc.)",
+    description: "Category of work (Core Feature, Frontend Demo, API Integration, etc.)",
     fieldType: "select",
     options: categoryConfig,
     required: false,
-    default: "Frontend Demo"
+    default: "Core Feature"
   },
 
   // Core Details
@@ -77,37 +69,36 @@ export const fieldMappings = {
   },
 
   // Data & Integration
-  fieldsData: {
-    label: "Fields/Data",
-    description: "What fields/data are needed for this feature?",
+  quickModelScaffolding: {
+    label: "Quick Model Scaffolding",
+    description: "How does this fit into the architecture? What models/data structures are needed?",
     fieldType: "textarea",
     placeholder: "joinCode, athleteId, runCrewId, RunCrewMembership junction table",
     required: false
   },
-  howToGet: {
-    label: "How To Get",
-    description: "APIs, routes, data sources - how do we get the data?",
+  relationalMapping: {
+    label: "Relational Mapping",
+    description: "Does this bolt on to athleteId? What's the relational mapping?",
     fieldType: "textarea",
-    placeholder: "POST /api/runcrew/join, GET /api/join/validate",
+    placeholder: "Athlete -> RunCrewMembership -> RunCrew (many-to-many)",
+    required: false
+  },
+  apiIntegration: {
+    label: "API Integration",
+    description: "API-specific integration details (e.g., 'hit garmin backend with a token')",
+    fieldType: "textarea",
+    placeholder: "POST /api/garmin/sync with OAuth token",
     required: false
   },
   prerequisites: {
     label: "Prerequisites",
-    description: "Setup, research, account creation, auth - what's needed first?",
+    description: "Setup, research, account creation, auth - what's needed first? (can include links)",
     fieldType: "textarea",
-    placeholder: "RunCrew must exist with unique joinCode, user authenticated",
+    placeholder: "Apply for Garmin API token: https://developer.garmin.com/...",
     required: false
   },
 
-  // Visual & Planning
-  visual: {
-    label: "Visual",
-    description: "How should this be displayed? (List, Timeline, Kanban)",
-    fieldType: "select",
-    options: visualConfig,
-    required: false,
-    default: "List"
-  },
+  // Planning
   orderNumber: {
     label: "Order Number",
     description: "Order in sequence (1, 2, 3...) - auto-assigned if not provided",
@@ -155,11 +146,11 @@ export const fieldMappings = {
   },
   priority: {
     label: "Priority",
-    description: "Priority level (P0 = Critical, P1 = Important, P2 = Nice to Have)",
+    description: "Priority level (Critical Path, Enhanced User Feature, Future Release, Revenue Builder)",
     fieldType: "select",
     options: priorityConfig,
     required: false,
-    default: "P1"
+    default: "Enhanced User Feature"
   },
   completedAt: {
     label: "Completed At",
@@ -238,7 +229,7 @@ export const getFieldRequired = (fieldName) => {
 export const fieldGroups = {
   classification: {
     label: "Classification",
-    fields: ["itemType", "parentArchitecture", "roadmapType", "category"]
+    fields: ["itemType", "primaryRepo", "category"]
   },
   details: {
     label: "Core Details",
@@ -246,11 +237,11 @@ export const fieldGroups = {
   },
   integration: {
     label: "Data & Integration",
-    fields: ["fieldsData", "howToGet", "prerequisites"]
+    fields: ["quickModelScaffolding", "relationalMapping", "apiIntegration", "prerequisites"]
   },
   planning: {
-    label: "Planning & Display",
-    fields: ["visual", "orderNumber"]
+    label: "Planning",
+    fields: ["orderNumber"]
   },
   tracking: {
     label: "Time Tracking",
@@ -283,11 +274,12 @@ export const getAllFieldGroups = () => {
 export const fieldExplanations = {
   whatItDoes: "Describe the user value proposition. What does this feature do for users? What problem does it solve?",
   howItHelps: "Explain how this feature helps the overall product/build. Why is this important? What does it enable?",
-  fieldsData: "List the data fields needed. What database fields, models, or data structures are required?",
-  howToGet: "List the APIs, routes, or data sources. How do we fetch or create the data? What endpoints are involved?",
-  prerequisites: "What needs to be in place first? Setup, research, account creation, authentication, dependencies?",
-  parentArchitecture: "Group related features. Examples: 'RunCrew' for all RunCrew features, 'Profile' for profile features, 'Messaging' for messaging features.",
-  priority: "P0 = Must have (critical, blocking), P1 = Should have (important, growth driver), P2 = Nice to have (enhancement, polish)"
+  quickModelScaffolding: "How does this fit into the architecture? What models/data structures are needed? Helps devs think about architecture fit.",
+  relationalMapping: "Does this bolt on to athleteId? What's the relational mapping? (e.g., Athlete -> RunCrewMembership -> RunCrew)",
+  apiIntegration: "API-specific integration details. How do we hit external APIs? (e.g., 'hit garmin backend with a token')",
+  prerequisites: "What needs to be in place first? Setup, research, account creation, authentication, dependencies? Can include links (e.g., 'apply for token: https://...')",
+  primaryRepo: "Primary repository where this work lives. Examples: 'mvp1', 'eventslanding', 'companystack', 'user-dashboard', 'backend'",
+  priority: "Critical Path = Must have (critical, blocking), Enhanced User Feature = Should have (important, growth driver), Future Release = Nice to have (enhancement, polish), Revenue Builder = Revenue-generating feature"
 };
 
 /**
@@ -296,4 +288,3 @@ export const fieldExplanations = {
 export const getFieldExplanation = (fieldName) => {
   return fieldExplanations[fieldName] || getFieldDescription(fieldName);
 };
-

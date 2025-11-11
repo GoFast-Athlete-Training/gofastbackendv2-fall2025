@@ -9,31 +9,39 @@
 
 /**
  * Priority Levels
- * P0 = Must have (critical, blocking)
- * P1 = Should have (important, growth driver)
- * P2 = Nice to have (enhancement, polish)
+ * Critical Path = Must have (critical, blocking)
+ * Enhanced User Feature = Should have (important, growth driver)
+ * Future Release = Nice to have (enhancement, polish)
+ * Revenue Builder = Revenue-generating feature
  */
 export const priorityConfig = {
-  P0: {
-    label: "P0 - Critical",
+  "Critical Path": {
+    label: "Critical Path",
     description: "Must have (critical, blocking)",
-    value: "P0",
+    value: "Critical Path",
     color: "red",
     order: 0
   },
-  P1: {
-    label: "P1 - Important",
+  "Enhanced User Feature": {
+    label: "Enhanced User Feature",
     description: "Should have (important, growth driver)",
-    value: "P1",
+    value: "Enhanced User Feature",
     color: "orange",
     order: 1
   },
-  P2: {
-    label: "P2 - Nice to Have",
+  "Future Release": {
+    label: "Future Release",
     description: "Nice to have (enhancement, polish)",
-    value: "P2",
+    value: "Future Release",
     color: "blue",
     order: 2
+  },
+  "Revenue Builder": {
+    label: "Revenue Builder",
+    description: "Revenue-generating feature",
+    value: "Revenue Builder",
+    color: "green",
+    order: 3
   }
 };
 
@@ -65,51 +73,19 @@ export const statusConfig = {
 };
 
 /**
- * Roadmap Types
- * Defines the type of roadmap (Product, GTM, Operations, etc.)
- */
-export const roadmapTypeConfig = {
-  Product: {
-    label: "Product",
-    description: "Product features and functionality",
-    value: "Product"
-  },
-  GTM: {
-    label: "GTM",
-    description: "Go-to-market strategy and execution",
-    value: "GTM"
-  },
-  Operations: {
-    label: "Operations",
-    description: "Operational improvements and processes",
-    value: "Operations"
-  },
-  Infrastructure: {
-    label: "Infrastructure",
-    description: "Infrastructure and technical foundation",
-    value: "Infrastructure"
-  },
-  "UX/Design": {
-    label: "UX/Design",
-    description: "User experience and design improvements",
-    value: "UX/Design"
-  }
-};
-
-/**
  * Item Types
- * Defines whether it's a Feature or Milestone
+ * Defines whether it's Dev Work or Product Milestone
  */
 export const itemTypeConfig = {
-  Feature: {
-    label: "Feature",
-    description: "A product feature or functionality",
-    value: "Feature"
+  "Dev Work": {
+    label: "Dev Work",
+    description: "Development work item",
+    value: "Dev Work"
   },
-  Milestone: {
-    label: "Milestone",
-    description: "A significant milestone or achievement",
-    value: "Milestone"
+  "Product Milestone": {
+    label: "Product Milestone",
+    description: "A significant product milestone (e.g., 'Get on GooglePlay')",
+    value: "Product Milestone"
   }
 };
 
@@ -141,43 +117,18 @@ export const categoryConfig = {
   }
 };
 
-/**
- * Visual Display Options
- * How the roadmap item should be displayed
- */
-export const visualConfig = {
-  List: {
-    label: "List",
-    description: "Display as a list item",
-    value: "List"
-  },
-  Timeline: {
-    label: "Timeline",
-    description: "Display on a timeline view",
-    value: "Timeline"
-  },
-  Kanban: {
-    label: "Kanban",
-    description: "Display on a kanban board",
-    value: "Kanban"
-  }
-};
 
 /**
- * Parent Architecture Options
- * Groups related features (e.g., "RunCrew", "Profile", "Messaging")
+ * Primary Repo Suggestions
+ * Primary repository where this work lives (e.g., "mvp1", "eventslanding", "companystack")
  * This is a free-form field but we can suggest common values
  */
-export const parentArchitectureSuggestions = [
-  "RunCrew",
-  "Profile",
-  "Messaging",
-  "Leaderboard",
-  "Training",
-  "Events",
-  "Settings",
-  "Authentication",
-  "Admin"
+export const primaryRepoSuggestions = [
+  "mvp1",
+  "eventslanding",
+  "companystack",
+  "user-dashboard",
+  "backend"
 ];
 
 /**
@@ -190,10 +141,6 @@ export const getPriorities = () => Object.keys(priorityConfig);
  */
 export const getStatuses = () => Object.keys(statusConfig);
 
-/**
- * Get all roadmap type keys
- */
-export const getRoadmapTypes = () => Object.keys(roadmapTypeConfig);
 
 /**
  * Get all item type keys
@@ -205,10 +152,6 @@ export const getItemTypes = () => Object.keys(itemTypeConfig);
  */
 export const getCategories = () => Object.keys(categoryConfig);
 
-/**
- * Get all visual keys
- */
-export const getVisuals = () => Object.keys(visualConfig);
 
 /**
  * Validate priority
@@ -230,15 +173,6 @@ export const validateStatus = (status) => {
   return true;
 };
 
-/**
- * Validate roadmap type
- */
-export const validateRoadmapType = (roadmapType) => {
-  if (!roadmapTypeConfig[roadmapType]) {
-    throw new Error(`Invalid roadmap type: ${roadmapType}. Allowed: ${getRoadmapTypes().join(", ")}`);
-  }
-  return true;
-};
 
 /**
  * Validate item type
@@ -260,15 +194,6 @@ export const validateCategory = (category) => {
   return true;
 };
 
-/**
- * Validate visual
- */
-export const validateVisual = (visual) => {
-  if (!visualConfig[visual]) {
-    throw new Error(`Invalid visual: ${visual}. Allowed: ${getVisuals().join(", ")}`);
-  }
-  return true;
-};
 
 /**
  * Get config for a specific priority
@@ -284,12 +209,6 @@ export const getStatusConfig = (status) => {
   return statusConfig[status];
 };
 
-/**
- * Get config for a specific roadmap type
- */
-export const getRoadmapTypeConfig = (roadmapType) => {
-  return roadmapTypeConfig[roadmapType];
-};
 
 /**
  * Get config for a specific item type
@@ -305,10 +224,4 @@ export const getCategoryConfig = (category) => {
   return categoryConfig[category];
 };
 
-/**
- * Get config for a specific visual
- */
-export const getVisualConfig = (visual) => {
-  return visualConfig[visual];
-};
 

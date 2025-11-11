@@ -12,13 +12,13 @@ const router = express.Router();
  * Get all roadmap items for GoFastCompany (single-tenant)
  * GET /api/company/roadmap
  * Auth: verifyFirebaseToken required
- * Query: ?status=Not Started|In Progress|Done, ?roadmapType=Product|GTM|Operations, ?parentArchitecture=RunCrew|Profile|etc
+ * Query: ?status=Not Started|In Progress|Done, ?primaryRepo=mvp1|eventslanding|etc, ?itemType=Dev Work|Product Milestone, ?category=Core Feature|Frontend Demo|etc
  */
 router.get('/roadmap', verifyFirebaseToken, async (req, res) => {
   try {
     const prisma = getPrismaClient();
     const firebaseId = req.user?.uid; // From verified Firebase token
-    const { status, roadmapType, parentArchitecture, itemType } = req.query;
+    const { status, primaryRepo, itemType, category } = req.query;
 
     // Verify staff exists
     const staff = await prisma.companyStaff.findUnique({
@@ -39,9 +39,9 @@ router.get('/roadmap', verifyFirebaseToken, async (req, res) => {
     // Build where clause - use goFastCompanyId for GoFastCompany
     const where = { goFastCompanyId };
     if (status) where.status = status;
-    if (roadmapType) where.roadmapType = roadmapType;
-    if (parentArchitecture) where.parentArchitecture = parentArchitecture;
+    if (primaryRepo) where.primaryRepo = primaryRepo;
     if (itemType) where.itemType = itemType;
+    if (category) where.category = category;
 
     const roadmapItems = await prisma.companyRoadmapItem.findMany({
       where,
@@ -122,7 +122,8 @@ router.get('/roadmap/:itemId', verifyFirebaseToken, async (req, res) => {
  * Create a new roadmap item
  * POST /api/company/roadmap
  * Auth: verifyFirebaseToken required
- * Body: { title, itemType?, parentArchitecture?, roadmapType?, category?, whatItDoes?, howItHelps?, fieldsData?, howToGet?, prerequisites?, visual?, hoursEstimated?, targetDate?, priority?, status? }
+ * Body: { title, itemType?, primaryRepo?, category?, whatItDoes?, howItHelps?, quickModelScaffolding?, relationalMapping?, apiIntegration?, prerequisites?, hoursEstimated?, targetDate?, priority?, status? }
+ * Note: Supports backward compatibility with old field names (parentArchitecture -> primaryRepo, fieldsData -> quickModelScaffolding, howToGet -> apiIntegration)
  */
 router.post('/roadmap', verifyFirebaseToken, async (req, res) => {
   try {
@@ -130,19 +131,21 @@ router.post('/roadmap', verifyFirebaseToken, async (req, res) => {
     const firebaseId = req.user?.uid;
     const {
       title,
-      itemType = 'Feature',
-      parentArchitecture,
-      roadmapType = 'Product',
-      category = 'Frontend Demo',
+      itemType = 'Dev Work',
+      primaryRepo,
+      parentArchitecture, // Backward compatibility
+      category = 'Core Feature',
       whatItDoes,
       howItHelps,
-      fieldsData,
-      howToGet,
+      quickModelScaffolding,
+      fieldsData, // Backward compatibility
+      relationalMapping,
+      apiIntegration,
+      howToGet, // Backward compatibility
       prerequisites,
-      visual = 'List',
       hoursEstimated,
       targetDate,
-      priority = 'P1',
+      priority = 'Enhanced User Feature',
       status = 'Not Started'
     } = req.body;
 
@@ -182,15 +185,14 @@ router.post('/roadmap', verifyFirebaseToken, async (req, res) => {
         goFastCompanyId, // Use hardcoded companyId from config
         title,
         itemType,
-        parentArchitecture,
-        roadmapType,
+        primaryRepo: primaryRepo || parentArchitecture || null, // Support backward compatibility
         category,
         whatItDoes,
         howItHelps,
-        fieldsData,
-        howToGet,
+        quickModelScaffolding: quickModelScaffolding || fieldsData || null, // Support backward compatibility
+        relationalMapping: relationalMapping || null,
+        apiIntegration: apiIntegration || howToGet || null, // Support backward compatibility
         prerequisites,
-        visual,
         hoursEstimated,
         targetDate: targetDate ? new Date(targetDate) : null,
         priority,
