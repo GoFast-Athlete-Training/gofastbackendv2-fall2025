@@ -36,6 +36,12 @@ Not a settings panel. It's an action center.
 3. **Page renders** → Reads from `localStorage` (instant)
 4. **Re-sync button** → Refresh data from backend if needed
 
+**Admin Check**:
+- **If `runCrewManagerId` (or `MyCrewManagerId`) exists → User is an admin**
+- Route to `/crew/crewadmin` (admin dashboard)
+- **If `runCrewManagerId` is null → User is a member**
+- Route to `/runcrew/central` (member view)
+
 **Key Files**:
 - `LocalStorageAPI` - centralized storage
 - `useHydratedAthlete()` - reads athlete + crew context
