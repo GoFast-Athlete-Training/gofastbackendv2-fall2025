@@ -36,11 +36,14 @@ Not a settings panel. It's an action center.
 3. **Page renders** → Reads from `localStorage` (instant)
 4. **Re-sync button** → Refresh data from backend if needed
 
-**Admin Check**:
-- **If `runCrewManagerId` (or `MyCrewManagerId`) exists → User is an admin**
-- Route to `/crew/crewadmin` (admin dashboard)
-- **If `runCrewManagerId` is null → User is a member**
-- Route to `/runcrew/central` (member view)
+**Navigation Logic**:
+1. **If `runCrewId` is null → No crew → Route to `/runcrew/join-or-start`** (create or join)
+2. **If `runCrewId` exists AND `runCrewManagerId` (or `MyCrewManagerId`) exists → User is an admin**
+   - Route to `/crew/crewadmin` (admin dashboard)
+3. **If `runCrewId` exists AND `runCrewManagerId` is null → User is a member**
+   - Route to `/runcrew/central` (member view)
+
+**Key Rule**: `runCrewId` must be set first. If missing, user must create or join a crew.
 
 **Key Files**:
 - `LocalStorageAPI` - centralized storage
