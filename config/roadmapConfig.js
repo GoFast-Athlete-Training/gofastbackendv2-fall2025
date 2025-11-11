@@ -115,9 +115,15 @@ export const itemTypeConfig = {
 
 /**
  * Categories
- * Defines the category of work (Frontend, Backend, API, etc.)
+ * Defines the category of work (Core Feature, Frontend, Backend, API, etc.)
+ * Note: "User Testing" and "Release" are workflow stages, not categories
  */
 export const categoryConfig = {
+  "Core Feature": {
+    label: "Core Feature",
+    description: "Core product feature",
+    value: "Core Feature"
+  },
   "Frontend Demo": {
     label: "Frontend Demo",
     description: "Frontend prototype or demo",
@@ -132,21 +138,6 @@ export const categoryConfig = {
     label: "Backend Scaffolding",
     description: "Backend infrastructure and scaffolding",
     value: "Backend Scaffolding"
-  },
-  "User Testing": {
-    label: "User Testing",
-    description: "User testing and validation",
-    value: "User Testing"
-  },
-  "Release": {
-    label: "Release",
-    description: "Product release and deployment",
-    value: "Release"
-  },
-  "Core Feature": {
-    label: "Core Feature",
-    description: "Core product feature",
-    value: "Core Feature"
   }
 };
 
