@@ -161,6 +161,71 @@ router.post('/:id/goal', verifyFirebaseToken, async (req, res) => {
 });
 
 /**
+ * GET /api/young-athlete/by-athlete/:athleteId
+ * Get all young athletes for a parent athlete, optionally filtered by eventCode
+ * Query params: eventCode (optional)
+ */
+router.get('/by-athlete/:athleteId', verifyFirebaseToken, async (req, res) => {
+  const prisma = getPrismaClient();
+  const firebaseId = req.user?.uid;
+  const { athleteId } = req.params;
+  const { eventCode } = req.query;
+
+  try {
+    // Verify athleteId belongs to authenticated Firebase user
+    const athlete = await prisma.athlete.findFirst({
+      where: {
+        id: athleteId,
+        firebaseId: firebaseId
+      }
+    });
+
+    if (!athlete) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'Athlete ID does not match authenticated user'
+      });
+    }
+
+    // Build where clause
+    const where = { athleteId };
+    if (eventCode) {
+      where.eventCode = eventCode;
+    }
+
+    // Get young athletes
+    const youngAthletes = await prisma.youngAthlete.findMany({
+      where,
+      include: {
+        goals: {
+          orderBy: { createdAt: 'desc' }
+        },
+        results: {
+          include: {
+            activity: true
+          },
+          orderBy: { createdAt: 'desc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      data: youngAthletes
+    });
+  } catch (error) {
+    console.error('❌ YOUNG ATHLETE BY-ATHLETE ERROR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get young athletes',
+      message: error.message
+    });
+  }
+});
+
+/**
  * GET /api/young-athlete/:id
  * Hydrate youth profile with goals and results
  */

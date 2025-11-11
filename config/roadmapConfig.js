@@ -119,17 +119,12 @@ export const categoryConfig = {
 
 
 /**
- * Primary Repo Suggestions
- * Primary repository where this work lives (e.g., "mvp1", "eventslanding", "companystack")
- * This is a free-form field but we can suggest common values
+ * Primary Repo Configuration
+ * Import from repoConfig.js for standardized repo options
  */
-export const primaryRepoSuggestions = [
-  "mvp1",
-  "eventslanding",
-  "companystack",
-  "user-dashboard",
-  "backend"
-];
+import { repoConfig, getRepos } from './repoConfig.js';
+
+export { repoConfig, getRepos };
 
 /**
  * Get all priority keys

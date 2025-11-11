@@ -5,6 +5,33 @@
 
 ---
 
+## Architecture Overview
+
+### Repository Split
+
+**Key Architectural Decision**: The young athlete feature is split across two repositories:
+
+1. **`gofastfrontend-mvp1`** (Main GoFast Repo)
+   - Core young athlete components and logic
+   - `YoungAthleteWelcome` component
+   - Future: Full young athlete dashboard, week-to-week tracking
+   - Route: `/young-athlete/welcome`
+
+2. **`GoFast-Events`** (Event-Specific Repo)
+   - Event-specific hydration and display
+   - `ParentSplash` - Auth gate for event participation
+   - `ParentProfile`, `YouthRegistration`, `PreRaceGoals` - Onboarding flow
+   - `YoungAthleteHome` - Event-specific home (shows Garmin activities, claim results)
+   - `Leaderboard` - Public event leaderboard
+   - Route prefix: `/5k-results/*`
+
+**Why This Split?**
+- Core young athlete functionality belongs in main GoFast repo (enduring feature)
+- Event-specific hydration/display belongs in Events repo (event-specific UX)
+- Allows event landing pages to have custom flows while sharing core components
+
+---
+
 ## Overview
 
 The Young Athlete system enables parents to create profiles for their children, set pre-race goals, and track race results. This system is designed to support:
@@ -48,8 +75,15 @@ model YoungAthlete {
 **Key Points**:
 - `athleteId` = **Required** - Links to parent Athlete (who created/manages this profile)
 - `eventCode` = **Required** - Event identifier (currently using Event.id, but stored as string for flexibility)
+- One parent (`Athlete`) can have multiple `YoungAthlete` records (different kids OR same kid in different events)
 - One young athlete can have multiple entries for different events (same kid, different races)
 - Profile is scoped to both parent (`athleteId`) and event (`eventCode`)
+
+**Database Architecture**:
+- `Athlete` model has `youngAthletes YoungAthlete[]` relation (one-to-many)
+- `Athlete` does NOT have a `youngAthleteId` field (would be wrong - parent can have many)
+- Query young athletes: `prisma.youngAthlete.findMany({ where: { athleteId } })`
+- Query by event: `prisma.youngAthlete.findMany({ where: { athleteId, eventCode } })`
 
 ### EventGoal Model
 
@@ -113,7 +147,7 @@ model EventResult {
 
 ```
 Athlete (parent)
- ├── YoungAthlete (child profile, event-scoped)
+ ├── youngAthletes: YoungAthlete[] (one-to-many relation)
  │     ├── EventGoal (pre-race goals)
  │     └── EventResult (post-race result)
  └── AthleteActivity (Garmin sync spine)
@@ -121,10 +155,17 @@ Athlete (parent)
 ```
 
 **Key Relationships**:
-- `YoungAthlete.athleteId` → `Athlete.id` (parent)
-- `EventGoal.youngAthleteId` → `YoungAthlete.id` (one-to-many)
-- `EventResult.youngAthleteId` → `YoungAthlete.id` (one-to-many)
+- `Athlete.youngAthletes` → `YoungAthlete[]` (one-to-many: one parent can have many young athletes)
+- `YoungAthlete.athleteId` → `Athlete.id` (foreign key: each young athlete belongs to one parent)
+- `EventGoal.youngAthleteId` → `YoungAthlete.id` (one-to-many: one young athlete can have many goals across events)
+- `EventResult.youngAthleteId` → `YoungAthlete.id` (one-to-many: one young athlete can have many results across events)
 - `EventResult.activityId` → `AthleteActivity.id` (links to Garmin data)
+
+**Important Architecture Note**:
+- **Athlete model does NOT have a `youngAthleteId` field** - it has `youngAthletes YoungAthlete[]` relation
+- **localStorage stores `youngAthleteId`** for the current session/event context (not a database field)
+- One parent (`Athlete`) can have multiple young athletes (`YoungAthlete[]`) across different events
+- Each `YoungAthlete` is scoped to both parent (`athleteId`) and event (`eventCode`)
 
 ---
 
@@ -172,39 +213,72 @@ GET    /api/events/:eventCode/leaderboard
 
 ## Frontend Flow
 
-### Auth Flow & localStorage Tracking
+### Repository: `GoFast-Events` (Event-Specific Hydration)
 
-1. **ParentWelcome** (`/engagement`)
+**Route Prefix**: `/5k-results/*`
+
+1. **ParentSplash** (`/5k-results`) - Auth gate
+   - Entry point from BGR event page → "Start Here" button
    - Checks Firebase auth
-   - Creates/finds athlete via `/api/athlete/create`
-   - Stores `athleteId` in localStorage
+   - NO auth → Shows `ParentPreProfileExplainer` (signup/signin)
+   - Auth + Returner → Shows `YoungAthleteWelcome` (from MVP1) → `/5k-results/home`
+   - Auth + New → Creates/finds athlete → Routes to `ParentProfile`
 
-2. **ParentProfile** (`/engagement/parent-profile`)
+2. **ParentProfile** (`/5k-results/parent-profile`)
    - Updates parent profile
    - Stores `athleteId` + `eventId` in localStorage
+   - Routes to `YouthRegistration`
 
-3. **YouthRegistration** (`/engagement/youth-registration`)
+3. **YouthRegistration** (`/5k-results/youth-registration`)
    - Creates young athlete via `/api/young-athlete/register`
    - Stores `youngAthleteId` + ensures `eventId` in localStorage
+   - Routes to `PreRaceGoals`
 
-4. **PreRaceGoals** (`/engagement/goals`)
+4. **PreRaceGoals** (`/5k-results/goals`)
    - Sets goal via `/api/young-athlete/:id/goal`
    - Uses `youngAthleteId` + `eventId` from localStorage
+   - Routes to `YoungAthleteHome`
 
-5. **YoungAthleteHome** (`/engagement/home`)
+5. **YoungAthleteHome** (`/5k-results/home`)
    - Hydrates profile via `/api/young-athlete/:id`
    - Shows goals, parent's Garmin activities
    - "Make this my 5K" button → claims activity
+   - Routes to `Leaderboard` after claiming
 
-6. **Leaderboard** (`/engagement/leaderboard`)
+6. **Leaderboard** (`/5k-results/leaderboard`)
    - Public view via `/api/events/:eventCode/leaderboard`
    - Shows all results for event
+   - Accessible via "See Results" CTA on event page
 
-### localStorage Keys
+### Repository: `gofastfrontend-mvp1` (Core Components)
 
-- `athleteId` - Parent athlete ID (set after ParentWelcome/ParentProfile)
-- `youngAthleteId` - Young athlete ID (set after YouthRegistration)
-- `eventId` - Event ID (set after ParentProfile, used as `eventCode` in API calls)
+**Route**: `/young-athlete/welcome`
+
+- **YoungAthleteWelcome** - MVP1-style welcome for returners
+  - Shown when parent has existing young athlete
+  - Routes to `/5k-results/home` (Events repo)
+
+### localStorage Keys (Session Context)
+
+**Important**: These are session-level storage, NOT database fields.
+
+- `athleteId` - Parent athlete ID (set after ParentSplash/ParentProfile)
+  - Maps to `Athlete.id` in database
+  - Used to identify the authenticated parent
+  
+- `youngAthleteId` - Current young athlete ID for this session/event (set after YouthRegistration)
+  - Maps to `YoungAthlete.id` in database
+  - **Can be null** - parent may have `athleteId` but no `youngAthleteId` yet (edge case)
+  - Used for current event context (one parent can have multiple young athletes)
+  
+- `eventId` - Current event ID (set after ParentProfile, used as `eventCode` in API calls)
+  - Maps to `Event.id` in database
+  - Used as `eventCode` parameter in API calls
+
+**Edge Case Handling**:
+- If `athleteId` exists but `youngAthleteId` is null → Route to `/5k-results/youth-registration`
+- This happens when parent has account but hasn't registered a young athlete yet
+- Handled in `YoungAthleteWelcome` component (MVP1) via localStorage hydration check
 
 ---
 

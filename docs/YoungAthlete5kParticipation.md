@@ -23,32 +23,42 @@ However, for the BGR Discovery 5K, we're initiating the goal-setting flow **just
 
 ---
 
+## Architecture
+
+### Repository Split
+
+- **`gofastfrontend-mvp1`**: Core young athlete components (`YoungAthleteWelcome`)
+- **`GoFast-Events`**: Event-specific hydration and display (all `/5k-results/*` routes)
+
+### Entry Points
+
+1. **BGR Event Page** → "Start Here" button → `/5k-results` (ParentSplash)
+2. **BGR Event Page** → "See Results" button → `/5k-results/leaderboard` (public)
+
 ## Flow Overview
 
 ### Phase 1: Parent Onboarding
 
-**Step 1: Engagement Landing** (`/engagement`)
-- Parent clicks "Start Here" from race overview page
-- Auth check: Signed in → ParentWelcome, Not signed in → ParentPreProfileExplainer
+**Step 1: ParentSplash** (`/5k-results`) - Auth Gate
+- Entry point from BGR event page → "Start Here" button
+- NO Firebase auth → Shows `ParentPreProfileExplainer` (signup/signin)
+- Firebase auth + Returner → Shows `YoungAthleteWelcome` (MVP1) → `/5k-results/home`
+- Firebase auth + New → Creates/finds athlete → Routes to `ParentProfile`
 
 **Step 2: Sign In** (if not signed in)
-- Google OAuth via Firebase
-- Auto-navigates to ParentWelcome after sign-in
+- Google OAuth or Email/Password via Firebase
+- Auto-navigates after sign-in (auth state change detected)
 
-**Step 3: Parent Welcome** (`/engagement`)
-- Creates/finds athlete via `/api/athlete/create`
-- Stores `athleteId` in localStorage
-- Shows "Continue" button
-
-**Step 4: Parent Profile** (`/engagement/parent-profile`)
+**Step 3: Parent Profile** (`/5k-results/parent-profile`)
 - Pre-filled form from Firebase (name, email)
 - User can edit and submit
+- Creates/updates athlete via `/api/athlete/create`
 - Stores `athleteId` + `eventId` in localStorage
 - Navigates to YouthRegistration
 
 ### Phase 2: Young Athlete Registration
 
-**Step 5: Youth Registration** (`/engagement/youth-registration`)
+**Step 4: Youth Registration** (`/5k-results/youth-registration`)
 - Form: firstName, lastName, grade (optional), school (optional)
 - Creates young athlete via `/api/young-athlete/register`
 - Body: `{ athleteId, eventCode: eventId, firstName, lastName, grade?, school? }`
@@ -57,7 +67,7 @@ However, for the BGR Discovery 5K, we're initiating the goal-setting flow **just
 
 ### Phase 3: Goal Setting
 
-**Step 6: Pre-Race Goals** (`/engagement/goals`)
+**Step 5: Pre-Race Goals** (`/5k-results/goals`)
 - Conversational form:
   - Target Pace (optional)
   - Target Distance (optional)
@@ -69,7 +79,7 @@ However, for the BGR Discovery 5K, we're initiating the goal-setting flow **just
 
 ### Phase 4: Race Day & Results
 
-**Step 7: Young Athlete Home** (`/engagement/home`)
+**Step 6: Young Athlete Home** (`/5k-results/home`)
 - Hydrates profile via `/api/young-athlete/:id`
 - Shows:
   - Goal summary (if set)
@@ -79,8 +89,9 @@ However, for the BGR Discovery 5K, we're initiating the goal-setting flow **just
 - Body: `{ eventCode: eventId, youngAthleteId, authorAthleteId, activityId }`
 - After claiming → Navigates to Leaderboard
 
-**Step 8: Leaderboard** (`/engagement/leaderboard`)
+**Step 7: Leaderboard** (`/5k-results/leaderboard`)
 - Public view (no auth required)
+- Accessible via "See Results" CTA on event page
 - Fetches via `/api/events/:eventCode/leaderboard`
 - Shows:
   - Young athlete name, grade, school
@@ -144,7 +155,7 @@ Leaderboard
 
 ### Flow Through Pages
 ```
-ParentWelcome → athleteId
+ParentSplash → Checks auth, creates athleteId
 ParentProfile → athleteId + eventId
 YouthRegistration → youngAthleteId + eventId
 PreRaceGoals → Uses youngAthleteId + eventId
