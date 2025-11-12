@@ -59,6 +59,29 @@ router.put('/:id/profile', verifyFirebaseToken, async (req, res) => {
       });
     }
 
+    // Validate gofastHandle uniqueness if provided
+    if (gofastHandle && gofastHandle.trim()) {
+      const normalizedHandle = gofastHandle.trim().toLowerCase();
+      
+      // Check if handle is already taken by another athlete
+      const handleTaken = await prisma.athlete.findFirst({
+        where: {
+          gofastHandle: normalizedHandle,
+          id: { not: id } // Exclude current athlete
+        },
+        select: { id: true }
+      });
+
+      if (handleTaken) {
+        return res.status(400).json({
+          success: false,
+          error: 'Handle already taken',
+          message: `The handle "@${normalizedHandle}" is already taken. Please choose another one.`,
+          field: 'gofastHandle'
+        });
+      }
+    }
+
     // Update athlete profile
     const athlete = await prisma.athlete.update({
       where: { id },
@@ -66,7 +89,7 @@ router.put('/:id/profile', verifyFirebaseToken, async (req, res) => {
         firstName,
         lastName,
         phoneNumber,
-        gofastHandle,
+        gofastHandle: gofastHandle ? gofastHandle.trim().toLowerCase() : null,
         birthday: birthday ? new Date(birthday) : null,
         gender,
         city,
