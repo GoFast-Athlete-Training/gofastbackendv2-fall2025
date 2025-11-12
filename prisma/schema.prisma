@@ -202,7 +202,7 @@ model JoinCode {
 model HandleRegistry {
   id        String   @id @default(cuid())
   handle    String   @unique // Normalized lowercase handle (e.g., "adamgofast")
-  athleteId String
+  athleteId String   @unique // One-to-one relation with Athlete
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   isActive  Boolean  @default(true)
