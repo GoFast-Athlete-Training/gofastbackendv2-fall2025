@@ -158,7 +158,15 @@ router.get('/admin-hydrate', async (req, res) => {
     const volunteers = await prisma.eventVolunteer.findMany({
       where: { eventId: eventId.trim() },
       orderBy: { createdAt: 'desc' },
-      include: {
+      select: {
+        id: true,
+        eventId: true,
+        name: true,
+        email: true,
+        phone: true, // Phone numbers for text strand communication
+        role: true,
+        notes: true,
+        createdAt: true,
         event: {
           select: {
             id: true,
@@ -166,7 +174,7 @@ router.get('/admin-hydrate', async (req, res) => {
           },
         },
       },
-      // NOTE: email is included for admin management
+      // NOTE: email and phone are included for admin management
     });
 
     res.json({
