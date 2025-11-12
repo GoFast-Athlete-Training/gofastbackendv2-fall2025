@@ -84,6 +84,9 @@ model Athlete {
   runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
   runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
   runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // Source of truth for admin/manager roles
+  
+  // Handle Registry (future use)
+  handleRegistry       HandleRegistry?       @relation // Registry entry for gofastHandle
 
   // Training Relations
   createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
@@ -193,6 +196,21 @@ model JoinCode {
   isActive   Boolean  @default(true)
 
   @@map("join_codes")
+}
+
+// HandleRegistry - Authoritative source for gofastHandle uniqueness (future use)
+model HandleRegistry {
+  id        String   @id @default(cuid())
+  handle    String   @unique // Normalized lowercase handle (e.g., "adamgofast")
+  athleteId String
+  athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  isActive  Boolean  @default(true)
+  
+  // Future: Track handle changes, analytics, etc.
+  lastUsedAt DateTime?
+  
+  @@map("handle_registry")
 }
 
 model RunCrewMembership {
