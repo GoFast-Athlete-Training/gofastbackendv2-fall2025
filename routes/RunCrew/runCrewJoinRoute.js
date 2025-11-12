@@ -108,7 +108,7 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
     const { runCrewId } = joinCodeRecord;
     console.log('✅ RUNCREW JOIN: Join code validated, runCrewId:', runCrewId);
     
-    // Upsert athlete (auto-create if new, update Firebase data if existing)
+    // Upsert athlete (auto-create if new)
     console.log('🔍 RUNCREW JOIN: Upserting athlete...');
     const athlete = await AthleteFindOrCreateService.findOrCreate({
       firebaseId: userId,
@@ -117,29 +117,15 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
       picture
     });
     
-    console.log('✅ RUNCREW JOIN: Athlete upserted:', athlete.id);
-    
-    // Explicitly update athlete record to ensure Firebase data is synced (important for existing users)
-    // This ensures email, photoURL, firstName, lastName are up-to-date from Firebase
-    await prisma.athlete.update({
-      where: { id: athlete.id },
-      data: {
-        email: email, // Sync email from Firebase
-        photoURL: picture || null, // Sync photo from Firebase
-        firstName: displayName?.split(' ')[0] || athlete.firstName, // Sync firstName from Firebase displayName
-        lastName: displayName?.split(' ').slice(1).join(' ') || athlete.lastName // Sync lastName from Firebase displayName
-      }
-    });
-    console.log('✅ RUNCREW JOIN: Athlete Firebase data synced');
-    
-    // Update athlete profile if additional data provided
+    // Update athlete profile if provided
     if (athleteProfile && Object.keys(athleteProfile).length > 0) {
       await prisma.athlete.update({
         where: { id: athlete.id },
         data: athleteProfile
       });
-      console.log('✅ RUNCREW JOIN: Additional athlete profile data updated');
     }
+    
+    console.log('✅ RUNCREW JOIN: Athlete upserted:', athlete.id);
     
     // Check if athlete is already a member
     console.log('🔍 RUNCREW JOIN: Checking for existing membership...');
