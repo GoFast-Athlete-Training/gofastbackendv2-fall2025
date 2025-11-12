@@ -70,15 +70,15 @@ export const fieldMappings = {
 
   // Data & Integration
   quickModelScaffolding: {
-    label: "Quick Model Scaffolding",
-    description: "How does this fit into the architecture? What models/data structures are needed?",
+    label: "Data Model Structure",
+    description: "What models, tables, or data structures are needed for this feature?",
     fieldType: "textarea",
     placeholder: "joinCode, athleteId, runCrewId, RunCrewMembership junction table",
     required: false
   },
   relationalMapping: {
-    label: "Relational Mapping",
-    description: "Does this bolt on to athleteId? What's the relational mapping?",
+    label: "Database Relationships",
+    description: "How does this connect to the existing data model? What's the relationship chain?",
     fieldType: "textarea",
     placeholder: "Athlete -> RunCrewMembership -> RunCrew (many-to-many)",
     required: false
@@ -274,8 +274,8 @@ export const getAllFieldGroups = () => {
 export const fieldExplanations = {
   whatItDoes: "Describe the user value proposition. What does this feature do for users? What problem does it solve?",
   howItHelps: "Explain how this feature helps the overall product/build. Why is this important? What does it enable?",
-  quickModelScaffolding: "How does this fit into the architecture? What models/data structures are needed? Helps devs think about architecture fit.",
-  relationalMapping: "Does this bolt on to athleteId? What's the relational mapping? (e.g., Athlete -> RunCrewMembership -> RunCrew)",
+  quickModelScaffolding: "What models, tables, or data structures are needed for this feature? Helps devs think about architecture fit.",
+  relationalMapping: "How does this connect to the existing data model? What's the relationship chain? (e.g., Athlete -> RunCrewMembership -> RunCrew)",
   apiIntegration: "API-specific integration details. How do we hit external APIs? (e.g., 'hit garmin backend with a token')",
   prerequisites: "What needs to be in place first? Setup, research, account creation, authentication, dependencies? Can include links (e.g., 'apply for token: https://...')",
   primaryRepo: "Primary repository where this work lives. Examples: 'mvp1', 'eventslanding', 'companystack', 'user-dashboard', 'backend'",
