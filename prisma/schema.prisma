@@ -94,9 +94,6 @@ model Athlete {
   // Event Relations
   events        Event[]               @relation("EventCreator") // Events created by this athlete
 
-  // Young Athlete Relations
-  youngAthletes YoungAthlete[] // Parent's young athletes
-
   // Founder Relations
   founder Founder?
 
@@ -150,7 +147,7 @@ model AthleteActivity {
 
   // Relations
   athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  eventResults EventResult[] @relation("EventResultActivity") // Event results that claim this activity
+  eventResults EventResult[] @relation("EventResultParentActivity") // Event results that claim this activity (legacy - parent's activity)
 
   @@map("athlete_activities")
 }
@@ -781,7 +778,7 @@ model CompanyEmployee {
 
 model CompanyRoadmapItem {
   id        String @id @default(cuid())
-  companyId String // Links to Company, not Founder
+  companyId String? // Legacy Company relation (nullable - using GoFastCompany instead)
 
   // Item Classification
   itemType         String  @default("Dev Work") // "Dev Work" or "Product Milestone"
@@ -817,7 +814,7 @@ model CompanyRoadmapItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company         Company?       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   GoFastCompany   GoFastCompany? @relation(fields: [goFastCompanyId], references: [id])
   goFastCompanyId String?
 
@@ -1096,13 +1093,50 @@ model ProductPipelineItem {
 }
 
 // =====================================================
+// PARENT MODEL - Universal Personhood for Parents
+// =====================================================
+
+model Parent {
+  id         String @id @default(cuid())
+  firebaseId String @unique // Firebase auth ID
+
+  // Universal Profile
+  firstName    String?
+  lastName     String?
+  email        String    @unique
+  phoneNumber  String?
+  photoURL     String?
+
+  // Garmin OAuth 2.0 PKCE Integration (for claiming parent's activities as race results)
+  garmin_user_id       String?   @unique // Garmin's unique user ID
+  garmin_access_token  String?
+  garmin_refresh_token String?
+  garmin_expires_in    Int?
+  garmin_scope         String?
+  garmin_connected_at  DateTime?
+  garmin_last_sync_at  DateTime?
+  garmin_permissions     Json?
+  garmin_is_connected    Boolean   @default(false)
+  garmin_disconnected_at DateTime?
+
+  // System fields
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  youngAthletes YoungAthlete[]
+
+  @@map("parents")
+}
+
+// =====================================================
 // YOUNG ATHLETE MODELS - Youth Participation System
 // =====================================================
 
 model YoungAthlete {
   id             String   @id @default(cuid())
-  athleteId      String   // Parent athlete ID
-  eventCode      String   // e.g., 'BGR5K2025'
+  parentId       String   // Parent ID (NOT athleteId)
+  eventCode      String   // Event identifier
   firstName      String
   lastName       String
   grade          String?
@@ -1110,12 +1144,25 @@ model YoungAthlete {
   profilePicUrl  String?
   createdAt      DateTime @default(now())
 
-  // Relations
-  athlete Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
-  goals   EventGoal[]
-  results EventResult[]
+  // Garmin OAuth 2.0 PKCE Integration (separate Garmin app for young athletes)
+  garmin_user_id       String?   @unique // Garmin's unique user ID for young athlete
+  garmin_access_token  String?
+  garmin_refresh_token String?
+  garmin_expires_in    Int?
+  garmin_scope         String?
+  garmin_connected_at  DateTime?
+  garmin_last_sync_at  DateTime?
+  garmin_permissions     Json?
+  garmin_is_connected    Boolean   @default(false)
+  garmin_disconnected_at DateTime?
 
-  @@index([athleteId])
+  // Relations
+  parent     Parent                @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  goals      EventGoal[]
+  results    EventResult[]
+  activities YoungAthleteActivity[] // Young athlete's own Garmin activities
+
+  @@index([parentId])
   @@index([eventCode])
   @@map("young_athletes")
 }
@@ -1142,16 +1189,77 @@ model EventResult {
   id                String   @id @default(cuid())
   eventCode         String
   youngAthleteId    String
-  authorAthleteId   String   // Parent Garmin-linked athlete
-  activityId        String   // Links to AthleteActivity.id
+  parentId          String?  // Parent who claimed this (optional - for legacy parent Garmin activities)
+  activityId        String?  // Links to YoungAthleteActivity.id (primary - young athlete's own activity)
+  parentActivityId  String?  // Links to AthleteActivity.id (legacy - parent's Garmin activity claimed as result)
   createdAt         DateTime @default(now())
 
   // Relations
-  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
-  activity     AthleteActivity @relation("EventResultActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  youngAthlete YoungAthlete         @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  activity     YoungAthleteActivity? @relation("EventResultYoungAthleteActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  parentActivity AthleteActivity?    @relation("EventResultParentActivity", fields: [parentActivityId], references: [id], onDelete: Cascade)
 
   @@unique([youngAthleteId, eventCode]) // One result per young athlete per event
   @@index([eventCode])
   @@index([activityId])
+  @@index([parentActivityId])
   @@map("event_results")
+}
+
+// =====================================================
+// YOUNG ATHLETE ACTIVITY MODEL - Separate Garmin Feed
+// =====================================================
+
+model YoungAthleteActivity {
+  id              String @id @default(cuid())
+  youngAthleteId String
+
+  // Source Information
+  sourceActivityId String @unique // Garmin's unique activity ID (join key)
+  source           String @default("garmin")
+
+  // Core Activity Data (Summary from /garmin/activity webhook)
+  activityType String? // running, cycling, swimming, etc.
+  activityName String? // "Morning Run", "Evening Bike Ride"
+  startTime    DateTime? // when activity started
+  duration     Int? // duration in seconds
+  distance     Float? // distance in meters
+  averageSpeed Float? // average speed in m/s
+  calories     Int? // calories burned
+
+  // Performance Metrics (Summary data)
+  averageHeartRate Int? // average heart rate
+  maxHeartRate     Int? // maximum heart rate
+  elevationGain    Float? // elevation gain in meters
+  steps            Int? // step count (if applicable)
+
+  // Location Data (Summary)
+  startLatitude   Float? // GPS start latitude
+  startLongitude  Float? // GPS start longitude
+  endLatitude     Float? // GPS end latitude
+  endLongitude    Float? // GPS end longitude
+  summaryPolyline String? // encoded route polyline
+
+  // Device Information
+  deviceName   String? // "Forerunner 255", "Edge 1040"
+  garminUserId String? // Garmin user GUID from webhook
+
+  // Hybrid Data Storage
+  summaryData Json? // Phase 1: Summary fields from /garmin/activity
+  detailData  Json? // Phase 2: Details from /garmin/details (laps, splits, HR zones, etc.)
+  hydratedAt  DateTime? // When details were hydrated
+
+  // Timestamps
+  syncedAt      DateTime @default(now())
+  lastUpdatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  eventResults EventResult[] @relation("EventResultYoungAthleteActivity") // Event results that claim this activity
+
+  @@index([youngAthleteId])
+  @@index([garminUserId])
+  @@map("young_athlete_activities")
 }
