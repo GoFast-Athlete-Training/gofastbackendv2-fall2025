@@ -153,11 +153,21 @@ router.post('/join', verifyFirebaseToken, async (req, res) => {
       console.log('✅ RUNCREW JOIN: Membership created');
     }
     
-    // Return full hydrated RunCrew
+    // Return full hydrated RunCrew (including description, logo, icon)
     console.log('🔍 RUNCREW JOIN: Hydrating RunCrew...');
     const runCrew = await prisma.runCrew.findUnique({
       where: { id: runCrewId },
-      include: {
+      select: {
+        // Core fields (including description, logo, icon)
+        id: true,
+        name: true,
+        description: true,
+        logo: true,
+        icon: true,
+        joinCode: true,
+        createdAt: true,
+        updatedAt: true,
+        // Relations
         memberships: {
           include: {
             athlete: {

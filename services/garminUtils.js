@@ -9,7 +9,15 @@ export const GARMIN_CONFIG = {
   TOKEN_URL: 'https://diauth.garmin.com/di-oauth2-service/oauth/token',
   USER_INFO_URL: 'https://apis.garmin.com/wellness-api/rest/user/id',
   FRONTEND_URL: process.env.FRONTEND_URL || 'https://athlete.gofastcrushgoals.com',
-  BACKEND_URL: process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'
+  BACKEND_URL: process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com',
+  
+  // Webhook URLs for Garmin to send activity data
+  WEBHOOK_URLS: {
+    ACTIVITY: `${process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'}/api/garmin/activity`,
+    ACTIVITY_DETAILS: `${process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'}/api/garmin/activity-details`,
+    PERMISSIONS: `${process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'}/api/garmin/permissions`,
+    DEREGISTRATION: `${process.env.BACKEND_URL || 'https://gofastbackendv2-fall2025.onrender.com'}/api/garmin/deregistration`
+  }
 };
 
 // Generate PKCE code verifier and challenge

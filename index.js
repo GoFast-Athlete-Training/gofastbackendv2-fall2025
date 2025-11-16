@@ -153,7 +153,7 @@ app.use('/api/athlete', athleteCreateRouter); // /create, /tokenretrieve, /:id, 
 app.use('/api/garmin', garminUrlGenRouter); // /auth-url (FIRST - most specific)
 app.use('/api/garmin', garminCodeCatchRouter); // /callback
 app.use('/api/garmin', garminUserProfileRouter); // /user
-app.use('/api/garmin', garminActivityRouter); // /activity, /activities, /activity/sync
+app.use('/api/garmin', garminActivityRouter); // /activity, /activities (GET), /activity/sync
 app.use('/api/garmin', garminActivityDetailsRouter); // /activity-details (dedicated file)
 app.use('/api/garmin', garminPermissionsRouter); // /permissions, /webhook
 app.use('/api/garmin', garminDeregistrationRouter); // /deregistration

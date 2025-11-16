@@ -271,3 +271,4 @@ Athlete (separate - for RunCrew, training, etc.)
 **Last Updated**: January 2025  
 **Status**: Proposed Refactor - Ready for Implementation
 
+
