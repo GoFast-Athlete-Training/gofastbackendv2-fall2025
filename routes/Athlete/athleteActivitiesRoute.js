@@ -83,8 +83,8 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
     
     console.log(`📅 Weekly range: ${sevenDaysAgo.toISOString()} to ${now.toISOString()}`);
     
-    // Fetch activities for this athlete from last 7 days
-    const activities = await prisma.athleteActivity.findMany({
+    // Fetch ALL activities for this athlete from last 7 days (for reference)
+    const allActivities = await prisma.athleteActivity.findMany({
       where: {
         athleteId: athleteId,
         startTime: {
@@ -97,7 +97,17 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
       }
     });
     
-    // Calculate weekly totals
+    // Filter to only running activities (exclude wheelchair)
+    const activities = allActivities.filter(activity => {
+      if (!activity.activityType) return false;
+      const type = activity.activityType.toLowerCase();
+      // Include activities with "running" or "run" in the type, but exclude wheelchair
+      return (type.includes('running') || type === 'run') && !type.includes('wheelchair');
+    });
+    
+    console.log(`📊 Filtered ${activities.length} running activities from ${allActivities.length} total activities`);
+    
+    // Calculate weekly totals ONLY for runs
     const weeklyTotals = {
       totalDistance: 0,
       totalDuration: 0,
@@ -114,8 +124,8 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
     // Convert distance from meters to miles
     weeklyTotals.totalDistanceMiles = (weeklyTotals.totalDistance / 1609.34).toFixed(2);
     
-    console.log(`✅ Found ${activities.length} activities for athleteId ${athleteId} (last 7 days)`);
-    console.log(`📊 Weekly totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
+    console.log(`✅ Found ${activities.length} running activities for athleteId ${athleteId} (last 7 days)`);
+    console.log(`📊 Weekly run totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
     
     res.json({
       success: true,
