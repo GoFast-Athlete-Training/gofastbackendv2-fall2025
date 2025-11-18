@@ -5,6 +5,7 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
+import { getCurrentWeek, getPreviousWeek } from '../../utils/weekUtils.js';
 
 const router = express.Router();
 
@@ -13,22 +14,26 @@ const router = express.Router();
  * GET /api/runcrew/:runCrewId/leaderboard
  * Query params:
  *   - metric: 'miles' | 'runs' | 'calories' (default: 'miles')
- *   - days: number (default: 7) - lookback window in days
+ *   - week: 'current' | 'previous' (default: 'current') - which week to show
  * 
  * Returns:
  *   - Array of leaderboard entries with:
  *     - athlete: { id, firstName, lastName, photoURL }
- *     - totalMiles: number
- *     - totalRuns: number
- *     - totalCalories: number
+ *     - totalMiles: number (running activities only)
+ *     - totalRuns: number (running activities only)
+ *     - totalCalories: number (running activities only)
  *     - latestRunAt: Date | null
  *     - Sorted by selected metric (descending)
+ * 
+ * Note: 
+ *   - Only includes running activities (excludes bikes, wheelchair, etc.)
+ *   - Uses Monday-Sunday week boundaries (not rolling 7 days)
  */
 router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
   try {
     const prisma = getPrismaClient();
     const { runCrewId } = req.params;
-    const { metric = 'miles', days = 7 } = req.query;
+    const { metric = 'miles', week = 'current' } = req.query;
     const firebaseId = req.user?.uid;
 
     // Validate metric
@@ -41,13 +46,13 @@ router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Validate days
-    const daysNum = parseInt(days, 10);
-    if (isNaN(daysNum) || daysNum < 1 || daysNum > 365) {
+    // Validate week parameter
+    const validWeeks = ['current', 'previous'];
+    if (!validWeeks.includes(week)) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid days',
-        message: 'Days must be a number between 1 and 365'
+        error: 'Invalid week',
+        message: `Week must be one of: ${validWeeks.join(', ')}`
       });
     }
 
@@ -94,11 +99,16 @@ router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
       });
     }
 
-    // Calculate date window
-    const now = new Date();
-    const windowStart = new Date(now.getTime() - daysNum * 24 * 60 * 60 * 1000);
+    // Calculate week boundaries (Monday-Sunday)
+    const weekRange = week === 'previous' 
+      ? getPreviousWeek()
+      : getCurrentWeek();
+    
+    const windowStart = weekRange.start;
+    const windowEnd = weekRange.end;
 
     // Get all memberships with their activities
+    // MVP1: Filter for running activities only (exclude wheelchair, bikes, etc.)
     const memberships = await prisma.runCrewMembership.findMany({
       where: { runCrewId },
       include: {
@@ -112,10 +122,25 @@ router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
               where: {
                 startTime: {
                   gte: windowStart,
-                  lte: now
-                }
+                  lte: windowEnd
+                },
+                // MVP1: Only include running activities (exclude wheelchair)
+                AND: [
+                  {
+                    OR: [
+                      { activityType: { equals: 'running', mode: 'insensitive' } },
+                      { activityType: { equals: 'run', mode: 'insensitive' } }
+                    ]
+                  },
+                  {
+                    NOT: {
+                      activityType: { contains: 'wheelchair', mode: 'insensitive' }
+                    }
+                  }
+                ]
               },
               select: {
+                activityType: true,
                 distance: true,
                 duration: true,
                 calories: true,
@@ -132,7 +157,15 @@ router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
 
     // Calculate leaderboard entries
     const leaderboardEntries = memberships.map((membership) => {
-      const activities = membership.athlete?.activities || [];
+      const allActivities = membership.athlete?.activities || [];
+      
+      // Safety net: Filter to only running activities (in case query filter missed something)
+      const activities = allActivities.filter(activity => {
+        if (!activity.activityType) return false;
+        const type = activity.activityType.toLowerCase();
+        // Include activities with "running" or "run" in the type, but exclude wheelchair
+        return (type.includes('running') || type === 'run') && !type.includes('wheelchair');
+      });
       
       const totals = activities.reduce(
         (acc, activity) => {
@@ -183,9 +216,9 @@ router.get('/:runCrewId/leaderboard', verifyFirebaseToken, async (req, res) => {
       success: true,
       leaderboard: sortedEntries,
       metric,
-      days: daysNum,
-      windowStart,
-      windowEnd: now
+      week: weekRange.label,
+      weekStart: windowStart.toISOString(),
+      weekEnd: windowEnd.toISOString()
     });
   } catch (error) {
     console.error('❌ RUNCREW LEADERBOARD ERROR:', error);

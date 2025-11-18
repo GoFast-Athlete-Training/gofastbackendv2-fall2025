@@ -1,5 +1,6 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
+import { getCurrentWeek } from '../../utils/weekUtils.js';
 
 const router = express.Router();
 
@@ -77,19 +78,20 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
       });
     }
     
-    // Calculate date range: last 7 days
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // Use Monday-Sunday week boundaries (not rolling 7 days)
+    const weekRange = getCurrentWeek();
+    const windowStart = weekRange.start;
+    const windowEnd = weekRange.end;
     
-    console.log(`📅 Weekly range: ${sevenDaysAgo.toISOString()} to ${now.toISOString()}`);
+    console.log(`📅 Weekly range (Monday-Sunday): ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
     
-    // Fetch ALL activities for this athlete from last 7 days (for reference)
+    // Fetch ALL activities for this athlete from current week (for reference)
     const allActivities = await prisma.athleteActivity.findMany({
       where: {
         athleteId: athleteId,
         startTime: {
-          gte: sevenDaysAgo,
-          lte: now
+          gte: windowStart,
+          lte: windowEnd
         }
       },
       orderBy: {
@@ -124,7 +126,7 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
     // Convert distance from meters to miles
     weeklyTotals.totalDistanceMiles = (weeklyTotals.totalDistance / 1609.34).toFixed(2);
     
-    console.log(`✅ Found ${activities.length} running activities for athleteId ${athleteId} (last 7 days)`);
+    console.log(`✅ Found ${activities.length} running activities for athleteId ${athleteId} (current week: Monday-Sunday)`);
     console.log(`📊 Weekly run totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
     
     res.json({
@@ -139,8 +141,9 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
       activities: activities,
       weeklyTotals: weeklyTotals,
       dateRange: {
-        start: sevenDaysAgo.toISOString(),
-        end: now.toISOString()
+        start: windowStart.toISOString(),
+        end: windowEnd.toISOString(),
+        label: weekRange.label
       },
       count: activities.length
     });

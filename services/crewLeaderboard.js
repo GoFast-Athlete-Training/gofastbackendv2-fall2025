@@ -1,18 +1,24 @@
 import { getPrismaClient } from '../config/database.js';
+import { getCurrentWeek } from '../utils/weekUtils.js';
 
 /**
  * Compute leaderboard metrics for a RunCrew on the fly.
- * Aggregates athlete activities over the last `days` days (default 7).
+ * Aggregates athlete activities for the current week (Monday-Sunday).
  * Returns sorted list by total miles (desc) with activity counts and calories.
+ * 
+ * Note: 
+ *   - Only includes running activities (excludes bikes, wheelchair, etc.)
+ *   - Uses Monday-Sunday week boundaries (not rolling 7 days)
  */
-export async function computeCrewLeaderboard(runCrewId, days = 7) {
+export async function computeCrewLeaderboard(runCrewId) {
   if (!runCrewId) {
     return [];
   }
 
   const prisma = getPrismaClient();
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const weekRange = getCurrentWeek();
+  const windowStart = weekRange.start;
+  const windowEnd = weekRange.end;
 
   const crew = await prisma.runCrew.findUnique({
     where: { id: runCrewId },
@@ -29,10 +35,25 @@ export async function computeCrewLeaderboard(runCrewId, days = 7) {
                 where: {
                   startTime: {
                     gte: windowStart,
-                    lte: now
-                  }
+                    lte: windowEnd
+                  },
+                  // MVP1: Only include running activities (exclude wheelchair)
+                  AND: [
+                    {
+                      OR: [
+                        { activityType: { equals: 'running', mode: 'insensitive' } },
+                        { activityType: { equals: 'run', mode: 'insensitive' } }
+                      ]
+                    },
+                    {
+                      NOT: {
+                        activityType: { contains: 'wheelchair', mode: 'insensitive' }
+                      }
+                    }
+                  ]
                 },
                 select: {
+                  activityType: true,
                   distance: true,
                   duration: true,
                   calories: true
@@ -50,7 +71,16 @@ export async function computeCrewLeaderboard(runCrewId, days = 7) {
   }
 
   const leaderboard = crew.memberships.map((membership) => {
-    const activities = membership.athlete?.activities || [];
+    const allActivities = membership.athlete?.activities || [];
+    
+    // Safety net: Filter to only running activities (in case query filter missed something)
+    const activities = allActivities.filter(activity => {
+      if (!activity.activityType) return false;
+      const type = activity.activityType.toLowerCase();
+      // Include activities with "running" or "run" in the type, but exclude wheelchair
+      return (type.includes('running') || type === 'run') && !type.includes('wheelchair');
+    });
+    
     const totals = activities.reduce(
       (acc, activity) => {
         const distance = activity.distance || 0;

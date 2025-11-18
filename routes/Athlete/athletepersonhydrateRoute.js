@@ -2,6 +2,7 @@ import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
 import { verifyFirebaseToken } from '../../middleware/firebaseMiddleware.js';
 import { findAthleteByFirebaseId } from '../../services/firebaseidathletelookup.js';
+import { getCurrentWeek } from '../../utils/weekUtils.js';
 
 const router = express.Router();
 
@@ -365,16 +366,21 @@ async function hydrateAthlete(req, res) {
     
     // Fetch weekly activities (last 7 days) for this athlete
     console.log('🔍 ATHLETE PERSON HYDRATE: Fetching weekly activities for athleteId:', athleteId);
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    
+    // Use Monday-Sunday week boundaries (not rolling 7 days)
+    const weekRange = getCurrentWeek();
+    const windowStart = weekRange.start;
+    const windowEnd = weekRange.end;
+    
+    console.log(`📅 Weekly range (Monday-Sunday): ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
     
     // MVP1: Filter for running activities only (case-insensitive)
     const weeklyActivities = await prisma.athleteActivity.findMany({
       where: {
         athleteId: athleteId,
         startTime: {
-          gte: sevenDaysAgo,
-          lte: now
+          gte: windowStart,
+          lte: windowEnd
         },
         // MVP1: Only show running activities (exclude wheelchair)
         AND: [
@@ -413,7 +419,7 @@ async function hydrateAthlete(req, res) {
       }
     });
     
-    console.log(`✅ Found ${weeklyActivities.length} running activities (last 7 days)`);
+    console.log(`✅ Found ${weeklyActivities.length} running activities (current week: Monday-Sunday)`);
     
     // Calculate weekly totals
     const weeklyTotals = {
