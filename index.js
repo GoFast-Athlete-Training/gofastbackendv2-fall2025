@@ -72,6 +72,8 @@ import companyRoadmapRouter from './routes/Company/companyRoadmapRoute.js';
 import companyCreateRouter from './routes/Company/companyCreateRoute.js';
 import staffCreateRouter from './routes/Company/staffCreateRoute.js';
 import staffHydrateRouter from './routes/Company/staffHydrateRoute.js';
+// F3 Workout routes (Hidden internal module)
+import f3WorkoutRouter from './routes/F3Workout/f3WorkoutRoute.js';
 
 dotenv.config();
 
@@ -211,6 +213,8 @@ app.use('/api/staff', staffHydrateRouter); // /hydrate (FIRST - most specific)
 app.use('/api/staff', staffCreateRouter); // /create
 // Messages routes (Group Wall Messaging)
 app.use('/api/messages', messagesRouter); // /:groupId (GET), / (POST)
+// F3 Workout routes (Hidden internal module)
+app.use('/api/f3workout', f3WorkoutRouter); // /, /:workoutId, /:workoutId/backblast
 
 // Health check
 app.get('/api/health', (req, res) => {
