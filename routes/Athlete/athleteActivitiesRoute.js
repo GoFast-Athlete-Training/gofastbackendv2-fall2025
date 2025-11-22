@@ -1,6 +1,6 @@
 import express from 'express';
 import { getPrismaClient } from '../../config/database.js';
-import { getCurrentWeek } from '../../utils/weekUtils.js';
+import { getCurrentWeek, getPreviousWeek, getCurrentMonth, getPreviousMonth } from '../../utils/weekUtils.js';
 
 const router = express.Router();
 
@@ -56,12 +56,14 @@ router.get('/activities', async (req, res) => {
   }
 });
 
-// GET /api/athlete/:athleteId/activities/weekly - Fetch weekly activities (last 7 days) by athleteId
+// GET /api/athlete/:athleteId/activities/weekly - Fetch weekly activities by athleteId
+// Query params: period = 'current' | 'previous' | 'month' | 'lastMonth' (default: 'current')
 router.get('/:athleteId/activities/weekly', async (req, res) => {
   try {
     const { athleteId } = req.params;
+    const { period = 'current' } = req.query;
     
-    console.log('🔍 Fetching weekly activities for athleteId:', athleteId);
+    console.log('🔍 Fetching activities for athleteId:', athleteId, 'period:', period);
     
     // Verify athlete exists
     const prisma = getPrismaClient();
@@ -78,14 +80,36 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
       });
     }
     
-    // Use Monday-Sunday week boundaries (not rolling 7 days)
-    const weekRange = getCurrentWeek();
-    const windowStart = weekRange.start;
-    const windowEnd = weekRange.end;
+    // Determine date range based on period
+    let dateRange;
+    let periodLabel;
     
-    console.log(`📅 Weekly range (Monday-Sunday): ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
+    switch (period) {
+      case 'previous':
+        dateRange = getPreviousWeek();
+        periodLabel = 'Last Week';
+        break;
+      case 'month':
+        dateRange = getCurrentMonth();
+        periodLabel = 'This Month';
+        break;
+      case 'lastMonth':
+        dateRange = getPreviousMonth();
+        periodLabel = 'Last Month';
+        break;
+      case 'current':
+      default:
+        dateRange = getCurrentWeek();
+        periodLabel = 'This Week';
+        break;
+    }
     
-    // Fetch ALL activities for this athlete from current week (for reference)
+    const windowStart = dateRange.start;
+    const windowEnd = dateRange.end;
+    
+    console.log(`📅 Date range (${periodLabel}): ${windowStart.toISOString()} to ${windowEnd.toISOString()}`);
+    
+    // Fetch ALL activities for this athlete from the selected period (for reference)
     const allActivities = await prisma.athleteActivity.findMany({
       where: {
         athleteId: athleteId,
@@ -126,8 +150,8 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
     // Convert distance from meters to miles
     weeklyTotals.totalDistanceMiles = (weeklyTotals.totalDistance / 1609.34).toFixed(2);
     
-    console.log(`✅ Found ${activities.length} running activities for athleteId ${athleteId} (current week: Monday-Sunday)`);
-    console.log(`📊 Weekly run totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
+    console.log(`✅ Found ${activities.length} running activities for athleteId ${athleteId} (${periodLabel})`);
+    console.log(`📊 Run totals: ${weeklyTotals.totalDistanceMiles} miles, ${weeklyTotals.totalDuration}s, ${weeklyTotals.totalCalories} cal`);
     
     res.json({
       success: true,
@@ -140,10 +164,12 @@ router.get('/:athleteId/activities/weekly', async (req, res) => {
       },
       activities: activities,
       weeklyTotals: weeklyTotals,
+      period: period,
+      periodLabel: periodLabel,
       dateRange: {
         start: windowStart.toISOString(),
         end: windowEnd.toISOString(),
-        label: weekRange.label
+        label: dateRange.label
       },
       count: activities.length
     });

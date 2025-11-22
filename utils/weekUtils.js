@@ -125,3 +125,62 @@ export function formatWeekRange(start, end) {
   return `${startStr} - ${endStr}`;
 }
 
+/**
+ * Get the start of the month (first day 00:00:00) for a given date
+ * @param {Date} date - The date to get the month start for (defaults to now)
+ * @returns {Date} First day of the month at 00:00:00
+ */
+export function getMonthStart(date = new Date()) {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * Get the end of the month (last day 23:59:59.999) for a given date
+ * @param {Date} date - The date to get the month end for (defaults to now)
+ * @returns {Date} Last day of the month at 23:59:59.999
+ */
+export function getMonthEnd(date = new Date()) {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(0); // Last day of previous month (which is the last day of current month)
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+/**
+ * Get the current month range
+ * @returns {{ start: Date, end: Date, label: string }}
+ */
+export function getCurrentMonth() {
+  const start = getMonthStart();
+  const end = getMonthEnd();
+  
+  return {
+    start,
+    end,
+    label: start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  };
+}
+
+/**
+ * Get the previous month range
+ * @returns {{ start: Date, end: Date, label: string }}
+ */
+export function getPreviousMonth() {
+  const now = new Date();
+  const lastMonth = new Date(now);
+  lastMonth.setMonth(lastMonth.getMonth() - 1);
+  
+  const start = getMonthStart(lastMonth);
+  const end = getMonthEnd(lastMonth);
+  
+  return {
+    start,
+    end,
+    label: start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  };
+}
+

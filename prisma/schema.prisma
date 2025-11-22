@@ -28,18 +28,18 @@ model Athlete {
 
   // RunCrew Integration (MVP1) - Junction table handles multiple crews per athlete
 
-  // Training Profile (Future)
-  currentPace       String?
-  weeklyMileage     Int?
-  trainingGoal      String?
-  targetRace        String?
-  trainingStartDate DateTime?
+  // Training Profile (Future) - Identity-level fields
+  myCurrentPace       String?
+  myWeeklyMileage     Int?
+  myTrainingGoal      String?
+  myTargetRace        String?
+  myTrainingStartDate DateTime?
 
-  // Match Profile (Future)
+  // Match Profile (Future) - Identity-level fields
   preferredDistance String?
   timePreference    String?
-  paceRange         String?
-  runningGoals      String?
+  myPaceRange         String?
+  myRunningGoals      String?
 
   // Garmin OAuth 2.0 PKCE Integration
   garmin_user_id       String?   @unique // Garmin's unique user ID
@@ -511,26 +511,47 @@ model Race {
 // TRAINING MODELS - MyTraining Container System
 // =====================================================
 
+model TrainingPhase {
+  id             String @id @default(cuid())
+  trainingPlanId String
+  phaseName      String          // "base", "build", "peak", "taper"
+  phaseIndex     Int             // 0,1,2,3
+  startWeek      Int
+  endWeek        Int
+  metadata       Json?
+
+  trainingPlan   TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  plannedDays    TrainingDayPlanned[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("training_phases")
+}
+
 model TrainingPlan {
   id        String @id @default(cuid())
   athleteId String
   raceId    String
 
-  // GOALS
-  goalTime              String // "1:45:00"
-  goalPace              String? // "8:00" per mile
-  baseline5k            String // "24:30"
-  baselineWeeklyMileage Int?
+  // PLAN IDENTITY
+  trainingPlanName String // Required plan name
 
-  // PLAN STRUCTURE (JSON arrays) - THE BLUEPRINT
-  startDate         DateTime
-  totalWeeks        Int
-  phaseOverview     Json? // { base: { weeks, startWeek, endWeek }, build: {...}, peak: {...}, taper: {...} }
-  weeklyMileagePlan Json? // [{ weekIndex, targetMileage, phase }]
-  weeks             Json? // [{ weekIndex, startDate, endDate, phase, targetMileage, workoutTypes, keyWorkouts }]
+  // CYCLE-LEVEL GOALS
+  trainingPlanGoalTime              String // "1:45:00"
+  trainingPlanGoalPace              String? // "8:00" per mile
+  trainingPlanBaseline5k            String // "24:30"
+  trainingPlanBaselineWeeklyMileage Int?
+
+  // PLAN STRUCTURE - Cycle-level metadata
+  trainingPlanStartDate         DateTime
+  trainingPlanTotalWeeks        Int
 
   // MONEY METRIC
-  adaptive5kTime String? // Only persistent predictive metric!
+  trainingPlanAdaptive5kTime String? // Only persistent predictive metric!
+
+  // STATUS
+  status String @default("draft") // draft, active, completed, archived
 
   // Timestamps
   createdAt DateTime @default(now())
@@ -539,6 +560,7 @@ model TrainingPlan {
   // Relations
   athlete     Athlete                 @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   race        Race                    @relation(fields: [raceId], references: [id], onDelete: Cascade)
+  phases      TrainingPhase[]
   plannedDays TrainingDayPlanned[]
   executions  TrainingPlanExecution[]
 
@@ -548,6 +570,7 @@ model TrainingPlan {
 model TrainingDayPlanned {
   id             String @id @default(cuid())
   trainingPlanId String
+  trainingPhaseId String?
   athleteId      String
 
   // Day Identification
@@ -568,6 +591,7 @@ model TrainingDayPlanned {
 
   // Relations
   trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  phase         TrainingPhase? @relation(fields: [trainingPhaseId], references: [id], onDelete: SetNull)
   athlete      Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@unique([trainingPlanId, weekIndex, dayIndex]) // One planned day per position in plan
