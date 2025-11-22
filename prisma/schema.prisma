@@ -38,8 +38,8 @@ model Athlete {
   // Match Profile (Future) - Identity-level fields
   preferredDistance String?
   timePreference    String?
-  myPaceRange         String?
-  myRunningGoals      String?
+  myPaceRange       String?
+  myRunningGoals    String?
 
   // Garmin OAuth 2.0 PKCE Integration
   garmin_user_id       String?   @unique // Garmin's unique user ID
@@ -84,9 +84,9 @@ model Athlete {
   runCrewEvents        RunCrewEvent[]        @relation("RunCrewEventOrganizer") // Events organized by this athlete
   runCrewEventRSVPs    RunCrewEventRSVP[]    @relation("RunCrewEventRSVP") // RSVPs to events by this athlete
   runCrewManagers      RunCrewManager[]      @relation("RunCrewManager") // Source of truth for admin/manager roles
-  
+
   // Handle Registry (future use)
-  handleRegistry       HandleRegistry?       @relation // Registry entry for gofastHandle
+  handleRegistry HandleRegistry? @relation // Registry entry for gofastHandle
 
   // Training Relations
   createdRaces  Race[]                @relation("RaceCreator") // Races this athlete created (optional)
@@ -95,7 +95,7 @@ model Athlete {
   executedDays  TrainingDayExecuted[]
 
   // Event Relations
-  events        Event[]               @relation("EventCreator") // Events created by this athlete
+  events Event[] @relation("EventCreator") // Events created by this athlete
 
   // Founder Relations
   founder Founder?
@@ -149,7 +149,7 @@ model AthleteActivity {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  athlete Athlete @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  athlete      Athlete       @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   eventResults EventResult[] @relation("EventResultParentActivity") // Event results that claim this activity (legacy - parent's activity)
 
   @@map("athlete_activities")
@@ -174,26 +174,26 @@ model RunCrew {
 
   // Relations
   // NOTE: Admin is now determined via RunCrewManager with role='admin'
-  memberships        RunCrewMembership[] // Junction table for members
-  messages           RunCrewMessage[] // Simple chat messages (real-time via socket)
-  announcements      RunCrewAnnouncement[] // Admin announcements
-  runs               RunCrewRun[] // Runs (MVP1: admin only)
-  events             RunCrewEvent[] // General events (future - happy hour, social, etc.)
-  managers           RunCrewManager[] // Source of truth for admin/manager roles
-  joinCodes          JoinCode[] // JoinCode registry (authoritative source for invites)
+  memberships   RunCrewMembership[] // Junction table for members
+  messages      RunCrewMessage[] // Simple chat messages (real-time via socket)
+  announcements RunCrewAnnouncement[] // Admin announcements
+  runs          RunCrewRun[] // Runs (MVP1: admin only)
+  events        RunCrewEvent[] // General events (future - happy hour, social, etc.)
+  managers      RunCrewManager[] // Source of truth for admin/manager roles
+  joinCodes     JoinCode[] // JoinCode registry (authoritative source for invites)
 
   @@map("run_crews")
 }
 
 // JoinCode Registry - Authoritative source for crew invites
 model JoinCode {
-  id         String   @id @default(cuid())
-  code       String   @unique
-  runCrewId  String
-  runCrew    RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  expiresAt  DateTime?
-  isActive   Boolean  @default(true)
+  id        String    @id @default(cuid())
+  code      String    @unique
+  runCrewId String
+  runCrew   RunCrew   @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  expiresAt DateTime?
+  isActive  Boolean   @default(true)
 
   @@map("join_codes")
 }
@@ -206,10 +206,10 @@ model HandleRegistry {
   athlete   Athlete  @relation(fields: [athleteId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   isActive  Boolean  @default(true)
-  
+
   // Future: Track handle changes, analytics, etc.
   lastUsedAt DateTime?
-  
+
   @@map("handle_registry")
 }
 
@@ -269,16 +269,16 @@ model RunCrewAnnouncement {
 
 // RunCrew Runs - MVP1
 model RunCrewRun {
-  id           String   @id @default(cuid())
-  runCrewId    String
-  createdById  String // Admin or manager who created the run (MVP1: admin only)
+  id          String @id @default(cuid())
+  runCrewId   String
+  createdById String // Admin or manager who created the run (MVP1: admin only)
 
   // Core presentation
-  title        String
-  runType      String   @default("single") // "single" | "recurring"
-  date         DateTime // Start date for single run or first occurrence
-  startTime    String   // "06:30 AM" – stored as human-readable string
-  timezone     String?  // IANA tz ("America/Chicago") for clarity
+  title     String
+  runType   String   @default("single") // "single" | "recurring"
+  date      DateTime // Start date for single run or first occurrence
+  startTime String // "06:30 AM" – stored as human-readable string
+  timezone  String? // IANA tz ("America/Chicago") for clarity
 
   // Meet-up logistics
   meetUpPoint   String
@@ -293,9 +293,9 @@ model RunCrewRun {
   recurrenceNote   String?
 
   // Run-specific fields
-  totalMiles   Float?   // Total miles for the run
-  pace         String?  // Target pace (e.g., "8:00-9:00 min/mile")
-  stravaMapUrl String?  // Strava map URL for route visualization
+  totalMiles   Float? // Total miles for the run
+  pace         String? // Target pace (e.g., "8:00-9:00 min/mile")
+  stravaMapUrl String? // Strava map URL for route visualization
 
   description String?
 
@@ -303,8 +303,8 @@ model RunCrewRun {
   updatedAt DateTime @updatedAt
 
   // Relations
-  runCrew   RunCrew  @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
-  createdBy Athlete  @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  runCrew   RunCrew          @relation(fields: [runCrewId], references: [id], onDelete: Cascade)
+  createdBy Athlete          @relation("RunCrewRunCreator", fields: [createdById], references: [id], onDelete: Cascade)
   rsvps     RunCrewRunRSVP[]
 
   @@map("run_crew_runs")
@@ -377,42 +377,42 @@ model RunCrewEventRSVP {
 // =====================================================
 
 model Event {
-  id          String   @id @default(cuid())
-  title       String   // "Boys Gotta Run – Discovery 5K (Final Run)"
+  id          String  @id @default(cuid())
+  title       String // "Boys Gotta Run – Discovery 5K (Final Run)"
   description String?
-  
+
   // Event Details
-  date        DateTime
-  startTime   String?  // "7:55 AM"
-  location    String?  // "Discovery Elementary"
-  address     String?  // "5275 N 36th St, Arlington, VA 22207"
-  
+  date      DateTime
+  startTime String? // "7:55 AM"
+  location  String? // "Discovery Elementary"
+  address   String? // "5275 N 36th St, Arlington, VA 22207"
+
   // Route Information
   stravaRouteUrl String? // Strava route URL (users just paste the URL)
   distance       String? // Distance (e.g., "5K", "3.1 miles", "10K")
-  
+
   // Athlete Relationship - Events are created by athletes
-  athleteId   String   // Links to Athlete.id (creator of the event)
-  
+  athleteId String // Links to Athlete.id (creator of the event)
+
   // Future State: Registration
-  registrantId   String? // Future: Links to athleteId for main UX registration (optional)
-  
+  registrantId String? // Future: Links to athleteId for main UX registration (optional)
+
   // Metadata
-  eventType   String?  // "race", "community-run", "training", etc.
-  isActive    Boolean  @default(true)
-  
+  eventType String? // "race", "community-run", "training", etc.
+  isActive  Boolean @default(true)
+
   // System
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  athlete     Athlete  @relation("EventCreator", fields: [athleteId], references: [id], onDelete: Cascade)
-  volunteers  EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
+  athlete       Athlete             @relation("EventCreator", fields: [athleteId], references: [id], onDelete: Cascade)
+  volunteers    EventVolunteer[] // Volunteers linked via eventId (EventVolunteer.eventId)
   registrations EventRegistration[] @relation("EventRegistrations") // Race participants
-  
-  @@map("events")
+
   @@index([athleteId])
   @@index([athleteId, title, date]) // For upsert lookup
+  @@map("events")
 }
 
 // =====================================================
@@ -421,10 +421,10 @@ model Event {
 
 model EventVolunteer {
   id        String   @id @default(cuid())
-  eventId   String   // Links to Event.id (primary identifier)
+  eventId   String // Links to Event.id (primary identifier)
   name      String
   email     String
-  phone     String?  // Optional phone number for group text communication
+  phone     String? // Optional phone number for group text communication
   role      String
   notes     String?
   createdAt DateTime @default(now())
@@ -432,8 +432,8 @@ model EventVolunteer {
   // Relations
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@map("event_volunteers")
   @@index([eventId])
+  @@map("event_volunteers")
 }
 
 // =====================================================
@@ -442,19 +442,19 @@ model EventVolunteer {
 
 model EventRegistration {
   id        String   @id @default(cuid())
-  eventId   String   // Links to Event.id (primary identifier)
+  eventId   String // Links to Event.id (primary identifier)
   name      String
   email     String
-  phone     String?  // Optional phone number for communication
-  notes     String?  // Optional notes (e.g., emergency contact, t-shirt size, etc.)
+  phone     String? // Optional phone number for communication
+  notes     String? // Optional notes (e.g., emergency contact, t-shirt size, etc.)
   createdAt DateTime @default(now())
 
   // Relations
   event Event @relation("EventRegistrations", fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@map("event_registrations")
-  @@index([eventId])
   @@unique([eventId, email]) // One registration per email per event
+  @@index([eventId])
+  @@map("event_registrations")
 }
 
 // RunCrew Managers - Future (Delegated managers)
@@ -514,17 +514,17 @@ model Race {
 model TrainingPhase {
   id             String @id @default(cuid())
   trainingPlanId String
-  phaseName      String          // "base", "build", "peak", "taper"
-  phaseIndex     Int             // 0,1,2,3
+  phaseName      String // "base", "build", "peak", "taper"
+  phaseIndex     Int // 0,1,2,3
   startWeek      Int
   endWeek        Int
   metadata       Json?
 
-  trainingPlan   TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
-  plannedDays    TrainingDayPlanned[]
+  trainingPlan TrainingPlan         @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  plannedDays  TrainingDayPlanned[]
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("training_phases")
 }
@@ -544,8 +544,8 @@ model TrainingPlan {
   trainingPlanBaselineWeeklyMileage Int?
 
   // PLAN STRUCTURE - Cycle-level metadata
-  trainingPlanStartDate         DateTime
-  trainingPlanTotalWeeks        Int
+  trainingPlanStartDate  DateTime
+  trainingPlanTotalWeeks Int
 
   // MONEY METRIC
   trainingPlanAdaptive5kTime String? // Only persistent predictive metric!
@@ -568,10 +568,10 @@ model TrainingPlan {
 }
 
 model TrainingDayPlanned {
-  id             String @id @default(cuid())
-  trainingPlanId String
+  id              String  @id @default(cuid())
+  trainingPlanId  String
   trainingPhaseId String?
-  athleteId      String
+  athleteId       String
 
   // Day Identification
   date      DateTime
@@ -590,9 +590,9 @@ model TrainingDayPlanned {
   updatedAt DateTime @updatedAt
 
   // Relations
-  trainingPlan TrainingPlan @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
-  phase         TrainingPhase? @relation(fields: [trainingPhaseId], references: [id], onDelete: SetNull)
-  athlete      Athlete      @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+  trainingPlan  TrainingPlan   @relation(fields: [trainingPlanId], references: [id], onDelete: Cascade)
+  trainingPhase TrainingPhase? @relation(fields: [trainingPhaseId], references: [id], onDelete: SetNull)
+  athlete       Athlete        @relation(fields: [athleteId], references: [id], onDelete: Cascade)
 
   @@unique([trainingPlanId, weekIndex, dayIndex]) // One planned day per position in plan
   @@map("training_days_planned")
@@ -819,13 +819,13 @@ model CompanyEmployee {
 }
 
 model CompanyRoadmapItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   companyId String? // Legacy Company relation (nullable - using GoFastCompany instead)
 
   // Item Classification
-  itemType         String  @default("Dev Work") // "Dev Work" or "Product Milestone"
-  primaryRepo      String? // Primary repository (e.g., "mvp1", "eventslanding", "companystack")
-  category         String  @default("Core Feature") // "Core Feature", "Frontend Demo", "API Integration", "Backend Scaffolding"
+  itemType    String  @default("Dev Work") // "Dev Work" or "Product Milestone"
+  primaryRepo String? // Primary repository (e.g., "mvp1", "eventslanding", "companystack")
+  category    String  @default("Core Feature") // "Core Feature", "Frontend Demo", "API Integration", "Backend Scaffolding"
 
   // Core Details
   title      String
@@ -1020,7 +1020,7 @@ model Message {
 // =====================================================
 
 model GoFastCompany {
-  id          String @id @default(cuid()) // Single tenant - hardcoded ID in config (cmhpqe7kl0000nw1uvcfhf2hs)
+  id String @id @default(cuid()) // Single tenant - hardcoded ID in config (cmhpqe7kl0000nw1uvcfhf2hs)
 
   // Company Details (Upserted by any authenticated staff)
   companyName String // "GoFast Inc"
@@ -1143,20 +1143,20 @@ model Parent {
   firebaseId String @unique // Firebase auth ID
 
   // Universal Profile
-  firstName    String?
-  lastName     String?
-  email        String    @unique
-  phoneNumber  String?
-  photoURL     String?
+  firstName   String?
+  lastName    String?
+  email       String  @unique
+  phoneNumber String?
+  photoURL    String?
 
   // Garmin OAuth 2.0 PKCE Integration (for claiming parent's activities as race results)
-  garmin_user_id       String?   @unique // Garmin's unique user ID
-  garmin_access_token  String?
-  garmin_refresh_token String?
-  garmin_expires_in    Int?
-  garmin_scope         String?
-  garmin_connected_at  DateTime?
-  garmin_last_sync_at  DateTime?
+  garmin_user_id         String?   @unique // Garmin's unique user ID
+  garmin_access_token    String?
+  garmin_refresh_token   String?
+  garmin_expires_in      Int?
+  garmin_scope           String?
+  garmin_connected_at    DateTime?
+  garmin_last_sync_at    DateTime?
   garmin_permissions     Json?
   garmin_is_connected    Boolean   @default(false)
   garmin_disconnected_at DateTime?
@@ -1176,30 +1176,30 @@ model Parent {
 // =====================================================
 
 model YoungAthlete {
-  id             String   @id @default(cuid())
-  parentId       String   // Parent ID (NOT athleteId)
-  eventCode      String   // Event identifier
-  firstName      String
-  lastName       String
-  grade          String?
-  school         String?
-  profilePicUrl  String?
-  createdAt      DateTime @default(now())
+  id            String   @id @default(cuid())
+  parentId      String // Parent ID (NOT athleteId)
+  eventCode     String // Event identifier
+  firstName     String
+  lastName      String
+  grade         String?
+  school        String?
+  profilePicUrl String?
+  createdAt     DateTime @default(now())
 
   // Garmin OAuth 2.0 PKCE Integration (separate Garmin app for young athletes)
-  garmin_user_id       String?   @unique // Garmin's unique user ID for young athlete
-  garmin_access_token  String?
-  garmin_refresh_token String?
-  garmin_expires_in    Int?
-  garmin_scope         String?
-  garmin_connected_at  DateTime?
-  garmin_last_sync_at  DateTime?
+  garmin_user_id         String?   @unique // Garmin's unique user ID for young athlete
+  garmin_access_token    String?
+  garmin_refresh_token   String?
+  garmin_expires_in      Int?
+  garmin_scope           String?
+  garmin_connected_at    DateTime?
+  garmin_last_sync_at    DateTime?
   garmin_permissions     Json?
   garmin_is_connected    Boolean   @default(false)
   garmin_disconnected_at DateTime?
 
   // Relations
-  parent     Parent                @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  parent     Parent                 @relation(fields: [parentId], references: [id], onDelete: Cascade)
   goals      EventGoal[]
   results    EventResult[]
   activities YoungAthleteActivity[] // Young athlete's own Garmin activities
@@ -1210,14 +1210,14 @@ model YoungAthlete {
 }
 
 model EventGoal {
-  id              String   @id @default(cuid())
-  youngAthleteId  String
-  eventCode       String
-  targetDistance  String?
-  targetPace      String?
-  motivation      String?
-  feeling         String?
-  createdAt       DateTime @default(now())
+  id             String   @id @default(cuid())
+  youngAthleteId String
+  eventCode      String
+  targetDistance String?
+  targetPace     String?
+  motivation     String?
+  feeling        String?
+  createdAt      DateTime @default(now())
 
   // Relations
   youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
@@ -1228,18 +1228,18 @@ model EventGoal {
 }
 
 model EventResult {
-  id                String   @id @default(cuid())
-  eventCode         String
-  youngAthleteId    String
-  parentId          String?  // Parent who claimed this (optional - for legacy parent Garmin activities)
-  activityId        String?  // Links to YoungAthleteActivity.id (primary - young athlete's own activity)
-  parentActivityId  String?  // Links to AthleteActivity.id (legacy - parent's Garmin activity claimed as result)
-  createdAt         DateTime @default(now())
+  id               String   @id @default(cuid())
+  eventCode        String
+  youngAthleteId   String
+  parentId         String? // Parent who claimed this (optional - for legacy parent Garmin activities)
+  activityId       String? // Links to YoungAthleteActivity.id (primary - young athlete's own activity)
+  parentActivityId String? // Links to AthleteActivity.id (legacy - parent's Garmin activity claimed as result)
+  createdAt        DateTime @default(now())
 
   // Relations
-  youngAthlete YoungAthlete         @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
-  activity     YoungAthleteActivity? @relation("EventResultYoungAthleteActivity", fields: [activityId], references: [id], onDelete: Cascade)
-  parentActivity AthleteActivity?    @relation("EventResultParentActivity", fields: [parentActivityId], references: [id], onDelete: Cascade)
+  youngAthlete   YoungAthlete          @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  activity       YoungAthleteActivity? @relation("EventResultYoungAthleteActivity", fields: [activityId], references: [id], onDelete: Cascade)
+  parentActivity AthleteActivity?      @relation("EventResultParentActivity", fields: [parentActivityId], references: [id], onDelete: Cascade)
 
   @@unique([youngAthleteId, eventCode]) // One result per young athlete per event
   @@index([eventCode])
@@ -1253,7 +1253,7 @@ model EventResult {
 // =====================================================
 
 model YoungAthleteActivity {
-  id              String @id @default(cuid())
+  id             String @id @default(cuid())
   youngAthleteId String
 
   // Source Information
@@ -1298,7 +1298,7 @@ model YoungAthleteActivity {
   updatedAt     DateTime @updatedAt
 
   // Relations
-  youngAthlete YoungAthlete @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
+  youngAthlete YoungAthlete  @relation(fields: [youngAthleteId], references: [id], onDelete: Cascade)
   eventResults EventResult[] @relation("EventResultYoungAthleteActivity") // Event results that claim this activity
 
   @@index([youngAthleteId])
@@ -1326,9 +1326,9 @@ model Workout {
 
 model WarmUp {
   warmupId  String       @id @default(cuid())
-  workout  Workout      @relation(fields: [workoutId], references: [workoutId], onDelete: Cascade)
+  workout   Workout      @relation(fields: [workoutId], references: [workoutId], onDelete: Cascade)
   workoutId String       @unique
-  moves    WarmUpMove[]
+  moves     WarmUpMove[]
 
   @@map("warm_ups")
 }
